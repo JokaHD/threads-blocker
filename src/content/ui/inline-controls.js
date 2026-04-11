@@ -75,15 +75,16 @@ export class InlineControls {
     button.addEventListener('click', () => this._handleBlockClick(button, username, element));
 
     // ── Container ─────────────────────────────────────────────────────────────
-    const wrapper = document.createElement('span');
+    const wrapper = document.createElement('div');
     wrapper.className = 'tb-inline-controls';
     wrapper.setAttribute('role', 'group');
     wrapper.setAttribute('aria-label', `封鎖工具 @${username}`);
     wrapper.appendChild(checkbox);
     wrapper.appendChild(button);
 
-    // Insert after the link element
-    linkElement.insertAdjacentElement('afterend', wrapper);
+    // Attach to comment container, positioned in the right margin area
+    element.style.position = 'relative';
+    element.appendChild(wrapper);
   }
 
   /**
