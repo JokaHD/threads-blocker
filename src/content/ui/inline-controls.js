@@ -99,9 +99,22 @@ export class InlineControls {
       }
     });
 
-    // Insert below the avatar link
-    avatarLink.after(blockIcon);
-    blockIcon.after(checkbox);
+    // Find the best link to attach below (prefer avatar = square-ish link).
+    // Use requestAnimationFrame to ensure layout is computed.
+    requestAnimationFrame(() => {
+      let targetLink = avatarLink;
+      // Check all /@username links in the container; pick the square one
+      const allLinks = element.querySelectorAll(`a[href="/@${username}"]`);
+      for (const link of allLinks) {
+        const r = link.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0 && Math.abs(r.width - r.height) < 15 && r.width <= 80) {
+          targetLink = link;
+          break;
+        }
+      }
+      targetLink.after(blockIcon);
+      blockIcon.after(checkbox);
+    });
   }
 
   updateState(username, state) {
