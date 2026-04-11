@@ -1,5 +1,5 @@
-const SIZE = 14;
-const STROKE = 1.5;
+const SIZE = 18;
+const STROKE = 2;
 const attrs = `width="${SIZE}" height="${SIZE}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${STROKE}" stroke-linecap="round" stroke-linejoin="round"`;
 
 export const Icons = {

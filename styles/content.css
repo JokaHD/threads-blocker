@@ -42,19 +42,22 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  margin-left: 4px;
-  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  margin-left: 6px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all var(--tb-transition);
-  opacity: 0.4;
+  opacity: 0.5;
   color: #999;
   vertical-align: middle;
+  border: 1px solid transparent;
 }
 
 .tb-avatar-block-icon:hover {
   opacity: 1;
+  background: rgba(220, 38, 38, 0.1);
+  border-color: rgba(220, 38, 38, 0.3);
 }
 
 .tb-avatar-block-icon:focus-visible {
