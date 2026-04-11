@@ -10,6 +10,12 @@
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch"
   },
+  "jest": {
+    "testEnvironment": "node",
+    "transform": {},
+    "setupFiles": ["./tests/jest-setup.js"],
+    "testMatch": ["**/tests/unit/**/*.test.js"]
+  },
   "devDependencies": {
     "esbuild": "^0.21.0",
     "jest": "^29.7.0",
