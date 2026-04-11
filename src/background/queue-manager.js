@@ -61,7 +61,7 @@ export class QueueManager {
       if (item.state === BlockState.QUEUED) {
         item.state = BlockState.BLOCKING;
         this._notify();
-        return item;
+        return { userId: item.userId, username: item.username, action: 'block' };
       }
     }
 
@@ -70,7 +70,7 @@ export class QueueManager {
       if (item.state === BlockState.UNBLOCKING && !item._unblockInFlight) {
         item._unblockInFlight = true;
         this._notify();
-        return item;
+        return { userId: item.userId, username: item.username, action: 'unblock' };
       }
     }
 

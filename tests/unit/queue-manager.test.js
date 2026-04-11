@@ -81,6 +81,7 @@ describe('getNextTask', () => {
     const task = qm.getNextTask();
     expect(task).toBeDefined();
     expect(task.userId).toBe('1');
+    expect(task.action).toBe('block');
     expect(qm.getItem('1').state).toBe(BlockState.BLOCKING);
   });
 
@@ -102,7 +103,7 @@ describe('getNextTask', () => {
     // Now getNextTask should pick up UNBLOCKING
     const task = qm.getNextTask();
     expect(task).toBeDefined();
-    expect(task.state).toBe(BlockState.UNBLOCKING);
+    expect(task.action).toBe('unblock');
     // Guard flag set
     expect(qm.getItem('1')._unblockInFlight).toBe(true);
     // Second call should skip it (in-flight)

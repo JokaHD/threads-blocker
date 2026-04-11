@@ -20,10 +20,18 @@ let executorTabId = null;
 
 // ── Queue persistence & notification ─────────────────────────────────────────
 
+function buildStatus() {
+  return {
+    ...queue.getQueueStatus(),
+    paused: queue.isPaused(),
+    cooldownEnd: rateLimitHandler.isInCooldown() ? rateLimitHandler.getCooldownEnd() : null,
+  };
+}
+
 queue.onChange(async (items) => {
   await saveQueue(items);
   // Notify content scripts via storage (chrome.runtime.sendMessage doesn't reach them)
-  await chrome.storage.local.set({ queueNotify: { ts: Date.now(), items } });
+  await chrome.storage.local.set({ queueNotify: { ts: Date.now(), items, status: buildStatus() } });
 });
 
 // ── Initialisation ────────────────────────────────────────────────────────────
@@ -60,7 +68,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handleMessage(message, sender) {
-  const { type, payload } = message;
+  const { type } = message;
 
   switch (type) {
     case MessageType.REGISTER_EXECUTOR: {
@@ -69,12 +77,14 @@ async function handleMessage(message, sender) {
     }
 
     case MessageType.ENQUEUE_BLOCK: {
-      queue.enqueue(payload);
+      const { userId, username } = message;
+      queue.enqueue({ userId, username });
       return { ok: true };
     }
 
     case MessageType.ENQUEUE_BLOCK_BATCH: {
-      queue.enqueueBatch(payload);
+      const { entries } = message;
+      queue.enqueueBatch(entries);
       return { ok: true };
     }
 
@@ -87,7 +97,7 @@ async function handleMessage(message, sender) {
     }
 
     case MessageType.TASK_RESULT: {
-      const { userId, success, error: errPayload, retryCount } = payload;
+      const { userId, success, error: errPayload, retryCount } = message;
 
       if (success) {
         const item = queue.getItem(userId);
@@ -134,17 +144,17 @@ async function handleMessage(message, sender) {
     }
 
     case MessageType.CANCEL_QUEUED: {
-      queue.cancel(payload.userId);
+      queue.cancel(message.userId);
       return { ok: true };
     }
 
     case MessageType.REQUEST_UNBLOCK: {
-      queue.requestUnblock(payload.userId);
+      queue.requestUnblock(message.userId);
       return { ok: true };
     }
 
     case MessageType.RETRY_FAILED: {
-      queue.retry(payload.userId);
+      queue.retry(message.userId);
       return { ok: true };
     }
 
@@ -154,21 +164,21 @@ async function handleMessage(message, sender) {
     }
 
     case MessageType.RESUME_QUEUE: {
-      queue.resume();
       if (rateLimitHandler.isInCooldown()) {
         rateLimitHandler.clearCooldown();
         await clearCooldown();
-        await chrome.storage.local.set({ queueNotify: { ts: Date.now(), items: queue.getAll() } });
       }
+      queue.resume();
+      await chrome.storage.local.set({ queueNotify: { ts: Date.now(), items: queue.getAll(), status: buildStatus() } });
       return { ok: true };
     }
 
     case MessageType.GET_ALL_STATES: {
-      return { states: queue.getAll() };
+      return { items: queue.getAll() };
     }
 
     case MessageType.GET_QUEUE_STATUS: {
-      return { status: queue.getQueueStatus() };
+      return { status: buildStatus() };
     }
 
     default:
@@ -183,6 +193,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     rateLimitHandler.clearCooldown();
     await clearCooldown();
     queue.resume();
-    await chrome.storage.local.set({ queueNotify: { ts: Date.now(), items: queue.getAll() } });
+    await chrome.storage.local.set({ queueNotify: { ts: Date.now(), items: queue.getAll(), status: buildStatus() } });
   }
 });

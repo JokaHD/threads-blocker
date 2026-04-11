@@ -18,6 +18,8 @@ export class Toolbar {
   init() {
     const toolbar = document.createElement('div');
     toolbar.className = 'tb-toolbar';
+    toolbar.setAttribute('role', 'toolbar');
+    toolbar.setAttribute('aria-label', '批量封鎖工具列');
 
     const count = document.createElement('span');
     count.className = 'tb-toolbar-count';

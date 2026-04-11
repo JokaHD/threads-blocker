@@ -20,6 +20,8 @@ export class Panel {
   init() {
     const panel = document.createElement('div');
     panel.className = 'tb-panel';
+    panel.setAttribute('role', 'region');
+    panel.setAttribute('aria-label', '封鎖進度');
 
     // ── Minimized badge ───────────────────────────────────────────────────────
     const badge = document.createElement('button');
@@ -55,6 +57,8 @@ export class Panel {
     // ── Item list ─────────────────────────────────────────────────────────────
     const body = document.createElement('div');
     body.className = 'tb-panel-body';
+    body.setAttribute('aria-live', 'polite');
+    body.setAttribute('aria-relevant', 'additions removals');
 
     // ── Pause/resume button ───────────────────────────────────────────────────
     const pauseBtn = document.createElement('button');
@@ -139,9 +143,9 @@ export class Panel {
 
     this._cooldownEnd = timestamp;
 
-    // Create button once
+    // Create cooldown display once
     if (!this._cooldownBtn) {
-      const btn = document.createElement('button');
+      const btn = document.createElement('div');
       btn.className = 'tb-panel-cooldown-btn';
 
       const label = document.createElement('span');
@@ -152,13 +156,23 @@ export class Panel {
 
       btn.appendChild(label);
       btn.appendChild(timeSpan);
+
+      const retryNowBtn = document.createElement('button');
+      retryNowBtn.className = 'tb-panel-cooldown-retry-btn';
+      retryNowBtn.textContent = '立即重試';
+      retryNowBtn.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ type: MessageType.RESUME_QUEUE });
+      });
       this._cooldownArea.appendChild(btn);
+      this._cooldownArea.appendChild(retryNowBtn);
 
       this._cooldownBtn = btn;
       this._cooldownTimeSpan = timeSpan;
+      this._retryNowBtn = retryNowBtn;
     }
 
     this._cooldownBtn.style.display = '';
+    if (this._retryNowBtn) this._retryNowBtn.style.display = '';
 
     const tick = () => {
       const remaining = Math.max(0, this._cooldownEnd - Date.now());
@@ -172,6 +186,9 @@ export class Panel {
         this._cooldownInterval = null;
         if (this._cooldownBtn) {
           this._cooldownBtn.style.display = 'none';
+        }
+        if (this._retryNowBtn) {
+          this._retryNowBtn.style.display = 'none';
         }
       }
     };
@@ -262,7 +279,7 @@ export class Panel {
       cancelBtn.innerHTML = Icons.x;
       cancelBtn.title = '取消';
       cancelBtn.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ type: MessageType.CANCEL_QUEUED, username: item.username });
+        chrome.runtime.sendMessage({ type: MessageType.CANCEL_QUEUED, userId: item.userId });
       });
       row.appendChild(cancelBtn);
     } else if (item.state === BlockState.FAILED) {
@@ -271,7 +288,7 @@ export class Panel {
       retryBtn.innerHTML = Icons.refreshCw;
       retryBtn.title = '重試';
       retryBtn.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ type: MessageType.RETRY_FAILED, username: item.username });
+        chrome.runtime.sendMessage({ type: MessageType.RETRY_FAILED, userId: item.userId });
       });
       row.appendChild(retryBtn);
     }

@@ -127,34 +127,34 @@
 }
 
 /* State: idle */
-.tb-block-btn.tb-state-idle {
+.tb-block-btn.tb-block-btn--idle {
   background: #F1F5F9;
   color: #475569;
   border-color: var(--tb-border);
 }
 
-.tb-block-btn.tb-state-idle:not(:disabled):hover {
+.tb-block-btn.tb-block-btn--idle:not(:disabled):hover {
   background: #FEE2E2;
   color: var(--tb-danger);
   border-color: #FECACA;
 }
 
 /* State: queued */
-.tb-block-btn.tb-state-queued {
+.tb-block-btn.tb-block-btn--queued {
   background: #FEF3C7;
   color: #92400E;
   border-color: #FDE68A;
 }
 
 /* State: blocking */
-.tb-block-btn.tb-state-blocking {
+.tb-block-btn.tb-block-btn--blocking {
   background: #FEE2E2;
   color: var(--tb-danger);
   border-color: #FECACA;
 }
 
 /* State: blocked */
-.tb-block-btn.tb-state-blocked {
+.tb-block-btn.tb-block-btn--blocked {
   background: #DCFCE7;
   color: var(--tb-success);
   border-color: #BBF7D0;
@@ -162,21 +162,21 @@
 }
 
 /* State: confirm_unblock */
-.tb-block-btn.tb-state-confirm_unblock {
+.tb-block-btn.tb-block-btn--confirm-unblock {
   background: #FFF7ED;
   color: #EA580C;
   border-color: #FDBA74;
 }
 
 /* State: unblocking */
-.tb-block-btn.tb-state-unblocking {
+.tb-block-btn.tb-block-btn--unblocking {
   background: #F1F5F9;
   color: #64748B;
   border-color: var(--tb-border);
 }
 
 /* State: failed */
-.tb-block-btn.tb-state-failed {
+.tb-block-btn.tb-block-btn--failed {
   background: #fff;
   color: var(--tb-danger);
   border-color: var(--tb-danger);
@@ -191,7 +191,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tb-block-btn.tb-state-blocked {
+  .tb-block-btn.tb-block-btn--blocked {
     animation: none;
   }
 }
@@ -425,24 +425,69 @@
 }
 
 /* Item Status Colors */
-.tb-status-queued {
+.tb-panel-item-status--queued {
   background: #FEF3C7;
   color: #92400E;
 }
 
-.tb-status-blocking {
+.tb-panel-item-status--blocking {
   background: #FEE2E2;
   color: var(--tb-danger);
 }
 
-.tb-status-blocked {
+.tb-panel-item-status--blocked {
   background: #DCFCE7;
   color: var(--tb-success);
 }
 
-.tb-status-failed {
+.tb-panel-item-status--unblocking {
+  background: #F1F5F9;
+  color: #64748B;
+}
+
+.tb-panel-item-status--failed {
   background: #FEE2E2;
   color: var(--tb-danger);
+}
+
+/* Cooldown Retry Button */
+.tb-panel-cooldown-retry-btn {
+  width: 100%;
+  padding: 6px 12px;
+  background: #F59E0B;
+  color: #fff;
+  border: none;
+  border-radius: var(--tb-radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background var(--tb-transition);
+}
+
+.tb-panel-cooldown-retry-btn:hover:not(:disabled) {
+  background: #D97706;
+}
+
+.tb-panel-cooldown-retry-btn:focus-visible {
+  outline: 2px solid var(--tb-primary);
+  outline-offset: 2px;
+}
+
+/* Cooldown Area */
+.tb-panel-cooldown-area {
+  padding: 8px 12px;
+  background: #FFF7ED;
+  border-top: 1px solid #FDE68A;
+  flex-shrink: 0;
+}
+
+.tb-panel-cooldown-btn {
+  font-size: 12px;
+  color: #92400E;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Pause Button */
