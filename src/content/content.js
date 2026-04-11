@@ -4,6 +4,7 @@ import { TokenProvider } from './token-provider.js';
 import { APIExecutor } from './api-executor.js';
 import { SelectionManager } from './selection-manager.js';
 import { InlineControls } from './ui/inline-controls.js';
+import { Sidebar } from './ui/sidebar.js';
 import { Toolbar } from './ui/toolbar.js';
 import { Panel } from './ui/panel.js';
 import { MessageType } from '../shared/messages.js';
@@ -16,6 +17,7 @@ const idResolver = new IDResolver();
 const tokenProvider = new TokenProvider();
 const selectionManager = new SelectionManager();
 const inlineControls = new InlineControls(selectionManager, idResolver);
+const sidebar = new Sidebar(selectionManager, idResolver);
 const toolbar = new Toolbar(selectionManager, idResolver);
 const panel = new Panel();
 
@@ -40,7 +42,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (!items) return;
 
   for (const item of items) {
-    inlineControls.updateState(item.username, item.state);
+    sidebar.updateState(item.username, item.state);
   }
   panel.update(items, status);
 
@@ -53,43 +55,37 @@ chrome.storage.onChanged.addListener((changes, area) => {
   activeTaskCount = (status.queued || 0) + (status.blocking || 0) + (status.unblocking || 0);
 });
 
-// Process existing comments
+// Process comments
+function processComment(comment) {
+  inlineControls.inject(comment);         // checkbox inline next to username
+  sidebar.addUser(comment.username, comment.element);  // block button in sidebar
+  selectionManager.recordSeen(comment.username);
+}
+
+// Process existing comments on page
 function processExistingComments() {
   const comments = domObserver.findComments(document.body);
   console.log('[ThreadBlocker] Found', comments.length, 'comments on page');
-  if (comments.length === 0) {
-    // Debug: dump ALL links with /@ in href
-    const allLinks = document.querySelectorAll('a[href*="/@"]');
-    console.log('[ThreadBlocker] Debug: found', allLinks.length, 'links with /@ in href');
-    allLinks.forEach((l, i) => {
-      if (i < 15) console.log('[ThreadBlocker] Debug link:', l.getAttribute('href'), '| text:', l.textContent?.substring(0, 30));
-    });
-    // Also check for any profile-like links
-    const profileLinks = document.querySelectorAll('a[href^="/@"]');
-    console.log('[ThreadBlocker] Debug: found', profileLinks.length, 'links starting with /@');
-    profileLinks.forEach((l, i) => {
-      if (i < 15) console.log('[ThreadBlocker] Profile link:', l.getAttribute('href'), '| text:', l.textContent?.substring(0, 30));
-    });
-  }
   for (const comment of comments) {
-    inlineControls.inject(comment);
-    selectionManager.recordSeen(comment.username);
+    processComment(comment);
   }
 }
 
-// Watch for new comments
+// Watch for new comments (virtual scroll / dynamic load)
 domObserver.startObserving(document.body, (newComments) => {
   console.log('[ThreadBlocker] MutationObserver found', newComments.length, 'new comments');
-  newComments.forEach((c, i) => {
-    if (i < 5) console.log('[ThreadBlocker]   comment:', c.username, '| link href:', c.linkElement?.getAttribute('href'));
-  });
   for (const comment of newComments) {
-    inlineControls.inject(comment);
-    selectionManager.recordSeen(comment.username);
+    processComment(comment);
   }
 });
 
+// Keep sidebar checkboxes in sync with selection
+selectionManager.onChange(() => {
+  sidebar.updateCheckboxes();
+});
+
 // Initialize UI
+sidebar.init();
 toolbar.init();
 panel.init();
 
@@ -99,12 +95,12 @@ if (document.readyState === 'loading') {
   processExistingComments();
 }
 
-// Fetch initial states
+// Fetch initial states from Service Worker
 (async () => {
   const response = await chrome.runtime.sendMessage({ type: MessageType.GET_ALL_STATES });
   if (response?.items) {
     for (const item of response.items) {
-      inlineControls.updateState(item.username, item.state);
+      sidebar.updateState(item.username, item.state);
     }
   }
   const statusResponse = await chrome.runtime.sendMessage({ type: MessageType.GET_QUEUE_STATUS });
@@ -113,7 +109,7 @@ if (document.readyState === 'loading') {
   }
 })();
 
-// beforeunload warning
+// beforeunload warning (best-effort)
 window.addEventListener('beforeunload', (e) => {
   if (activeTaskCount > 0) {
     e.preventDefault();

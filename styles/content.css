@@ -40,15 +40,176 @@
 /* ============================================================
    Inline Controls
    ============================================================ */
-.tb-inline-controls {
-  position: absolute;
-  right: -120px;
-  top: 8px;
+/* Inline checkbox only — sits right after username link */
+.tb-checkbox-inline {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+/* ============================================================
+   Right Sidebar
+   ============================================================ */
+.tb-sidebar {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  width: 200px;
+  max-height: calc(100vh - 100px);
+  background: #fff;
+  border: 1px solid var(--tb-border);
+  border-radius: var(--tb-radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 9999;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  color: var(--tb-text);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tb-sidebar-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--tb-border);
+  background: var(--tb-surface);
+  flex-shrink: 0;
+}
+
+.tb-sidebar-title {
+  font-weight: 600;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tb-sidebar-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  color: #64748B;
+  display: flex;
+}
+.tb-sidebar-toggle:hover {
+  background: var(--tb-border);
+  color: var(--tb-text);
+}
+
+.tb-sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.tb-sidebar.tb-sidebar-minimized .tb-sidebar-body {
+  display: none;
+}
+
+.tb-sidebar-list {
+  padding: 4px 0;
+}
+
+.tb-sidebar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
   gap: 6px;
+  transition: background var(--tb-transition);
+}
+
+.tb-sidebar-row:hover {
+  background: var(--tb-surface);
+}
+
+.tb-sidebar-row-selected {
+  background: var(--tb-selection-bg) !important;
+}
+
+.tb-sidebar-username {
+  flex: 1;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  z-index: 9999;
+  cursor: pointer;
+  color: #64748B;
+}
+.tb-sidebar-username:hover {
+  color: var(--tb-primary);
+  text-decoration: underline;
+}
+
+/* Sidebar block buttons — compact icon-only */
+.tb-sidebar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--tb-transition);
+  background: none;
+  padding: 0;
+}
+
+.tb-sidebar-btn:focus-visible {
+  outline: 2px solid var(--tb-primary);
+  outline-offset: 1px;
+}
+
+.tb-sbtn-idle {
+  color: #94A3B8;
+  border-color: var(--tb-border);
+}
+.tb-sbtn-idle:hover {
+  color: var(--tb-danger);
+  border-color: var(--tb-danger);
+  background: #FEF2F2;
+}
+
+.tb-sbtn-queued {
+  color: var(--tb-warning);
+  border-color: var(--tb-warning);
+  background: #FFFBEB;
+}
+.tb-sbtn-queued:hover {
+  background: #FEF3C7;
+}
+
+.tb-sbtn-blocking {
+  color: var(--tb-danger);
+  cursor: default;
+}
+
+.tb-sbtn-blocked {
+  color: var(--tb-success);
+  border-color: var(--tb-success);
+  background: #F0FDF4;
+}
+.tb-sbtn-blocked:hover {
+  background: #DCFCE7;
+}
+
+.tb-sbtn-confirm {
+  color: #EA580C;
+  border-color: #EA580C;
+  background: #FFF7ED;
+  font-weight: 700;
+}
+
+.tb-sbtn-failed {
+  color: var(--tb-danger);
+  border-color: var(--tb-danger);
 }
 
 /* Checkbox */

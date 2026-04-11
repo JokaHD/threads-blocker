@@ -37,9 +37,8 @@ export class InlineControls {
 
     // ── Checkbox ─────────────────────────────────────────────────────────────
     const checkbox = document.createElement('div');
-    checkbox.role = 'checkbox';
     checkbox.setAttribute('role', 'checkbox');
-    checkbox.className = 'tb-checkbox';
+    checkbox.className = 'tb-checkbox tb-checkbox-inline';
     checkbox.dataset.username = username;
     const isChecked = this._selection.isSelected(username);
     checkbox.setAttribute('aria-checked', String(isChecked));
@@ -75,18 +74,9 @@ export class InlineControls {
     button.addEventListener('click', () => this._handleBlockClick(button, username, element));
 
     // ── Container ─────────────────────────────────────────────────────────────
-    const wrapper = document.createElement('div');
-    wrapper.className = 'tb-inline-controls';
-    wrapper.setAttribute('role', 'group');
-    wrapper.setAttribute('aria-label', `封鎖工具 @${username}`);
-    wrapper.appendChild(checkbox);
-    wrapper.appendChild(button);
-
-    // Make the comment container a positioning anchor, then place controls
-    // absolutely to its right. This way controls scroll naturally with content.
-    element.style.position = 'relative';
-    element.style.overflow = 'visible';
-    element.appendChild(wrapper);
+    // Just inject checkbox inline after the username link — small and unobtrusive.
+    // The block button lives in the right sidebar instead.
+    linkElement.insertAdjacentElement('afterend', checkbox);
   }
 
   /**
