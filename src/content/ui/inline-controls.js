@@ -99,14 +99,14 @@ export class InlineControls {
       }
     });
 
-    // Find the avatar link: the one with no visible text content
-    // (avatar links render an image via CSS background, not text).
-    // Fall back to first link if heuristic fails.
+    // Find the avatar link: Threads uses "個人檔案" (or similar localized
+    // accessible text) for the avatar, while username links contain the actual username.
+    // The avatar link's text does NOT contain the username.
     let targetLink = avatarLink;
     const allLinks = element.querySelectorAll(`a[href="/@${username}"]`);
     for (const link of allLinks) {
-      const text = link.textContent?.trim();
-      if (!text || text.length === 0) {
+      const text = link.textContent?.trim().toLowerCase();
+      if (text && !text.includes(username.toLowerCase()) && !text.startsWith('@')) {
         targetLink = link;
         break;
       }
