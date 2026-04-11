@@ -4,92 +4,98 @@ import { Icons } from './icons.js';
 import { DOMObserver } from '../dom-observer.js';
 
 /**
- * Manages per-comment UI:
- * - Block icon below avatar (always visible)
- * - Checkbox below avatar (only in multi-select mode)
+ * Overlay-based inline controls.
+ *
+ * Creates a fixed overlay layer on top of the page. For each detected comment,
+ * renders a block button in the right margin area, aligned vertically with
+ * the comment. This avoids Threads' overflow:hidden clipping entirely.
  */
 export class InlineControls {
   constructor(selectionManager, idResolver) {
     this._selection = selectionManager;
     this._idResolver = idResolver;
-    this._users = new Map(); // username -> { state, confirmTimer, userId, elements }
+    this._users = new Map(); // username -> { state, confirmTimer, userId, commentEl, row }
     this._multiSelectMode = false;
 
+    this._overlay = null;
+    this._rafId = null;
+    this._visible = new Set(); // usernames currently in viewport
+
     this._selection.onChange(() => this._updateAllCheckboxes());
+  }
+
+  init() {
+    // Create a fixed overlay that covers the viewport but doesn't block clicks
+    this._overlay = document.createElement('div');
+    this._overlay.className = 'tb-overlay';
+    document.body.appendChild(this._overlay);
+
+    // Reposition all visible buttons on scroll
+    const onScroll = () => {
+      if (this._rafId) return;
+      this._rafId = requestAnimationFrame(() => {
+        this._rafId = null;
+        this._repositionAll();
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    // Also handle resize
+    window.addEventListener('resize', onScroll, { passive: true });
   }
 
   get multiSelectMode() { return this._multiSelectMode; }
 
   setMultiSelectMode(enabled) {
     this._multiSelectMode = enabled;
-    // Show/hide all checkboxes
-    document.querySelectorAll('.tb-avatar-checkbox').forEach(cb => {
-      cb.style.display = enabled ? '' : 'none';
-    });
-    // Hide block icons in multi-select mode, show checkboxes instead
-    document.querySelectorAll('.tb-avatar-block-icon').forEach(icon => {
-      icon.style.display = enabled ? 'none' : '';
-    });
+    for (const [, user] of this._users) {
+      if (user.row) {
+        const cb = user.row.querySelector('.tb-ol-checkbox');
+        const btn = user.row.querySelector('.tb-ol-block');
+        if (cb) cb.style.display = enabled ? '' : 'none';
+        if (btn) btn.style.display = enabled ? 'none' : '';
+      }
+    }
   }
 
-  /**
-   * Inject block icon (and hidden checkbox) below a comment's avatar.
-   */
   inject(comment) {
-    const { username, element, avatarLink } = comment;
-    if (!avatarLink) return;
-
+    const { username, element } = comment;
     DOMObserver.markProcessed(element);
     this._selection.recordSeen(username);
 
-    if (!this._users.has(username)) {
-      this._users.set(username, {
-        state: BlockState.IDLE,
-        confirmTimer: null,
-        userId: null,
-        commentElement: element,
-      });
-    }
+    if (this._users.has(username)) return;
 
-    // Find the avatar's parent container to append below it
-    const avatarParent = avatarLink.parentElement;
-    if (!avatarParent) return;
+    this._users.set(username, {
+      state: BlockState.IDLE,
+      confirmTimer: null,
+      userId: null,
+      commentEl: element,
+      row: null,
+    });
 
-    // ── Block icon (below avatar) ────────────────────────────────────────
-    const blockIcon = document.createElement('div');
-    blockIcon.className = 'tb-avatar-block-icon';
-    blockIcon.dataset.username = username;
-    blockIcon.title = `封鎖 @${username}`;
-    blockIcon.setAttribute('role', 'button');
-    blockIcon.setAttribute('aria-label', `封鎖 @${username}`);
-    blockIcon.setAttribute('tabindex', '0');
-    this._renderBlockIcon(blockIcon, username, BlockState.IDLE);
+    // Create overlay row for this user
+    const row = document.createElement('div');
+    row.className = 'tb-ol-row';
+    row.dataset.username = username;
 
-    blockIcon.addEventListener('click', (e) => {
-      e.preventDefault();
+    // Block button
+    const btn = document.createElement('button');
+    btn.className = 'tb-ol-block tb-ol-idle';
+    btn.innerHTML = Icons.ban;
+    btn.title = `封鎖 @${username}`;
+    btn.setAttribute('aria-label', `封鎖 @${username}`);
+    btn.addEventListener('click', (e) => {
       e.stopPropagation();
       this._handleBlockClick(username, element);
     });
-    blockIcon.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        e.stopPropagation();
-        this._handleBlockClick(username, element);
-      }
-    });
 
-    // ── Checkbox (below avatar, hidden by default) ──────────────────────
-    const checkbox = document.createElement('div');
-    checkbox.className = 'tb-avatar-checkbox';
-    checkbox.dataset.username = username;
-    checkbox.setAttribute('role', 'checkbox');
-    checkbox.setAttribute('aria-checked', 'false');
-    checkbox.setAttribute('aria-label', `選取 @${username}`);
-    checkbox.setAttribute('tabindex', '0');
-    checkbox.style.display = 'none'; // hidden until multi-select mode
-
-    checkbox.addEventListener('click', (e) => {
-      e.preventDefault();
+    // Checkbox (hidden by default)
+    const cb = document.createElement('div');
+    cb.className = 'tb-ol-checkbox';
+    cb.setAttribute('role', 'checkbox');
+    cb.setAttribute('aria-checked', 'false');
+    cb.setAttribute('aria-label', `選取 @${username}`);
+    cb.style.display = 'none';
+    cb.addEventListener('click', (e) => {
       e.stopPropagation();
       if (e.shiftKey) {
         this._selection.onClick(username, true);
@@ -99,20 +105,31 @@ export class InlineControls {
       }
     });
 
-    // Find the username text link to place controls next to it.
-    // Prefer a link whose text contains the username (not the avatar "個人檔案" link).
-    let targetLink = avatarLink; // fallback
-    const allLinks = element.querySelectorAll(`a[href="/@${username}"]`);
-    for (const link of allLinks) {
-      const text = link.textContent?.trim().toLowerCase();
-      if (text && (text.includes(username.toLowerCase()) || text.startsWith('@'))) {
-        targetLink = link;
-        break;
+    row.appendChild(btn);
+    row.appendChild(cb);
+    this._overlay.appendChild(row);
+
+    const user = this._users.get(username);
+    user.row = row;
+
+    // Observe visibility
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          this._visible.add(username);
+          row.style.display = '';
+          this._positionRow(username);
+        } else {
+          this._visible.delete(username);
+          row.style.display = 'none';
+        }
       }
-    }
-    // Insert as inline-flex right after the username text link
-    targetLink.after(blockIcon);
-    blockIcon.after(checkbox);
+    }, { threshold: 0 });
+    io.observe(element);
+    user._io = io;
+
+    // Initial position
+    this._positionRow(username);
   }
 
   updateState(username, state) {
@@ -125,13 +142,30 @@ export class InlineControls {
     }
     user.state = state;
 
-    // Update all block icons for this username
-    document.querySelectorAll(`.tb-avatar-block-icon[data-username="${CSS.escape(username)}"]`).forEach(icon => {
-      this._renderBlockIcon(icon, username, state);
-    });
+    const btn = user.row?.querySelector('.tb-ol-block');
+    if (btn) this._renderButton(btn, username, state);
   }
 
-  // ── Private ───────────────────────────────────────────────────────────────
+  _positionRow(username) {
+    const user = this._users.get(username);
+    if (!user || !user.row || !user.commentEl) return;
+
+    const rect = user.commentEl.getBoundingClientRect();
+    if (rect.height === 0) return;
+
+    // Position in the right margin: to the right of the content area
+    const contentRight = rect.right;
+    const margin = 16;
+
+    user.row.style.top = `${rect.top + 12}px`;
+    user.row.style.left = `${contentRight + margin}px`;
+  }
+
+  _repositionAll() {
+    for (const username of this._visible) {
+      this._positionRow(username);
+    }
+  }
 
   async _handleBlockClick(username, element) {
     const user = this._users.get(username);
@@ -172,56 +206,60 @@ export class InlineControls {
     }
   }
 
-  _renderBlockIcon(el, username, state) {
-    el.className = 'tb-avatar-block-icon';
+  _renderButton(btn, username, state) {
+    // Reset classes
+    btn.className = 'tb-ol-block';
+    btn.disabled = false;
 
     switch (state) {
       case BlockState.IDLE:
-        el.innerHTML = Icons.ban;
-        el.classList.add('tb-icon-idle');
-        el.title = `封鎖 @${username}`;
+        btn.classList.add('tb-ol-idle');
+        btn.innerHTML = Icons.ban;
+        btn.title = `封鎖 @${username}`;
         break;
       case BlockState.QUEUED:
-        el.innerHTML = Icons.x;
-        el.classList.add('tb-icon-queued');
-        el.title = `取消排隊 @${username}`;
+        btn.classList.add('tb-ol-queued');
+        btn.innerHTML = Icons.x;
+        btn.title = `取消排隊 @${username}`;
         break;
       case BlockState.BLOCKING:
-        el.innerHTML = Icons.loader;
-        el.classList.add('tb-icon-blocking');
-        el.title = `封鎖中 @${username}`;
+        btn.classList.add('tb-ol-blocking');
+        btn.innerHTML = Icons.loader;
+        btn.disabled = true;
+        btn.title = `封鎖中...`;
         break;
       case BlockState.BLOCKED:
-        el.innerHTML = Icons.check;
-        el.classList.add('tb-icon-blocked');
-        el.title = `已封鎖 @${username}`;
+        btn.classList.add('tb-ol-blocked');
+        btn.innerHTML = Icons.check;
+        btn.title = `已封鎖 @${username}`;
         break;
       case UIState.CONFIRM_UNBLOCK:
-        el.innerHTML = Icons.undo;
-        el.classList.add('tb-icon-confirm');
-        el.title = `確定解除封鎖 @${username}？`;
+        btn.classList.add('tb-ol-confirm');
+        btn.innerHTML = Icons.undo;
+        btn.title = `確定解除封鎖？`;
         break;
       case BlockState.UNBLOCKING:
-        el.innerHTML = Icons.loader;
-        el.classList.add('tb-icon-blocking');
-        el.title = `解除中 @${username}`;
+        btn.classList.add('tb-ol-blocking');
+        btn.innerHTML = Icons.loader;
+        btn.disabled = true;
+        btn.title = `解除中...`;
         break;
       case BlockState.FAILED:
-        el.innerHTML = Icons.refreshCw;
-        el.classList.add('tb-icon-failed');
-        el.title = `封鎖失敗，點擊重試`;
+        btn.classList.add('tb-ol-failed');
+        btn.innerHTML = Icons.refreshCw;
+        btn.title = `封鎖失敗，點擊重試`;
         break;
     }
   }
 
   _updateAllCheckboxes() {
-    document.querySelectorAll('.tb-avatar-checkbox').forEach(cb => {
-      const username = cb.dataset.username;
-      if (!username) return;
+    for (const [username, user] of this._users) {
+      const cb = user.row?.querySelector('.tb-ol-checkbox');
+      if (!cb) continue;
       const checked = this._selection.isSelected(username);
       cb.setAttribute('aria-checked', String(checked));
-      cb.classList.toggle('tb-checked', checked);
-    });
+      cb.classList.toggle('tb-ol-checked', checked);
+    }
   }
 
   updateCheckboxes() {

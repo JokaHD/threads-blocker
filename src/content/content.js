@@ -94,6 +94,7 @@ domObserver.startObserving(document.body, (newComments) => {
 });
 
 // Initialize UI
+inlineControls.init();
 toolbar.init();
 panel.init();
 

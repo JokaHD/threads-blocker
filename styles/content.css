@@ -15,7 +15,7 @@
   --tb-toolbar-bg: #1E293B;
   --tb-radius-sm: 8px;
   --tb-radius-md: 12px;
-  --tb-transition: 200ms ease;
+  --tb-transition: 150ms ease;
 }
 
 /* ============================================================
@@ -25,116 +25,117 @@
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
-
 .tb-spin {
   display: inline-block;
   animation: tb-spin 700ms linear infinite;
 }
-
 @media (prefers-reduced-motion: reduce) {
   .tb-spin { animation: none; }
 }
 
 /* ============================================================
-   Avatar Block Icon (below avatar, always visible)
+   Overlay Layer — lives outside Threads DOM to avoid clipping
    ============================================================ */
-.tb-avatar-block-icon {
-  display: inline-flex;
+.tb-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;  /* Don't block page interaction */
+  z-index: 99999;
+}
+
+/* Each row is positioned absolutely within the overlay */
+.tb-ol-row {
+  position: fixed;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  margin-left: 6px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all var(--tb-transition);
-  opacity: 0.5;
-  color: #999;
-  vertical-align: middle;
-  border: 1px solid transparent;
-}
-
-.tb-avatar-block-icon:hover {
-  opacity: 1;
-  background: rgba(220, 38, 38, 0.1);
-  border-color: rgba(220, 38, 38, 0.3);
-}
-
-.tb-avatar-block-icon:focus-visible {
-  outline: 2px solid var(--tb-primary);
-  outline-offset: 2px;
-  opacity: 1;
-}
-
-/* States */
-.tb-icon-idle { color: #888; }
-.tb-icon-idle:hover { color: var(--tb-danger); }
-
-.tb-icon-queued {
-  color: var(--tb-warning);
-  opacity: 0.9;
-}
-
-.tb-icon-blocking {
-  color: var(--tb-danger);
-  opacity: 0.9;
-  cursor: default;
-}
-
-.tb-icon-blocked {
-  color: var(--tb-success);
-  opacity: 0.9;
-}
-.tb-icon-blocked:hover { opacity: 1; }
-
-.tb-icon-confirm {
-  color: #EA580C;
-  opacity: 1;
-  background: rgba(234, 88, 12, 0.1);
-}
-
-.tb-icon-failed {
-  color: var(--tb-danger);
-  opacity: 0.9;
+  gap: 6px;
+  pointer-events: auto;  /* Buttons are clickable */
 }
 
 /* ============================================================
-   Avatar Checkbox (below avatar, hidden until multi-select)
+   Overlay Block Button — 44x44 touch target
    ============================================================ */
-.tb-avatar-checkbox {
-  display: inline-flex;
+.tb-ol-block {
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  margin-left: 4px;
-  border: 2px solid #555;
-  border-radius: 4px;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 10px;
   cursor: pointer;
-  background: transparent;
-  vertical-align: middle;
   transition: all var(--tb-transition);
+  background: rgba(40, 40, 40, 0.8);
+  color: #888;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
-.tb-avatar-checkbox:hover {
-  border-color: var(--tb-primary);
+.tb-ol-block:hover {
+  transform: scale(1.08);
 }
 
-.tb-avatar-checkbox:focus-visible {
+.tb-ol-block:active {
+  transform: scale(0.95);
+}
+
+.tb-ol-block:focus-visible {
   outline: 2px solid var(--tb-primary);
   outline-offset: 2px;
 }
 
-.tb-avatar-checkbox.tb-checked {
+.tb-ol-block:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}
+
+/* States */
+.tb-ol-idle { color: #777; }
+.tb-ol-idle:hover { color: #ff6b6b; background: rgba(220, 38, 38, 0.2); }
+
+.tb-ol-queued { color: var(--tb-warning); background: rgba(245, 158, 11, 0.15); }
+.tb-ol-queued:hover { background: rgba(245, 158, 11, 0.25); }
+
+.tb-ol-blocking { color: var(--tb-danger); background: rgba(220, 38, 38, 0.15); }
+
+.tb-ol-blocked { color: var(--tb-success); background: rgba(22, 163, 74, 0.15); }
+.tb-ol-blocked:hover { background: rgba(22, 163, 74, 0.25); }
+
+.tb-ol-confirm { color: #EA580C; background: rgba(234, 88, 12, 0.2); font-weight: 700; }
+
+.tb-ol-failed { color: var(--tb-danger); background: rgba(220, 38, 38, 0.15); border: 1px solid rgba(220, 38, 38, 0.3); }
+
+/* ============================================================
+   Overlay Checkbox — for multi-select mode
+   ============================================================ */
+.tb-ol-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid #555;
+  border-radius: 6px;
+  cursor: pointer;
+  background: rgba(40, 40, 40, 0.8);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: all var(--tb-transition);
+}
+.tb-ol-checkbox:hover { border-color: var(--tb-primary); }
+.tb-ol-checkbox.tb-ol-checked {
   background: var(--tb-primary);
   border-color: var(--tb-primary);
 }
-
-.tb-avatar-checkbox.tb-checked::after {
+.tb-ol-checkbox.tb-ol-checked::after {
   content: '';
   display: block;
-  width: 5px;
-  height: 9px;
+  width: 6px;
+  height: 10px;
   border: 2px solid #fff;
   border-top: none;
   border-left: none;
@@ -142,30 +143,29 @@
 }
 
 /* ============================================================
-   Multi-Select Toggle Button (floating)
+   Multi-Select Toggle Button (floating, bottom-left)
    ============================================================ */
 .tb-multiselect-toggle {
   position: fixed;
   bottom: 20px;
   left: 20px;
-  z-index: 10000;
-  padding: 8px 16px;
+  z-index: 100000;
+  padding: 10px 20px;
   border: 1px solid #444;
-  border-radius: 20px;
-  background: #222;
+  border-radius: 22px;
+  background: rgba(30, 30, 30, 0.9);
   color: #ccc;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   transition: all var(--tb-transition);
+  pointer-events: auto;
 }
-
-.tb-multiselect-toggle:hover {
-  background: #333;
-  color: #fff;
-}
-
+.tb-multiselect-toggle:hover { background: rgba(50, 50, 50, 0.95); color: #fff; }
 .tb-multiselect-toggle.tb-multiselect-active {
   background: var(--tb-primary);
   border-color: var(--tb-primary);
@@ -174,105 +174,66 @@
 
 @media (prefers-color-scheme: light) {
   .tb-multiselect-toggle {
-    background: #fff;
+    background: rgba(255, 255, 255, 0.95);
     border-color: var(--tb-border);
     color: var(--tb-text);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
-  .tb-multiselect-toggle:hover { background: var(--tb-surface); }
-  .tb-multiselect-toggle.tb-multiselect-active {
-    background: var(--tb-primary);
-    color: #fff;
-    border-color: var(--tb-primary);
-  }
+  .tb-multiselect-toggle:hover { background: #fff; }
+  .tb-ol-block { background: rgba(255, 255, 255, 0.9); }
+  .tb-ol-checkbox { background: rgba(255, 255, 255, 0.9); border-color: #ccc; }
 }
 
 /* ============================================================
-   Block Button — Base (used in toolbar batch action)
-   ============================================================ */
-.tb-block-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  font-size: 13px;
-  font-family: inherit;
-  font-weight: 500;
-  line-height: 1.4;
-  border: 1px solid transparent;
-  border-radius: var(--tb-radius-sm);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background var(--tb-transition), color var(--tb-transition),
-              border-color var(--tb-transition), opacity var(--tb-transition);
-}
-
-.tb-block-btn:focus-visible {
-  outline: 2px solid var(--tb-primary);
-  outline-offset: 2px;
-}
-
-.tb-block-btn:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-/* ============================================================
-   Toolbar (top, appears in multi-select mode when items selected)
+   Toolbar (top bar for batch actions in multi-select mode)
    ============================================================ */
 .tb-toolbar {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 10001;
+  z-index: 100001;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: var(--tb-toolbar-bg);
+  gap: 12px;
+  padding: 10px 20px;
+  background: rgba(20, 20, 20, 0.95);
   color: #fff;
-  font-family: inherit;
-  font-size: 13px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   transform: translateY(-100%);
-  transition: transform var(--tb-transition);
+  transition: transform 250ms ease-out;
 }
+.tb-toolbar.tb-toolbar-visible { transform: translateY(0); }
 
-.tb-toolbar.tb-toolbar-visible {
-  transform: translateY(0);
-}
-
-.tb-toolbar-label {
-  flex: 1;
-  font-weight: 500;
-  color: #CBD5E1;
-}
+.tb-toolbar-label { flex: 1; font-weight: 600; color: #ccc; }
 
 .tb-toolbar-block-btn {
   background: var(--tb-danger);
   color: #fff;
   border: none;
   border-radius: var(--tb-radius-sm);
-  padding: 6px 14px;
-  font-size: 13px;
+  padding: 8px 18px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: background var(--tb-transition);
 }
-.tb-toolbar-block-btn:hover:not(:disabled) { background: #B91C1C; }
+.tb-toolbar-block-btn:hover { background: #B91C1C; }
 
 .tb-toolbar-clear-btn {
   background: transparent;
-  color: #fff;
-  border: 1px solid #fff;
+  color: #ccc;
+  border: 1px solid #555;
   border-radius: var(--tb-radius-sm);
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 500;
+  padding: 8px 18px;
+  font-size: 14px;
   cursor: pointer;
 }
-.tb-toolbar-clear-btn:hover:not(:disabled) { background: rgba(255,255,255,0.1); }
+.tb-toolbar-clear-btn:hover { border-color: #fff; color: #fff; }
 
 /* ============================================================
    Panel (bottom-right, queue progress)
@@ -281,28 +242,21 @@
   position: fixed;
   bottom: 16px;
   right: 16px;
-  z-index: 10000;
-  width: 320px;
-  max-height: 400px;
+  z-index: 100000;
+  width: 300px;
+  max-height: 360px;
   display: flex;
   flex-direction: column;
-  background: #1a1a1a;
+  background: rgba(25, 25, 25, 0.95);
   border: 1px solid #333;
   border-radius: var(--tb-radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  font-family: inherit;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 13px;
   color: #e0e0e0;
   overflow: hidden;
-}
-
-@media (prefers-color-scheme: light) {
-  .tb-panel {
-    background: #fff;
-    border-color: var(--tb-border);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    color: var(--tb-text);
-  }
 }
 
 .tb-panel-header {
@@ -310,25 +264,15 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #222;
+  background: rgba(35, 35, 35, 0.9);
   border-bottom: 1px solid #333;
   flex-shrink: 0;
 }
-@media (prefers-color-scheme: light) {
-  .tb-panel-header { background: var(--tb-surface); border-bottom-color: var(--tb-border); }
-}
-
-.tb-panel-title { flex: 1; font-weight: 600; font-size: 13px; }
+.tb-panel-title { flex: 1; font-weight: 600; }
 
 .tb-panel-minimize-btn {
-  background: transparent;
-  border: none;
-  color: #888;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-size: 14px;
-  line-height: 1;
+  background: transparent; border: none; color: #888; cursor: pointer;
+  padding: 2px 4px; border-radius: 4px; font-size: 14px; line-height: 1;
 }
 .tb-panel-minimize-btn:hover { color: #e0e0e0; background: #333; }
 
@@ -336,12 +280,10 @@
 
 .tb-panel-progress { padding: 8px 12px 4px; flex-shrink: 0; }
 .tb-panel-progress-bar { width: 100%; height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
-@media (prefers-color-scheme: light) { .tb-panel-progress-bar { background: var(--tb-border); } }
 .tb-panel-progress-fill { height: 100%; background: var(--tb-primary); border-radius: 2px; transition: width 300ms ease; }
 
 .tb-panel-item-list { list-style: none; margin: 0; padding: 0; }
 .tb-panel-item { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid #2a2a2a; }
-@media (prefers-color-scheme: light) { .tb-panel-item { border-bottom-color: var(--tb-border); } }
 .tb-panel-item:last-child { border-bottom: none; }
 .tb-panel-item-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tb-panel-item-status { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
@@ -353,23 +295,11 @@
 .tb-panel-item-status--failed { background: rgba(220,38,38,0.15); color: var(--tb-danger); }
 
 .tb-panel-pause-btn {
-  width: 100%;
-  padding: 8px;
-  background: #222;
-  border: none;
-  border-top: 1px solid #333;
-  color: #888;
-  font-size: 12px;
-  cursor: pointer;
-  flex-shrink: 0;
+  width: 100%; padding: 8px; background: #222; border: none;
+  border-top: 1px solid #333; color: #888; font-size: 12px; cursor: pointer; flex-shrink: 0;
 }
 .tb-panel-pause-btn:hover { background: #333; color: #e0e0e0; }
-@media (prefers-color-scheme: light) {
-  .tb-panel-pause-btn { background: var(--tb-surface); border-top-color: var(--tb-border); color: #64748B; }
-  .tb-panel-pause-btn:hover { background: var(--tb-border); color: var(--tb-text); }
-}
 
-/* Minimized */
 .tb-panel.tb-panel-minimized { width: 48px; height: 48px; max-height: 48px; border-radius: 50%; cursor: pointer; }
 .tb-panel.tb-panel-minimized .tb-panel-header,
 .tb-panel.tb-panel-minimized .tb-panel-body,
@@ -380,4 +310,13 @@
   display: flex; align-items: center; justify-content: center;
   width: 100%; height: 100%; background: var(--tb-primary); color: #fff;
   font-size: 14px; font-weight: 700;
+}
+
+@media (prefers-color-scheme: light) {
+  .tb-panel { background: rgba(255,255,255,0.95); border-color: var(--tb-border); color: var(--tb-text); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+  .tb-panel-header { background: var(--tb-surface); border-bottom-color: var(--tb-border); }
+  .tb-panel-progress-bar { background: var(--tb-border); }
+  .tb-panel-item { border-bottom-color: var(--tb-border); }
+  .tb-panel-pause-btn { background: var(--tb-surface); border-top-color: var(--tb-border); color: #64748B; }
+  .tb-panel-pause-btn:hover { background: var(--tb-border); color: var(--tb-text); }
 }
