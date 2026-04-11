@@ -27,6 +27,18 @@ export class InlineControls {
     this._fab.setAttribute('aria-label', '進入封鎖模式');
     this._fab.addEventListener('click', () => this._toggleBlockMode());
     document.body.appendChild(this._fab);
+
+    // Global safety net: in block mode, intercept any click that would navigate
+    // away from the current page (catches clicks on links Threads adds dynamically)
+    window.addEventListener('click', (e) => {
+      if (!this._blockMode) return;
+      // Check if the click target is inside a processed comment
+      const processed = e.target.closest?.('[data-tb-processed]');
+      if (processed) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true); // capture phase = runs first
   }
 
   get multiSelectMode() { return this._blockMode; }
@@ -45,14 +57,18 @@ export class InlineControls {
       commentEl: element,
     });
 
-    // Add click handler to the comment element (only active in block mode)
-    const handler = (e) => {
+    // Block ALL interaction events in block mode to prevent Threads navigation.
+    // We intercept at capture phase on the element AND add a window-level
+    // capture listener that blocks clicks on links inside processed elements.
+    const selectHandler = (e) => {
       if (!this._blockMode) return;
 
-      // Intercept all clicks in block mode
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
+
+      // Only process actual clicks, not mousedown/pointerdown
+      if (e.type !== 'click') return;
 
       if (e.shiftKey) {
         this._selection.onClick(username, true);
@@ -63,8 +79,23 @@ export class InlineControls {
       this._updateHighlights();
     };
 
-    // Use capture phase to intercept before Threads' handlers
-    element.addEventListener('click', handler, true);
+    // Intercept click, mousedown, mouseup, pointerdown, pointerup at capture phase
+    for (const evt of ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup']) {
+      element.addEventListener(evt, selectHandler, true);
+    }
+
+    // Also intercept all <a> tags inside this element
+    const links = element.querySelectorAll('a');
+    for (const link of links) {
+      for (const evt of ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup']) {
+        link.addEventListener(evt, (e) => {
+          if (!this._blockMode) return;
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+        }, true);
+      }
+    }
     this._commentClickHandlers.set(element, handler);
 
     // Add hover style class
