@@ -99,22 +99,20 @@ export class InlineControls {
       }
     });
 
-    // Find the best link to attach below (prefer avatar = square-ish link).
-    // Use requestAnimationFrame to ensure layout is computed.
-    requestAnimationFrame(() => {
-      let targetLink = avatarLink;
-      // Check all /@username links in the container; pick the square one
-      const allLinks = element.querySelectorAll(`a[href="/@${username}"]`);
-      for (const link of allLinks) {
-        const r = link.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0 && Math.abs(r.width - r.height) < 15 && r.width <= 80) {
-          targetLink = link;
-          break;
-        }
+    // Find the avatar link: the one with no visible text content
+    // (avatar links render an image via CSS background, not text).
+    // Fall back to first link if heuristic fails.
+    let targetLink = avatarLink;
+    const allLinks = element.querySelectorAll(`a[href="/@${username}"]`);
+    for (const link of allLinks) {
+      const text = link.textContent?.trim();
+      if (!text || text.length === 0) {
+        targetLink = link;
+        break;
       }
-      targetLink.after(blockIcon);
-      blockIcon.after(checkbox);
-    });
+    }
+    targetLink.after(blockIcon);
+    blockIcon.after(checkbox);
   }
 
   updateState(username, state) {
