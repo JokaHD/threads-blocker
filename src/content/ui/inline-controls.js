@@ -112,23 +112,9 @@ export class InlineControls {
     const user = this._users.get(username);
     user.row = row;
 
-    // Observe visibility
-    const io = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          this._visible.add(username);
-          row.style.display = '';
-          this._positionRow(username);
-        } else {
-          this._visible.delete(username);
-          row.style.display = 'none';
-        }
-      }
-    }, { threshold: 0 });
-    io.observe(element);
-    user._io = io;
-
-    // Initial position
+    // Always visible — position:fixed rows outside viewport are naturally hidden.
+    // Just reposition on every scroll frame.
+    this._visible.add(username);
     this._positionRow(username);
   }
 
@@ -151,18 +137,25 @@ export class InlineControls {
     if (!user || !user.row || !user.commentEl) return;
 
     const rect = user.commentEl.getBoundingClientRect();
-    if (rect.height === 0) return;
+    const row = user.row;
+
+    // Hide if comment is not in viewport
+    if (rect.height === 0 || rect.bottom < 0 || rect.top > window.innerHeight) {
+      row.style.display = 'none';
+      return;
+    }
+    row.style.display = '';
 
     // Position in the right margin: to the right of the content area
     const contentRight = rect.right;
     const margin = 16;
 
-    user.row.style.top = `${rect.top + 12}px`;
-    user.row.style.left = `${contentRight + margin}px`;
+    row.style.top = `${rect.top + 12}px`;
+    row.style.left = `${contentRight + margin}px`;
   }
 
   _repositionAll() {
-    for (const username of this._visible) {
+    for (const [username] of this._users) {
       this._positionRow(username);
     }
   }
