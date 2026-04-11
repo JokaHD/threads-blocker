@@ -99,18 +99,18 @@ export class InlineControls {
       }
     });
 
-    // Find the avatar link: Threads uses "個人檔案" (or similar localized
-    // accessible text) for the avatar, while username links contain the actual username.
-    // The avatar link's text does NOT contain the username.
-    let targetLink = avatarLink;
+    // Find the username text link to place controls next to it.
+    // Prefer a link whose text contains the username (not the avatar "個人檔案" link).
+    let targetLink = avatarLink; // fallback
     const allLinks = element.querySelectorAll(`a[href="/@${username}"]`);
     for (const link of allLinks) {
       const text = link.textContent?.trim().toLowerCase();
-      if (text && !text.includes(username.toLowerCase()) && !text.startsWith('@')) {
+      if (text && (text.includes(username.toLowerCase()) || text.startsWith('@'))) {
         targetLink = link;
         break;
       }
     }
+    // Insert as inline-flex right after the username text link
     targetLink.after(blockIcon);
     blockIcon.after(checkbox);
   }

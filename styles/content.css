@@ -39,17 +39,18 @@
    Avatar Block Icon (below avatar, always visible)
    ============================================================ */
 .tb-avatar-block-icon {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  margin: 4px auto 0;
+  width: 20px;
+  height: 20px;
+  margin-left: 4px;
   border-radius: 50%;
   cursor: pointer;
   transition: all var(--tb-transition);
   opacity: 0.4;
   color: #999;
+  vertical-align: middle;
 }
 
 .tb-avatar-block-icon:hover {
@@ -98,16 +99,17 @@
    Avatar Checkbox (below avatar, hidden until multi-select)
    ============================================================ */
 .tb-avatar-checkbox {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  margin: 4px auto 0;
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
   border: 2px solid #555;
   border-radius: 4px;
   cursor: pointer;
   background: transparent;
+  vertical-align: middle;
   transition: all var(--tb-transition);
 }
 
