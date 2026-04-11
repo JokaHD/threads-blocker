@@ -58,17 +58,22 @@ export class InlineControls {
   }
 
   inject(comment) {
-    const { username, element } = comment;
+    const { username, element, avatarLink, textLink } = comment;
     DOMObserver.markProcessed(element);
     this._selection.recordSeen(username);
 
     if (this._users.has(username)) return;
+
+    // Use the text username link for positioning (more reliable size/position).
+    // Fall back to avatarLink, then element.
+    const anchorEl = textLink || avatarLink || element;
 
     this._users.set(username, {
       state: BlockState.IDLE,
       confirmTimer: null,
       userId: null,
       commentEl: element,
+      anchorEl,
       row: null,
     });
 
@@ -134,24 +139,25 @@ export class InlineControls {
 
   _positionRow(username) {
     const user = this._users.get(username);
-    if (!user || !user.row || !user.commentEl) return;
+    if (!user || !user.row || !user.anchorEl) return;
 
-    const rect = user.commentEl.getBoundingClientRect();
+    const rect = user.anchorEl.getBoundingClientRect();
     const row = user.row;
 
-    // Hide if comment is not in viewport
-    if (rect.height === 0 || rect.bottom < 0 || rect.top > window.innerHeight) {
+    // Hide if anchor element is not in viewport or has no size
+    if (rect.height === 0 || rect.bottom < -50 || rect.top > window.innerHeight + 50) {
       row.style.display = 'none';
       return;
     }
     row.style.display = '';
 
-    // Position in the right margin: to the right of the content area
-    const contentRight = rect.right;
-    const margin = 16;
+    // Align vertically with the anchor (username text), place in right margin.
+    // Use a fixed right position (e.g. 60px from right edge) so all buttons line up.
+    const rightPos = 60;
 
-    row.style.top = `${rect.top + 12}px`;
-    row.style.left = `${contentRight + margin}px`;
+    row.style.top = `${rect.top + rect.height / 2 - 22}px`; // center vertically on anchor
+    row.style.right = `${rightPos}px`;
+    row.style.left = 'auto';
   }
 
   _repositionAll() {
