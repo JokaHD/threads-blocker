@@ -12,54 +12,74 @@ export class DOMObserver {
     return match ? match[1] : null;
   }
 
+  /**
+   * Find comments in the DOM. Returns one entry per comment, with both
+   * the avatar link and the text username link if found.
+   */
   findComments(root) {
     const links = root.querySelectorAll('a[href^="/@"]');
-    const comments = [];
-    const seenContainers = new Set();
+    const results = [];
+    const seenUsernames = new Set();
 
     for (const link of links) {
       const href = link.getAttribute('href');
       const username = this.extractUsername(href);
       if (!username) continue;
+      if (seenUsernames.has(username)) continue;
 
-      // Skip avatar links — they contain <img> or are square-ish (e.g. 60x60)
-      if (link.querySelector('img, canvas, svg[width]')) continue;
       const rect = link.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        const ratio = rect.width / rect.height;
-        if (ratio > 0.7 && ratio < 1.4 && rect.width < 100) {
-          continue; // Square-ish and small = avatar
-        }
+      if (rect.width === 0 && rect.height === 0) continue;
+
+      // Classify: avatar (square-ish, ≤80px) vs text link (wider than tall)
+      const isAvatar = rect.width <= 80 && Math.abs(rect.width - rect.height) < 15;
+
+      if (isAvatar) {
+        seenUsernames.add(username);
+        const container = this._findCommentContainer(link);
+        if (!container || container.hasAttribute(PROCESSED_ATTR)) continue;
+
+        results.push({
+          username,
+          element: container,
+          avatarLink: link,
+          textLink: null, // may be filled later
+        });
       }
-
-      const container = this._findCommentContainer(link);
-      if (!container) continue;
-      if (container.hasAttribute(PROCESSED_ATTR)) continue;
-      if (seenContainers.has(container)) continue;
-      seenContainers.add(container);
-
-      comments.push({ username, element: container, linkElement: link });
     }
-    return comments;
+
+    // Second pass: find text links for already-found avatars
+    for (const link of links) {
+      const href = link.getAttribute('href');
+      const username = this.extractUsername(href);
+      if (!username) continue;
+
+      const rect = link.getBoundingClientRect();
+      const isAvatar = rect.width <= 80 && Math.abs(rect.width - rect.height) < 15;
+      if (isAvatar) continue;
+
+      const entry = results.find(r => r.username === username && !r.textLink);
+      if (entry) {
+        entry.textLink = link;
+      }
+    }
+
+    return results;
   }
 
   _findCommentContainer(linkElement) {
-    // Walk up looking for a container that is roughly the width of a comment
-    // On Threads, comments are ~500-700px wide
     let el = linkElement.parentElement;
     let depth = 0;
     while (el && depth < 15) {
       if (el === document.body) break;
       const w = el.offsetWidth;
       const children = el.children.length;
-      // A comment container is typically 400-800px wide with multiple children
       if (w >= 400 && w <= 900 && children >= 2) {
         return el;
       }
       el = el.parentElement;
       depth++;
     }
-    // Fallback: just go up a few levels
+    // Fallback
     el = linkElement.parentElement;
     for (let i = 0; i < 5; i++) {
       if (el.parentElement && el.parentElement !== document.body) {
