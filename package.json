@@ -11,10 +11,23 @@
     "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch"
   },
   "jest": {
-    "testEnvironment": "node",
-    "transform": {},
-    "setupFiles": ["./tests/jest-setup.js"],
-    "testMatch": ["**/tests/unit/**/*.test.js"]
+    "projects": [
+      {
+        "displayName": "node",
+        "testEnvironment": "node",
+        "transform": {},
+        "setupFiles": ["./tests/jest-setup.js"],
+        "testMatch": ["**/tests/unit/**/*.test.js"],
+        "testPathIgnorePatterns": ["dom-observer"]
+      },
+      {
+        "displayName": "jsdom",
+        "testEnvironment": "jsdom",
+        "transform": {},
+        "setupFiles": ["./tests/jest-setup.js"],
+        "testMatch": ["**/tests/unit/dom-observer.test.js"]
+      }
+    ]
   },
   "devDependencies": {
     "esbuild": "^0.21.0",
