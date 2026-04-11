@@ -41,14 +41,11 @@
    Inline Controls
    ============================================================ */
 .tb-inline-controls {
-  position: absolute;
-  right: -140px;    /* Push into the right margin area */
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  z-index: 1;
+  margin-left: 8px;
+  vertical-align: middle;
   white-space: nowrap;
 }
 
