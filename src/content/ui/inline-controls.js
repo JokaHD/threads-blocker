@@ -48,6 +48,8 @@ export class InlineControls {
     checkbox.setAttribute('aria-label', `選取 @${username}`);
 
     const handleCheckboxToggle = (e) => {
+      e.preventDefault();
+      e.stopPropagation(); // Prevent triggering parent <a> link navigation
       if (e.shiftKey) {
         this._selection.onClick(username, true);
       } else {
@@ -60,23 +62,17 @@ export class InlineControls {
     checkbox.addEventListener('keydown', (e) => {
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
+        e.stopPropagation();
         handleCheckboxToggle(e);
       }
     });
 
-    // ── Block button ──────────────────────────────────────────────────────────
-    const button = document.createElement('button');
-    button.className = 'tb-block-btn';
-
-    const entry = this._uiStates.get(username);
-    this._renderButton(button, username, entry.state);
-
-    button.addEventListener('click', () => this._handleBlockClick(button, username, element));
-
-    // ── Container ─────────────────────────────────────────────────────────────
-    // Just inject checkbox inline after the username link — small and unobtrusive.
-    // The block button lives in the right sidebar instead.
-    linkElement.insertAdjacentElement('afterend', checkbox);
+    // Insert checkbox next to the username link.
+    // Place OUTSIDE the <a> tag to avoid link click issues.
+    const parent = linkElement.parentElement;
+    if (parent) {
+      linkElement.after(checkbox);
+    }
   }
 
   /**

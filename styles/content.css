@@ -56,17 +56,27 @@
   right: 16px;
   width: 200px;
   max-height: calc(100vh - 100px);
-  background: #fff;
-  border: 1px solid var(--tb-border);
+  background: #1a1a1a;
+  border: 1px solid #333;
   border-radius: var(--tb-radius-md);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   z-index: 9999;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 13px;
-  color: var(--tb-text);
+  color: #e0e0e0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* Respect user's light mode preference */
+@media (prefers-color-scheme: light) {
+  .tb-sidebar {
+    background: #fff;
+    border-color: var(--tb-border);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    color: var(--tb-text);
+  }
 }
 
 .tb-sidebar-header {
@@ -74,9 +84,16 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--tb-border);
-  background: var(--tb-surface);
+  border-bottom: 1px solid #333;
+  background: #222;
   flex-shrink: 0;
+}
+
+@media (prefers-color-scheme: light) {
+  .tb-sidebar-header {
+    border-bottom-color: var(--tb-border);
+    background: var(--tb-surface);
+  }
 }
 
 .tb-sidebar-title {
@@ -93,12 +110,17 @@
   cursor: pointer;
   padding: 2px;
   border-radius: 4px;
-  color: #64748B;
+  color: #888;
   display: flex;
 }
 .tb-sidebar-toggle:hover {
-  background: var(--tb-border);
-  color: var(--tb-text);
+  background: #333;
+  color: #e0e0e0;
+}
+
+@media (prefers-color-scheme: light) {
+  .tb-sidebar-toggle { color: #64748B; }
+  .tb-sidebar-toggle:hover { background: var(--tb-border); color: var(--tb-text); }
 }
 
 .tb-sidebar-body {
@@ -125,11 +147,11 @@
 }
 
 .tb-sidebar-row:hover {
-  background: var(--tb-surface);
+  background: #2a2a2a;
 }
 
 .tb-sidebar-row-selected {
-  background: var(--tb-selection-bg) !important;
+  background: #1e3a5f !important;
 }
 
 .tb-sidebar-username {
@@ -139,11 +161,23 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
-  color: #64748B;
+  color: #999;
 }
 .tb-sidebar-username:hover {
   color: var(--tb-primary);
   text-decoration: underline;
+}
+
+@media (prefers-color-scheme: light) {
+  .tb-sidebar-row:hover {
+    background: var(--tb-surface);
+  }
+  .tb-sidebar-row-selected {
+    background: var(--tb-selection-bg) !important;
+  }
+  .tb-sidebar-username {
+    color: #64748B;
+  }
 }
 
 /* Sidebar block buttons — compact icon-only */

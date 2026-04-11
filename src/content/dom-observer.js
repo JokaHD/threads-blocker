@@ -22,11 +22,14 @@ export class DOMObserver {
       const username = this.extractUsername(href);
       if (!username) continue;
 
-      // Skip avatar links (small square images) — we want text username links
-      // Avatar links are typically 60x60 or similar square, text links are wider
+      // Skip avatar links — they contain <img> or are square-ish (e.g. 60x60)
+      if (link.querySelector('img, canvas, svg[width]')) continue;
       const rect = link.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0 && Math.abs(rect.width - rect.height) < 5 && rect.width < 80) {
-        continue; // Square-ish and small = avatar
+      if (rect.width > 0 && rect.height > 0) {
+        const ratio = rect.width / rect.height;
+        if (ratio > 0.7 && ratio < 1.4 && rect.width < 100) {
+          continue; // Square-ish and small = avatar
+        }
       }
 
       const container = this._findCommentContainer(link);
