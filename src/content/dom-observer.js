@@ -13,8 +13,9 @@ export class DOMObserver {
   }
 
   /**
-   * Find comments in the DOM. Returns one entry per comment, with both
-   * the avatar link and the text username link if found.
+   * Find comments in the DOM. For each unique username, takes the first
+   * /@username link found (typically the avatar) and walks up to find
+   * the comment container.
    */
   findComments(root) {
     const links = root.querySelectorAll('a[href^="/@"]');
@@ -26,43 +27,27 @@ export class DOMObserver {
       const username = this.extractUsername(href);
       if (!username) continue;
       if (seenUsernames.has(username)) continue;
+      seenUsernames.add(username);
 
-      const rect = link.getBoundingClientRect();
-      if (rect.width === 0 && rect.height === 0) continue;
+      const container = this._findCommentContainer(link);
+      if (!container) continue;
+      if (container.hasAttribute(PROCESSED_ATTR)) continue;
 
-      // Classify: avatar (square-ish, ≤80px) vs text link (wider than tall)
-      const isAvatar = rect.width <= 80 && Math.abs(rect.width - rect.height) < 15;
-
-      if (isAvatar) {
-        seenUsernames.add(username);
-        const container = this._findCommentContainer(link);
-        if (!container || container.hasAttribute(PROCESSED_ATTR)) continue;
-
-        results.push({
-          username,
-          element: container,
-          avatarLink: link,
-          textLink: null, // may be filled later
-        });
+      // The first link per username is typically the avatar.
+      // Try to find a second text link for the same username.
+      let textLink = null;
+      const siblingLinks = container.querySelectorAll(`a[href="/@${username}"]`);
+      for (const sl of siblingLinks) {
+        if (sl !== link) { textLink = sl; break; }
       }
+
+      results.push({
+        username,
+        element: container,
+        avatarLink: link,     // first link = avatar
+        textLink,             // second link = username text (may be null)
+      });
     }
-
-    // Second pass: find text links for already-found avatars
-    for (const link of links) {
-      const href = link.getAttribute('href');
-      const username = this.extractUsername(href);
-      if (!username) continue;
-
-      const rect = link.getBoundingClientRect();
-      const isAvatar = rect.width <= 80 && Math.abs(rect.width - rect.height) < 15;
-      if (isAvatar) continue;
-
-      const entry = results.find(r => r.username === username && !r.textLink);
-      if (entry) {
-        entry.textLink = link;
-      }
-    }
-
     return results;
   }
 
@@ -71,15 +56,15 @@ export class DOMObserver {
     let depth = 0;
     while (el && depth < 15) {
       if (el === document.body) break;
-      const w = el.offsetWidth;
       const children = el.children.length;
-      if (w >= 400 && w <= 900 && children >= 2) {
+      // A comment container typically has multiple children (avatar col + content col)
+      if (children >= 3) {
         return el;
       }
       el = el.parentElement;
       depth++;
     }
-    // Fallback
+    // Fallback: go up 5 levels
     el = linkElement.parentElement;
     for (let i = 0; i < 5; i++) {
       if (el.parentElement && el.parentElement !== document.body) {
