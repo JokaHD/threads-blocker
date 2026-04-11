@@ -54,22 +54,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 // ── Multi-select toggle button (floating) ────────────────────────────────
-const multiSelectBtn = document.createElement('button');
-multiSelectBtn.className = 'tb-multiselect-toggle';
-multiSelectBtn.textContent = '多選';
-multiSelectBtn.title = '開啟多選模式以批量封鎖';
-multiSelectBtn.setAttribute('aria-label', '開啟多選模式');
-multiSelectBtn.addEventListener('click', () => {
-  const enabled = !inlineControls.multiSelectMode;
-  inlineControls.setMultiSelectMode(enabled);
-  multiSelectBtn.classList.toggle('tb-multiselect-active', enabled);
-  multiSelectBtn.textContent = enabled ? '取消多選' : '多選';
-  multiSelectBtn.title = enabled ? '關閉多選模式' : '開啟多選模式以批量封鎖';
-  if (!enabled) {
-    selectionManager.clearSelection();
-  }
-});
-document.body.appendChild(multiSelectBtn);
+// FAB and block mode are handled by inlineControls
 
 // Process comments
 function processComment(comment) {
