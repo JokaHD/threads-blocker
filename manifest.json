@@ -11,14 +11,14 @@
     "*://www.threads.com/*"
   ],
   "background": {
-    "service_worker": "src/background/service-worker.js",
+    "service_worker": "service-worker.js",
     "type": "module"
   },
   "content_scripts": [
     {
       "matches": ["*://www.threads.com/*"],
-      "js": ["dist/content.js"],
-      "css": ["dist/content.css"]
+      "js": ["content.js"],
+      "css": ["content.css"]
     }
   ],
   "icons": {
