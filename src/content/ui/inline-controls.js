@@ -75,15 +75,39 @@ export class InlineControls {
     button.addEventListener('click', () => this._handleBlockClick(button, username, element));
 
     // ── Container ─────────────────────────────────────────────────────────────
-    const wrapper = document.createElement('span');
+    const wrapper = document.createElement('div');
     wrapper.className = 'tb-inline-controls';
     wrapper.setAttribute('role', 'group');
     wrapper.setAttribute('aria-label', `封鎖工具 @${username}`);
     wrapper.appendChild(checkbox);
     wrapper.appendChild(button);
 
-    // Insert after the link element (inline, inside the comment)
-    linkElement.insertAdjacentElement('afterend', wrapper);
+    // Position as a fixed-right overlay outside the comment container
+    // Uses CSS position:fixed + JS to track vertical position
+    document.body.appendChild(wrapper);
+    this._positionWrapper(wrapper, element);
+
+    // Re-position on scroll/resize
+    const reposition = () => this._positionWrapper(wrapper, element);
+    // Use IntersectionObserver to show/hide when comment is in view
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        wrapper.style.display = entry.isIntersecting ? 'flex' : 'none';
+        if (entry.isIntersecting) reposition();
+      }
+    }, { threshold: 0 });
+    io.observe(element);
+
+    // Store reference for cleanup
+    wrapper._io = io;
+    wrapper._target = element;
+
+    // Listen for scroll to reposition
+    const scrollContainer = this._findScrollContainer(element);
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', reposition, { passive: true });
+      wrapper._scrollCleanup = () => scrollContainer.removeEventListener('scroll', reposition);
+    }
   }
 
   /**
@@ -123,6 +147,29 @@ export class InlineControls {
         cb.classList.toggle('tb-checked', checked);
       }
     }
+  }
+
+  // ── Positioning ───────────────────────────────────────────────────────────
+
+  _positionWrapper(wrapper, target) {
+    const rect = target.getBoundingClientRect();
+    // Place to the right of the main content area
+    // Threads content is centered ~600px wide, so we put controls just right of it
+    const rightEdge = rect.right;
+    wrapper.style.position = 'fixed';
+    wrapper.style.top = `${rect.top + rect.height / 2}px`;
+    wrapper.style.left = `${rightEdge + 12}px`;
+    wrapper.style.transform = 'translateY(-50%)';
+  }
+
+  _findScrollContainer(element) {
+    let el = element.parentElement;
+    while (el && el !== document.body) {
+      const overflow = getComputedStyle(el).overflowY;
+      if (overflow === 'auto' || overflow === 'scroll') return el;
+      el = el.parentElement;
+    }
+    return window;
   }
 
   // ── Private ───────────────────────────────────────────────────────────────

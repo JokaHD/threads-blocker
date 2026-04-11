@@ -8,6 +8,8 @@ import { Toolbar } from './ui/toolbar.js';
 import { Panel } from './ui/panel.js';
 import { MessageType } from '../shared/messages.js';
 
+console.log('[ThreadBlocker] Content script loaded on', window.location.href);
+
 // Initialize modules
 const domObserver = new DOMObserver();
 const idResolver = new IDResolver();
@@ -54,6 +56,21 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // Process existing comments
 function processExistingComments() {
   const comments = domObserver.findComments(document.body);
+  console.log('[ThreadBlocker] Found', comments.length, 'comments on page');
+  if (comments.length === 0) {
+    // Debug: dump ALL links with /@ in href
+    const allLinks = document.querySelectorAll('a[href*="/@"]');
+    console.log('[ThreadBlocker] Debug: found', allLinks.length, 'links with /@ in href');
+    allLinks.forEach((l, i) => {
+      if (i < 15) console.log('[ThreadBlocker] Debug link:', l.getAttribute('href'), '| text:', l.textContent?.substring(0, 30));
+    });
+    // Also check for any profile-like links
+    const profileLinks = document.querySelectorAll('a[href^="/@"]');
+    console.log('[ThreadBlocker] Debug: found', profileLinks.length, 'links starting with /@');
+    profileLinks.forEach((l, i) => {
+      if (i < 15) console.log('[ThreadBlocker] Profile link:', l.getAttribute('href'), '| text:', l.textContent?.substring(0, 30));
+    });
+  }
   for (const comment of comments) {
     inlineControls.inject(comment);
     selectionManager.recordSeen(comment.username);
@@ -62,6 +79,10 @@ function processExistingComments() {
 
 // Watch for new comments
 domObserver.startObserving(document.body, (newComments) => {
+  console.log('[ThreadBlocker] MutationObserver found', newComments.length, 'new comments');
+  newComments.forEach((c, i) => {
+    if (i < 5) console.log('[ThreadBlocker]   comment:', c.username, '| link href:', c.linkElement?.getAttribute('href'));
+  });
   for (const comment of newComments) {
     inlineControls.inject(comment);
     selectionManager.recordSeen(comment.username);
