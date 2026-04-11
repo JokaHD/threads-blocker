@@ -8,7 +8,7 @@
     "alarms"
   ],
   "host_permissions": [
-    "*://www.threads.net/*"
+    "*://www.threads.com/*"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js",
@@ -16,7 +16,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://www.threads.net/*"],
+      "matches": ["*://www.threads.com/*"],
       "js": ["dist/content.js"],
       "css": ["dist/content.css"]
     }
