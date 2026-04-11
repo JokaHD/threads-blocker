@@ -13,7 +13,6 @@ export class DOMObserver {
   }
 
   findComments(root) {
-    // Find all links that are exactly /@username (not /@user/post/xxx)
     const links = root.querySelectorAll('a[href^="/@"]');
     const comments = [];
     const seenContainers = new Set();
@@ -23,19 +22,18 @@ export class DOMObserver {
       const username = this.extractUsername(href);
       if (!username) continue;
 
-      // Heuristic: the commenter's profile link is typically the FIRST
-      // /@username link in a comment block, and it usually contains just
-      // the username text or is near the top of the comment.
-      // Skip @mentions inside comment text — these are usually inside
-      // a <span dir="auto"> text block deeper in the DOM.
+      // Skip avatar links (small square images) — we want text username links
+      // Avatar links are typically 60x60 or similar square, text links are wider
+      const rect = link.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0 && Math.abs(rect.width - rect.height) < 5 && rect.width < 80) {
+        continue; // Square-ish and small = avatar
+      }
+
       const container = this._findCommentContainer(link);
       if (!container) continue;
       if (container.hasAttribute(PROCESSED_ATTR)) continue;
-
-      // Only take the first /@username link per container
-      const containerId = this._getContainerId(container);
-      if (seenContainers.has(containerId)) continue;
-      seenContainers.add(containerId);
+      if (seenContainers.has(container)) continue;
+      seenContainers.add(container);
 
       comments.push({ username, element: container, linkElement: link });
     }
@@ -43,26 +41,29 @@ export class DOMObserver {
   }
 
   _findCommentContainer(linkElement) {
-    // Walk up looking for a block-level container with multiple children
+    // Walk up looking for a container that is roughly the width of a comment
+    // On Threads, comments are ~500-700px wide
     let el = linkElement.parentElement;
     let depth = 0;
-    while (el && depth < 10) {
-      // Look for a container that has at least 2 child elements
-      // and is reasonably sized (not the whole page)
-      if (el.children.length >= 2 && el !== document.body) {
+    while (el && depth < 15) {
+      if (el === document.body) break;
+      const w = el.offsetWidth;
+      const children = el.children.length;
+      // A comment container is typically 400-800px wide with multiple children
+      if (w >= 400 && w <= 900 && children >= 2) {
         return el;
       }
       el = el.parentElement;
       depth++;
     }
-    return linkElement.parentElement;
-  }
-
-  _getContainerId(element) {
-    // Generate a unique-ish ID for deduplication
-    if (element.id) return element.id;
-    // Use the element reference itself (works within a single scan)
-    return element;
+    // Fallback: just go up a few levels
+    el = linkElement.parentElement;
+    for (let i = 0; i < 5; i++) {
+      if (el.parentElement && el.parentElement !== document.body) {
+        el = el.parentElement;
+      }
+    }
+    return el;
   }
 
   startObserving(targetNode, onNewComments) {

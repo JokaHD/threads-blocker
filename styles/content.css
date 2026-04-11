@@ -41,13 +41,14 @@
    Inline Controls
    ============================================================ */
 .tb-inline-controls {
+  position: absolute;
+  right: -120px;
+  top: 8px;
   display: flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
   z-index: 9999;
-  pointer-events: auto;
-  /* position/top/left set by JS */
 }
 
 /* Checkbox */
