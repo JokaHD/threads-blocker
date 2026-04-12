@@ -9,7 +9,8 @@ import { Icons } from './icons.js';
 import { getUIContainer } from './shadow-host.js';
 
 export class Panel {
-  constructor() {
+  constructor(container = null) {
+    this._container = container;
     this._el = null;
     this._minimized = true;
     this._cooldownInterval = null;
@@ -32,7 +33,7 @@ export class Panel {
    * Create panel in Shadow DOM.
    */
   init() {
-    const container = getUIContainer();
+    const container = this._container ?? getUIContainer();
     if (!container) {
       console.error('[ThreadBlocker] Failed to get UI container');
       return;

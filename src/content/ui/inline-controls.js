@@ -10,9 +10,10 @@ import { getUIContainer } from './shadow-host.js';
 import { COMMENT_ID_ATTR } from '../dom-observer.js';
 
 export class InlineControls {
-  constructor(selectionManager, idResolver) {
+  constructor(selectionManager, idResolver, container = null) {
     this._selection = selectionManager;
     this._idResolver = idResolver;
+    this._container = container;
     this._users = new Map(); // username -> { state, container }
     this._blockMode = false;
     this._fab = null;
@@ -22,7 +23,7 @@ export class InlineControls {
   }
 
   init() {
-    const container = getUIContainer();
+    const container = this._container ?? getUIContainer();
     if (!container) {
       console.error('[ThreadBlocker] Failed to get UI container');
       return;
@@ -139,10 +140,12 @@ export class InlineControls {
   _exitBlockMode() {
     this._blockMode = false;
 
-    // Update FAB
-    this._fab.classList.remove('tb-fab-active');
-    this._fab.innerHTML = `${Icons.shield}<span>Block Mode</span>`;
-    this._fab.title = 'Enter block mode: click comments to select';
+    // Update FAB (may be null during destroy)
+    if (this._fab) {
+      this._fab.classList.remove('tb-fab-active');
+      this._fab.innerHTML = `${Icons.shield}<span>Block Mode</span>`;
+      this._fab.title = 'Enter block mode: click comments to select';
+    }
 
     // Remove body class
     document.body.classList.remove('tb-blockmode');
