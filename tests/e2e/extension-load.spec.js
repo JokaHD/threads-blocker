@@ -10,8 +10,9 @@ test.describe('Extension Loading', () => {
     await page.goto('https://www.threads.com/');
 
     // Wait for extension to inject Shadow DOM host
-    const shadowHost = await page.waitForSelector('[data-thread-blocker-host]', {
+    const shadowHost = await page.waitForSelector('#tb-shadow-host', {
       timeout: 10000,
+      state: 'attached',
     });
 
     expect(shadowHost).toBeTruthy();
@@ -25,11 +26,11 @@ test.describe('Extension Loading', () => {
     await page.goto('https://www.threads.com/');
 
     // Wait for Shadow DOM host
-    await page.waitForSelector('[data-thread-blocker-host]', { timeout: 10000 });
+    await page.waitForSelector('#tb-shadow-host', { timeout: 10000, state: 'attached' });
 
     // Check for toolbar inside Shadow DOM
     const hasToolbar = await page.evaluate(() => {
-      const host = document.querySelector('[data-thread-blocker-host]');
+      const host = document.querySelector('#tb-shadow-host');
       if (!host || !host.shadowRoot) return false;
       return !!host.shadowRoot.querySelector('.tb-toolbar');
     });
@@ -44,7 +45,7 @@ test.describe('Extension Loading', () => {
     // Wait a bit for any potential injection
     await page.waitForTimeout(2000);
 
-    const shadowHost = await page.$('[data-thread-blocker-host]');
+    const shadowHost = await page.$('#tb-shadow-host');
     expect(shadowHost).toBeNull();
   });
 });

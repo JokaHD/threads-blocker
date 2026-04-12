@@ -14,11 +14,11 @@ test.describe('Block Flow', () => {
     await page.goto('https://www.threads.com/');
 
     // Wait for extension and comments to load
-    await page.waitForSelector('[data-thread-blocker-host]', { timeout: 10000 });
+    await page.waitForSelector('#tb-shadow-host', { timeout: 10000, state: 'attached' });
 
     // Look for inline controls (block buttons) in Shadow DOM
     const hasInlineControls = await page.evaluate(() => {
-      const host = document.querySelector('[data-thread-blocker-host]');
+      const host = document.querySelector('#tb-shadow-host');
       if (!host || !host.shadowRoot) return false;
       const controls = host.shadowRoot.querySelectorAll('.tb-inline-control');
       return controls.length > 0;
@@ -33,11 +33,11 @@ test.describe('Block Flow', () => {
     await setupApiMocks(page, 'blockSuccess');
     await page.goto('https://www.threads.com/');
 
-    await page.waitForSelector('[data-thread-blocker-host]', { timeout: 10000 });
+    await page.waitForSelector('#tb-shadow-host', { timeout: 10000, state: 'attached' });
 
     // Check panel exists in Shadow DOM
     const hasPanel = await page.evaluate(() => {
-      const host = document.querySelector('[data-thread-blocker-host]');
+      const host = document.querySelector('#tb-shadow-host');
       if (!host || !host.shadowRoot) return false;
       return !!host.shadowRoot.querySelector('.tb-panel');
     });
