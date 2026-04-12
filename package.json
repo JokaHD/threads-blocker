@@ -8,9 +8,22 @@
     "build": "node esbuild.config.js",
     "watch": "node esbuild.config.js --watch",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
-    "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch"
+    "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
+    "test:coverage": "node --experimental-vm-modules node_modules/.bin/jest --coverage"
   },
   "jest": {
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/content/content.js",
+      "!src/content/debug.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 40,
+        "functions": 45,
+        "lines": 35
+      }
+    },
     "projects": [
       {
         "displayName": "node",
