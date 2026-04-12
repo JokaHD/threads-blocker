@@ -11,10 +11,10 @@ test.describe('Unblock Flow', () => {
     await setupApiMocks(page, 'unblockSuccess');
     await page.goto('https://www.threads.com/');
 
-    await page.waitForSelector('[data-thread-blocker-host]', { timeout: 10000 });
+    await page.waitForSelector('#tb-shadow-host', { timeout: 10000, state: 'attached' });
 
     // Verify extension loaded
-    const shadowHost = await page.$('[data-thread-blocker-host]');
+    const shadowHost = await page.$('#tb-shadow-host');
     expect(shadowHost).toBeTruthy();
   });
 });

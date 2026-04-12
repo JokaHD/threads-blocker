@@ -11,10 +11,10 @@ test.describe('Error Handling', () => {
     await setupApiMocks(page, 'blockRateLimit');
     await page.goto('https://www.threads.com/');
 
-    await page.waitForSelector('[data-thread-blocker-host]', { timeout: 10000 });
+    await page.waitForSelector('#tb-shadow-host', { timeout: 10000, state: 'attached' });
 
     // Extension should load even with rate limit response queued
-    const shadowHost = await page.$('[data-thread-blocker-host]');
+    const shadowHost = await page.$('#tb-shadow-host');
     expect(shadowHost).toBeTruthy();
   });
 
@@ -22,10 +22,10 @@ test.describe('Error Handling', () => {
     await setupApiMocks(page, 'networkError');
     await page.goto('https://www.threads.com/');
 
-    await page.waitForSelector('[data-thread-blocker-host]', { timeout: 10000 });
+    await page.waitForSelector('#tb-shadow-host', { timeout: 10000, state: 'attached' });
 
     // Extension should still load
-    const shadowHost = await page.$('[data-thread-blocker-host]');
+    const shadowHost = await page.$('#tb-shadow-host');
     expect(shadowHost).toBeTruthy();
   });
 });
