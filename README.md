@@ -1,0 +1,105 @@
+# Threads Blocker
+
+[![Test](https://github.com/JokaHD/threads-blocker/actions/workflows/test.yml/badge.svg)](https://github.com/JokaHD/threads-blocker/actions/workflows/test.yml)
+
+A Chrome extension for batch-blocking accounts on Threads (threads.com).
+
+## Features
+
+- **Block Mode** - Click comments to select multiple users for blocking
+- **Batch Processing** - Queue multiple blocks and process them automatically
+- **Rate Limit Handling** - Automatic cooldown and retry on rate limits
+- **Progress Panel** - Track blocking progress in real-time
+- **Undo Support** - Unblock users directly from the panel
+
+## Installation
+
+### From Chrome Web Store
+
+Coming soon.
+
+### Manual Installation (Developer Mode)
+
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/JokaHD/threads-blocker.git
+   cd threads-blocker
+   ```
+
+2. Install dependencies and build:
+   ```bash
+   npm install
+   npm run build
+   ```
+
+3. Load in Chrome:
+   - Open `chrome://extensions/`
+   - Enable "Developer mode" (top right)
+   - Click "Load unpacked"
+   - Select the `dist/` folder
+
+## Usage
+
+1. Navigate to any page on [threads.com](https://www.threads.com/)
+2. Click the **Block Mode** button (shield icon) in the bottom-right corner
+3. Click on comments to select users you want to block
+4. Click **Block Selected** in the toolbar that appears
+5. Monitor progress in the panel
+
+### Keyboard Shortcuts
+
+- **Click** - Toggle selection on a comment
+- **Shift+Click** - Select range of comments
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Build extension
+npm run build
+
+# Watch mode (auto-rebuild on changes)
+npm run watch
+
+# Run unit tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run E2E tests (requires xvfb on Linux)
+npm run test:e2e
+```
+
+## Project Structure
+
+```
+src/
+├── background/       # Service worker (queue management, persistence)
+├── content/          # Content script (UI, DOM observation)
+│   └── ui/           # UI components (toolbar, panel, etc.)
+└── shared/           # Shared constants and message types
+
+tests/
+├── unit/             # Unit tests (Jest)
+└── e2e/              # E2E tests (Playwright)
+```
+
+## Privacy
+
+This extension:
+- Does **not** collect any personal data
+- Does **not** send data to external servers
+- Stores blocking queue locally in your browser
+
+See [PRIVACY.md](PRIVACY.md) for details.
+
+## License
+
+[MIT](LICENSE)
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
