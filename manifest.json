@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Thread Blocker",
+  "name": "Threads Blocker",
   "version": "1.0.0",
   "description": "在 Threads 留言區快速批量封鎖帳號",
   "permissions": [
