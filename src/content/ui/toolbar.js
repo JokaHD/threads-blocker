@@ -7,9 +7,10 @@ import { MessageType } from '../../shared/messages.js';
 import { getUIContainer } from './shadow-host.js';
 
 export class Toolbar {
-  constructor(selectionManager, idResolver) {
+  constructor(selectionManager, idResolver, container = null) {
     this._selection = selectionManager;
     this._idResolver = idResolver;
+    this._container = container;
     this._el = null;
     this._countEl = null;
   }
@@ -18,7 +19,7 @@ export class Toolbar {
    * Create toolbar in Shadow DOM.
    */
   init() {
-    const container = getUIContainer();
+    const container = this._container ?? getUIContainer();
     if (!container) {
       console.error('[ThreadBlocker] Failed to get UI container');
       return;

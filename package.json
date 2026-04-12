@@ -22,9 +22,9 @@
     ],
     "coverageThreshold": {
       "global": {
-        "branches": 50,
-        "functions": 50,
-        "lines": 45
+        "branches": 65,
+        "functions": 75,
+        "lines": 75
       }
     },
     "projects": [
@@ -43,7 +43,10 @@
           "token-provider",
           "id-resolver",
           "site-adapter",
-          "icons"
+          "icons",
+          "toolbar",
+          "panel",
+          "inline-controls"
         ]
       },
       {
@@ -58,7 +61,10 @@
           "**/tests/unit/token-provider.test.js",
           "**/tests/unit/id-resolver.test.js",
           "**/tests/unit/site-adapter.test.js",
-          "**/tests/unit/icons.test.js"
+          "**/tests/unit/icons.test.js",
+          "**/tests/unit/toolbar.test.js",
+          "**/tests/unit/panel.test.js",
+          "**/tests/unit/inline-controls.test.js"
         ]
       }
     ]
