@@ -18,14 +18,19 @@
         "transform": {},
         "setupFiles": ["./tests/jest-setup.js"],
         "testMatch": ["**/tests/unit/**/*.test.js"],
-        "testPathIgnorePatterns": ["dom-observer"]
+        "testPathIgnorePatterns": ["dom-observer", "token-provider", "id-resolver", "site-adapter"]
       },
       {
         "displayName": "jsdom",
         "testEnvironment": "jsdom",
         "transform": {},
         "setupFiles": ["./tests/jest-setup.js"],
-        "testMatch": ["**/tests/unit/dom-observer.test.js"]
+        "testMatch": [
+          "**/tests/unit/dom-observer.test.js",
+          "**/tests/unit/token-provider.test.js",
+          "**/tests/unit/id-resolver.test.js",
+          "**/tests/unit/site-adapter.test.js"
+        ]
       }
     ]
   },
