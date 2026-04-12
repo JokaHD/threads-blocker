@@ -65,3 +65,25 @@ export function resetChromeMocks() {
   mockStorage._clear();
   jest.clearAllMocks();
 }
+
+// Mock fetch
+export let mockFetchResponse = { ok: true, json: async () => ({}) };
+export const mockFetch = jest.fn(() => Promise.resolve({
+  ok: mockFetchResponse.ok,
+  status: mockFetchResponse.status || 200,
+  json: mockFetchResponse.json || (async () => ({})),
+  text: mockFetchResponse.text || (async () => ''),
+}));
+
+export function setMockFetchResponse(response) {
+  mockFetchResponse = response;
+}
+
+export function setupFetchMock() {
+  global.fetch = mockFetch;
+}
+
+export function resetFetchMock() {
+  mockFetch.mockClear();
+  mockFetchResponse = { ok: true, json: async () => ({}) };
+}
