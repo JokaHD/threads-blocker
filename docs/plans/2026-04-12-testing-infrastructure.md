@@ -233,50 +233,63 @@ git commit -m "test: add threads-api.test.js with GraphQL tests"
 
 **Files:**
 - Create: `tests/unit/token-provider.test.js`
+- Modify: `package.json` (add to jsdom project testMatch)
 - Reference: `src/content/token-provider.js`
 
-- [ ] **Step 1: Write tests for TokenProvider**
+**Note:** This test requires jsdom environment for DOM APIs.
+
+- [ ] **Step 1: Update Jest config for jsdom tests**
+
+In `package.json`, update the jsdom project's testMatch:
+
+```json
+{
+  "displayName": "jsdom",
+  "testEnvironment": "jsdom",
+  "transform": {},
+  "setupFiles": ["./tests/jest-setup.js"],
+  "testMatch": [
+    "**/tests/unit/dom-observer.test.js",
+    "**/tests/unit/token-provider.test.js",
+    "**/tests/unit/id-resolver.test.js",
+    "**/tests/unit/site-adapter.test.js"
+  ]
+}
+```
+
+- [ ] **Step 2: Write tests for TokenProvider**
 
 Create `tests/unit/token-provider.test.js`:
 
 ```javascript
+/**
+ * @jest-environment jsdom
+ */
 import { jest } from '@jest/globals';
 
-// Must set up DOM mocks before importing
-let mockCookie = '';
 let mockScripts = [];
-let mockInputs = [];
 
-Object.defineProperty(global.document, 'cookie', {
-  get: () => mockCookie,
-  configurable: true,
-});
-
-global.document.querySelectorAll = jest.fn((selector) => {
+// Mock querySelectorAll for scripts
+const originalQuerySelectorAll = document.querySelectorAll.bind(document);
+document.querySelectorAll = jest.fn((selector) => {
   if (selector === 'script') return mockScripts;
-  if (selector === 'input[name="fb_dtsg"]') return mockInputs.filter(i => i.name === 'fb_dtsg');
-  if (selector === 'input[name="lsd"]') return mockInputs.filter(i => i.name === 'lsd');
-  return [];
-});
-
-global.document.querySelector = jest.fn((selector) => {
-  if (selector === 'input[name="fb_dtsg"]') return mockInputs.find(i => i.name === 'fb_dtsg') || null;
-  if (selector === 'input[name="lsd"]') return mockInputs.find(i => i.name === 'lsd') || null;
-  return null;
+  return originalQuerySelectorAll(selector);
 });
 
 const { TokenProvider } = await import('../../src/content/token-provider.js');
 
 beforeEach(() => {
-  mockCookie = '';
   mockScripts = [];
-  mockInputs = [];
+  // Clear cookies
+  document.cookie.split(';').forEach(c => {
+    document.cookie = c.trim().split('=')[0] + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  });
 });
 
 describe('TokenProvider', () => {
   describe('getTokens', () => {
     it('extracts csrftoken from cookie', async () => {
-      mockCookie = 'csrftoken=abc123; other=value';
+      document.cookie = 'csrftoken=abc123';
 
       const provider = new TokenProvider();
       const tokens = await provider.getTokens();
@@ -285,7 +298,7 @@ describe('TokenProvider', () => {
     });
 
     it('extracts URL-encoded csrftoken', async () => {
-      mockCookie = 'csrftoken=abc%3D123';
+      document.cookie = 'csrftoken=abc%3D123';
 
       const provider = new TokenProvider();
       const tokens = await provider.getTokens();
@@ -294,7 +307,7 @@ describe('TokenProvider', () => {
     });
 
     it('throws if csrftoken not found', async () => {
-      mockCookie = 'other=value';
+      // No cookie set
 
       const provider = new TokenProvider();
 
@@ -302,7 +315,7 @@ describe('TokenProvider', () => {
     });
 
     it('extracts fb_dtsg from DTSGInitialData pattern', async () => {
-      mockCookie = 'csrftoken=csrf';
+      document.cookie = 'csrftoken=csrf';
       mockScripts = [{ textContent: '"DTSGInitialData",[],{"token":"dtsg-token-123"}' }];
 
       const provider = new TokenProvider();
@@ -312,7 +325,7 @@ describe('TokenProvider', () => {
     });
 
     it('extracts fb_dtsg from dtsg pattern', async () => {
-      mockCookie = 'csrftoken=csrf';
+      document.cookie = 'csrftoken=csrf';
       mockScripts = [{ textContent: 'dtsg":{"token":"dtsg-alt-456"}' }];
 
       const provider = new TokenProvider();
@@ -322,7 +335,7 @@ describe('TokenProvider', () => {
     });
 
     it('extracts lsd from LSD pattern', async () => {
-      mockCookie = 'csrftoken=csrf';
+      document.cookie = 'csrftoken=csrf';
       mockScripts = [{ textContent: '"LSD",[],{"token":"lsd-token-789"}' }];
 
       const provider = new TokenProvider();
@@ -332,14 +345,14 @@ describe('TokenProvider', () => {
     });
 
     it('caches tokens after first call', async () => {
-      mockCookie = 'csrftoken=csrf';
+      document.cookie = 'csrftoken=csrf';
       mockScripts = [{ textContent: '"DTSGInitialData",[],{"token":"dtsg"}' }];
 
       const provider = new TokenProvider();
       await provider.getTokens();
 
-      // Change mock data
-      mockCookie = 'csrftoken=different';
+      // Change mock data - but cache should persist
+      document.cookie = 'csrftoken=different';
       mockScripts = [];
 
       const tokens = await provider.getTokens();
@@ -349,13 +362,13 @@ describe('TokenProvider', () => {
 
   describe('invalidate', () => {
     it('clears cached tokens', async () => {
-      mockCookie = 'csrftoken=first';
+      document.cookie = 'csrftoken=first';
       mockScripts = [{ textContent: '"DTSGInitialData",[],{"token":"dtsg"}' }];
 
       const provider = new TokenProvider();
       await provider.getTokens();
 
-      mockCookie = 'csrftoken=second';
+      document.cookie = 'csrftoken=second';
       provider.invalidate();
 
       const tokens = await provider.getTokens();
@@ -387,20 +400,27 @@ git commit -m "test: add token-provider.test.js with extraction tests"
 - Create: `tests/unit/id-resolver.test.js`
 - Reference: `src/content/id-resolver.js`
 
+**Note:** This test needs jsdom for document.querySelectorAll (already added in Task 3 Step 1).
+
 - [ ] **Step 1: Write tests for IDResolver**
 
 Create `tests/unit/id-resolver.test.js`:
 
 ```javascript
+/**
+ * @jest-environment jsdom
+ */
 import { jest } from '@jest/globals';
 
 let mockFetchResponse;
 let mockScripts = [];
 
 global.fetch = jest.fn(() => Promise.resolve(mockFetchResponse));
-global.document.querySelectorAll = jest.fn((selector) => {
+
+const originalQuerySelectorAll = document.querySelectorAll.bind(document);
+document.querySelectorAll = jest.fn((selector) => {
   if (selector === 'script') return mockScripts;
-  return [];
+  return originalQuerySelectorAll(selector);
 });
 
 const { IDResolver } = await import('../../src/content/id-resolver.js');
@@ -414,7 +434,8 @@ beforeEach(() => {
 describe('IDResolver', () => {
   describe('resolve', () => {
     it('finds user_id from page scripts first', async () => {
-      mockScripts = [{ textContent: '"username":"testuser","pk":"99999"' }];
+      // Mock data must match regex: "username":"X"[^}]*"(?:pk|id|user_id)":"Y"
+      mockScripts = [{ textContent: '{"username":"testuser","pk":"99999"}' }];
 
       const resolver = new IDResolver();
       const userId = await resolver.resolve('testuser');
@@ -987,14 +1008,20 @@ export async function injectFakeTokens(context) {
 
 export async function injectFakeScripts(page) {
   await page.addInitScript(() => {
+    // TokenProvider looks for these specific patterns in script textContent:
+    // - "DTSGInitialData",[],{"token":"..."}
+    // - "LSD",[],{"token":"..."}
     const script = document.createElement('script');
     script.textContent = `
       window.__FAKE_TOKENS__ = true;
-      // DTSGInitialData pattern
-      var __dtsg = {"token": "test-dtsg-token"};
-      // LSD pattern
-      var __lsd = {"token": "test-lsd-token"};
+      var __data = {
+        "DTSGInitialData": [],
+        "_token": "DTSGInitialData",[],{"token":"test-dtsg-token"},
+        "LSD":[],{"token":"test-lsd-token"}
+      };
     `;
+    // The pattern matching looks for literal strings, so embed them directly
+    script.textContent = '"DTSGInitialData",[],{"token":"test-dtsg-token"} "LSD",[],{"token":"test-lsd-token"}';
     script.setAttribute('data-testid', 'fake-tokens');
     document.head.appendChild(script);
   });
