@@ -38,13 +38,17 @@ Establish a comprehensive testing infrastructure for Threads Blocker with:
 
 ### Coverage Configuration
 
+Add to `package.json` under the `jest` key:
+
 ```json
 {
-  "coverageThreshold": {
-    "global": {
-      "branches": 70,
-      "functions": 70,
-      "lines": 70
+  "jest": {
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 70,
+        "lines": 70
+      }
     }
   }
 }
@@ -63,14 +67,16 @@ Playwright - chosen for:
 ```
 tests/e2e/
 ├── fixtures/
-│   └── extension.ts      # Extension loading fixture
+│   └── extension.js      # Extension loading fixture
 ├── mocks/
-│   └── threads-api.ts    # API mock responses
-├── extension-load.spec.ts
-├── block-flow.spec.ts
-├── error-handling.spec.ts
-└── unblock-flow.spec.ts
+│   └── threads-api.js    # API mock responses
+├── extension-load.spec.js
+├── block-flow.spec.js
+├── error-handling.spec.js
+└── unblock-flow.spec.js
 ```
+
+Note: Using `.js` files for consistency with the project (pure JavaScript, no TypeScript).
 
 ### Extension Fixture
 
@@ -140,6 +146,39 @@ Visit real `threads.com` with all API requests intercepted. This ensures:
 - No fixture maintenance required
 - Real user flow testing
 
+**Network Reliability Considerations:**
+- Configure timeout (60s default) for slow connections
+- Retry failed tests (2 retries) for flaky network conditions
+- Abort navigation on persistent failure with clear error message
+
+### Playwright Configuration
+
+Create `playwright.config.js` in project root:
+
+```javascript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  testDir: 'tests/e2e',
+  timeout: 60000,
+  retries: 2,
+  use: {
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { 
+        browserName: 'chromium',
+        // Extension requires headed mode
+        headless: false,
+      },
+    },
+  ],
+});
+```
+
 ## GitHub Actions CI
 
 ### Workflow
@@ -175,8 +214,9 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run build
-      - run: npx playwright install chromium
-      - run: npm run test:e2e
+      - run: npx playwright install chromium --with-deps
+      # Chrome extensions require headed mode; use xvfb for virtual display
+      - run: xvfb-run npm run test:e2e
 ```
 
 ## Package.json Updates
@@ -193,13 +233,15 @@ jobs:
 
 ### New Scripts
 
+Note: Project uses ES modules, so Jest requires `--experimental-vm-modules` flag.
+
 ```json
 {
   "scripts": {
-    "test": "jest",
-    "test:coverage": "jest --coverage",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "test:coverage": "node --experimental-vm-modules node_modules/.bin/jest --coverage",
+    "test:e2e": "npx playwright test",
+    "test:e2e:headed": "npx playwright test --headed",
     "test:all": "npm run test:coverage && npm run test:e2e"
   }
 }
