@@ -96,6 +96,15 @@ This extension:
 
 See [PRIVACY.md](PRIVACY.md) for details.
 
+## Disclaimer
+
+This extension is provided "as is" for personal use. It is not affiliated with, endorsed by, or associated with Meta or Threads.
+
+Use of automation tools may violate the Terms of Service of certain platforms. By using this extension, you acknowledge that:
+- You use it at your own risk
+- The developers are not responsible for any consequences, including account restrictions
+- You should review the [Threads Terms of Use](https://help.instagram.com/769983657850450) before use
+
 ## License
 
 [MIT](LICENSE)
