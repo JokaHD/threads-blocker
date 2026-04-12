@@ -12,6 +12,8 @@ export const MessageType = {
   RESUME_QUEUE: 'resumeQueue',
   GET_ALL_STATES: 'getAllStates',
   GET_QUEUE_STATUS: 'getQueueStatus',
+  CLEAR_QUEUE: 'clearQueue',
+  CLEAR_COMPLETED: 'clearCompleted',
 
   // Service Worker → Content Script (via storage change)
   QUEUE_UPDATED: 'queueUpdated',

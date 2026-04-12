@@ -218,4 +218,20 @@ export class QueueManager {
   onChange(listener) {
     this._listeners.push(listener);
   }
+
+  // ── Bulk clear ────────────────────────────────────────────────────────────
+
+  clearCompleted() {
+    for (const [userId, item] of this._items) {
+      if (item.state === BlockState.BLOCKED) {
+        this._items.delete(userId);
+      }
+    }
+    this._notify();
+  }
+
+  clearAll() {
+    this._items.clear();
+    this._notify();
+  }
 }

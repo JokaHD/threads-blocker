@@ -1,76 +1,148 @@
+/**
+ * ID Resolver - resolves username to numeric user_id.
+ * Threads API requires numeric user_id, not username.
+ */
+
 export class IDResolver {
-  constructor() { this._cache = new Map(); }
-
-  async resolve(username, commentElement) {
-    if (this._cache.has(username)) return this._cache.get(username);
-
-    const fiberId = this._fromReactFiber(commentElement);
-    if (fiberId) { this._cache.set(username, fiberId); return fiberId; }
-
-    const dataId = this._fromDataAttributes(commentElement);
-    if (dataId) { this._cache.set(username, dataId); return dataId; }
-
-    const linkId = this._fromProfileLink(commentElement, username);
-    if (linkId) { this._cache.set(username, linkId); return linkId; }
-
-    console.warn(`[ThreadBlocker] Could not resolve user_id for @${username}, using username`);
-    return username;
+  constructor() {
+    this._cache = new Map();
+    this._pending = new Map(); // Prevent duplicate fetches
   }
 
-  _fromReactFiber(element) {
-    const fiberKey = Object.keys(element).find(
-      (key) => key.startsWith('__reactFiber$') || key.startsWith('__reactInternalInstance$')
-    );
-    if (!fiberKey) return null;
+  /**
+   * Resolve username to user_id.
+   * @param {string} username
+   * @returns {Promise<string|null>} user_id or null if not found
+   */
+  async resolve(username) {
+    // Check cache first
+    if (this._cache.has(username)) {
+      return this._cache.get(username);
+    }
+
+    // Check if already fetching
+    if (this._pending.has(username)) {
+      return this._pending.get(username);
+    }
+
+    // Start fetch
+    const promise = this._fetchUserId(username);
+    this._pending.set(username, promise);
+
     try {
-      let fiber = element[fiberKey];
-      let depth = 0;
-      while (fiber && depth < 20) {
-        const props = fiber.memoizedProps || fiber.pendingProps;
-        if (props?.user?.pk) return String(props.user.pk);
-        if (props?.user?.id) return String(props.user.id);
-        if (props?.userId) return String(props.userId);
-        if (props?.authorId) return String(props.authorId);
-        fiber = fiber.return;
-        depth++;
+      const userId = await promise;
+      if (userId) {
+        this._cache.set(username, userId);
       }
-    } catch { }
-    return null;
+      return userId;
+    } finally {
+      this._pending.delete(username);
+    }
   }
 
-  _fromDataAttributes(element) {
-    const attrs = ['data-user-id', 'data-author-id', 'data-pk'];
-    for (const attr of attrs) {
-      let el = element;
-      let depth = 0;
-      while (el && depth < 8) {
-        const val = el.getAttribute(attr);
-        if (val) return val;
-        el = el.parentElement;
-        depth++;
+  /**
+   * Fetch user_id from profile page.
+   */
+  async _fetchUserId(username) {
+    try {
+      // Method 1: Try to find in page HTML (if we're on their profile or they're in feed)
+      const fromPage = this._findInPage(username);
+      if (fromPage) {
+        console.log(`[ThreadBlocker] Found user_id for @${username} in page: ${fromPage}`);
+        return fromPage;
+      }
+
+      // Method 2: Fetch profile page and extract from script data
+      const response = await fetch(`https://www.threads.com/@${username}`, {
+        credentials: 'include',
+        headers: {
+          'Accept': 'text/html',
+        },
+      });
+
+      if (!response.ok) {
+        console.warn(`[ThreadBlocker] Failed to fetch profile for @${username}: ${response.status}`);
+        return null;
+      }
+
+      const html = await response.text();
+
+      // Look for user_id in various patterns
+      // Pattern 1: "user_id":"12345"
+      const match1 = html.match(/"user_id"\s*:\s*"(\d+)"/);
+      if (match1) {
+        console.log(`[ThreadBlocker] Found user_id for @${username}: ${match1[1]}`);
+        return match1[1];
+      }
+
+      // Pattern 2: "pk":"12345" or "id":"12345" near username
+      const match2 = html.match(new RegExp(`"username"\\s*:\\s*"${username}"[^}]*"(?:pk|id)"\\s*:\\s*"?(\\d+)"?`));
+      if (match2) {
+        console.log(`[ThreadBlocker] Found user_id for @${username}: ${match2[1]}`);
+        return match2[1];
+      }
+
+      // Pattern 3: userID or userId in script
+      const match3 = html.match(/"(?:userID|userId|user_id|profileID)"\s*:\s*"?(\d+)"?/);
+      if (match3) {
+        console.log(`[ThreadBlocker] Found user_id for @${username}: ${match3[1]}`);
+        return match3[1];
+      }
+
+      // Pattern 4: props containing id near username context
+      const match4 = html.match(new RegExp(`${username}[^}]{0,200}"id"\\s*:\\s*"?(\\d{10,})"?`));
+      if (match4) {
+        console.log(`[ThreadBlocker] Found user_id for @${username}: ${match4[1]}`);
+        return match4[1];
+      }
+
+      console.warn(`[ThreadBlocker] Could not find user_id for @${username} in profile page`);
+      return null;
+
+    } catch (err) {
+      console.error(`[ThreadBlocker] Error fetching user_id for @${username}:`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Try to find user_id in current page HTML/scripts.
+   */
+  _findInPage(username) {
+    // Look in script tags for user data
+    const scripts = document.querySelectorAll('script');
+    for (const script of scripts) {
+      const text = script.textContent || '';
+
+      // Pattern: username followed by user_id/pk/id
+      const pattern = new RegExp(`"username"\\s*:\\s*"${username}"[^}]*"(?:pk|id|user_id)"\\s*:\\s*"?(\\d+)"?`);
+      const match = text.match(pattern);
+      if (match) {
+        return match[1];
+      }
+
+      // Reverse pattern: id followed by username
+      const pattern2 = new RegExp(`"(?:pk|id|user_id)"\\s*:\\s*"?(\\d+)"?[^}]*"username"\\s*:\\s*"${username}"`);
+      const match2 = text.match(pattern2);
+      if (match2) {
+        return match2[1];
       }
     }
+
     return null;
   }
 
-  _fromProfileLink(element, username) {
-    const link = element.querySelector(`a[href="/@${username}"]`);
-    if (!link) return null;
-    const fiberKey = Object.keys(link).find((key) => key.startsWith('__reactFiber$'));
-    if (!fiberKey) return null;
-    try {
-      let fiber = link[fiberKey];
-      let depth = 0;
-      while (fiber && depth < 10) {
-        const props = fiber.memoizedProps || fiber.pendingProps;
-        if (props?.id && /^\d+$/.test(String(props.id))) return String(props.id);
-        if (props?.userId) return String(props.userId);
-        fiber = fiber.return;
-        depth++;
-      }
-    } catch { }
-    return null;
+  /**
+   * Pre-populate cache with known mappings.
+   */
+  setCache(username, userId) {
+    this._cache.set(username, userId);
   }
 
-  clearCache() { this._cache.clear(); }
+  /**
+   * Clear cache.
+   */
+  clearCache() {
+    this._cache.clear();
+  }
 }

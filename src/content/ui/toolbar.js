@@ -1,10 +1,12 @@
+/**
+ * Toolbar - batch operation bar at top of screen.
+ * Lives in Shadow DOM.
+ */
+
 import { MessageType } from '../../shared/messages.js';
+import { getUIContainer } from './shadow-host.js';
 
 export class Toolbar {
-  /**
-   * @param {import('../selection-manager.js').SelectionManager} selectionManager
-   * @param {import('../id-resolver.js').IDResolver} idResolver
-   */
   constructor(selectionManager, idResolver) {
     this._selection = selectionManager;
     this._idResolver = idResolver;
@@ -13,32 +15,38 @@ export class Toolbar {
   }
 
   /**
-   * Create DOM element and append to body. Register selection listener.
+   * Create toolbar in Shadow DOM.
    */
   init() {
+    const container = getUIContainer();
+    if (!container) {
+      console.error('[ThreadBlocker] Failed to get UI container');
+      return;
+    }
+
     const toolbar = document.createElement('div');
     toolbar.className = 'tb-toolbar';
     toolbar.setAttribute('role', 'toolbar');
-    toolbar.setAttribute('aria-label', '批量封鎖工具列');
+    toolbar.setAttribute('aria-label', 'Batch block toolbar');
 
     const count = document.createElement('span');
     count.className = 'tb-toolbar-count';
 
     const blockBtn = document.createElement('button');
     blockBtn.className = 'tb-toolbar-block-btn';
-    blockBtn.textContent = '封鎖所有已選';
+    blockBtn.textContent = 'Block Selected';
     blockBtn.addEventListener('click', () => this._handleBlockAll());
 
     const clearBtn = document.createElement('button');
     clearBtn.className = 'tb-toolbar-clear-btn';
-    clearBtn.textContent = '取消選取';
+    clearBtn.textContent = 'Clear Selection';
     clearBtn.addEventListener('click', () => this._selection.clearSelection());
 
     toolbar.appendChild(count);
     toolbar.appendChild(blockBtn);
     toolbar.appendChild(clearBtn);
 
-    document.body.appendChild(toolbar);
+    container.appendChild(toolbar);
 
     this._el = toolbar;
     this._countEl = count;
@@ -47,7 +55,7 @@ export class Toolbar {
     this._selection.onChange((selected) => {
       const n = selected.length;
       if (n > 0) {
-        count.textContent = `已選 ${n} 人`;
+        count.textContent = `${n} selected`;
         toolbar.classList.add('tb-toolbar-visible');
       } else {
         toolbar.classList.remove('tb-toolbar-visible');
@@ -56,7 +64,7 @@ export class Toolbar {
   }
 
   /**
-   * Remove the toolbar from the DOM.
+   * Remove toolbar.
    */
   destroy() {
     if (this._el) {
@@ -66,21 +74,32 @@ export class Toolbar {
     }
   }
 
-  // ── Private ───────────────────────────────────────────────────────────────
-
+  /**
+   * Handle block all selected users.
+   */
   async _handleBlockAll() {
     const selected = this._selection.getSelected();
     if (selected.length === 0) return;
 
+    console.log(`[ThreadBlocker] Resolving user IDs for ${selected.length} users...`);
+
     // Build list of { username, userId } entries
-    const entries = await Promise.all(
-      selected.map(async (username) => {
-        // We don't have the comment element here, pass null — resolver will
-        // fall back to username as the ID if it can't resolve.
-        const userId = await this._idResolver.resolve(username, document.body);
-        return { username, userId };
-      })
-    );
+    const entries = [];
+    for (const username of selected) {
+      const userId = await this._idResolver.resolve(username);
+      if (userId) {
+        entries.push({ username, userId });
+      } else {
+        console.warn(`[ThreadBlocker] Skipping @${username} - could not resolve user_id`);
+      }
+    }
+
+    if (entries.length === 0) {
+      console.error('[ThreadBlocker] No valid user IDs found');
+      return;
+    }
+
+    console.log(`[ThreadBlocker] Enqueueing ${entries.length} users for blocking`);
 
     chrome.runtime.sendMessage({
       type: MessageType.ENQUEUE_BLOCK_BATCH,
@@ -88,5 +107,8 @@ export class Toolbar {
     });
 
     this._selection.clearSelection();
+
+    // Exit block mode via custom event
+    window.dispatchEvent(new CustomEvent('tb-exit-block-mode'));
   }
 }

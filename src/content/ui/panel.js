@@ -1,84 +1,130 @@
+/**
+ * Panel - queue progress display.
+ * Lives in Shadow DOM, positioned bottom-right above FAB.
+ */
+
 import { BlockState } from '../../shared/constants.js';
 import { MessageType } from '../../shared/messages.js';
 import { Icons } from './icons.js';
+import { getUIContainer } from './shadow-host.js';
 
 export class Panel {
   constructor() {
     this._el = null;
     this._minimized = true;
     this._cooldownInterval = null;
-    // Hold references to avoid re-creating the cooldown button on every update
-    this._cooldownBtn = null;
-    this._cooldownTimeSpan = null;
     this._cooldownEnd = null;
     this._paused = false;
+
+    // Element references
+    this._badge = null;
+    this._badgeText = null;
+    this._progressFill = null;
+    this._body = null;
+    this._pauseBtn = null;
+    this._cooldownArea = null;
+    this._cooldownBtn = null;
+    this._cooldownTimeSpan = null;
+    this._retryNowBtn = null;
   }
 
   /**
-   * Create DOM, append to body, hidden by default.
+   * Create panel in Shadow DOM.
    */
   init() {
-    const panel = document.createElement('div');
-    panel.className = 'tb-panel';
-    panel.setAttribute('role', 'region');
-    panel.setAttribute('aria-label', '封鎖進度');
+    const container = getUIContainer();
+    if (!container) {
+      console.error('[ThreadBlocker] Failed to get UI container');
+      return;
+    }
 
-    // ── Minimized badge ───────────────────────────────────────────────────────
+    const panel = document.createElement('div');
+    panel.className = 'tb-panel tb-panel-hidden';
+    panel.setAttribute('role', 'region');
+    panel.setAttribute('aria-label', 'Block progress');
+
+    // Minimized badge
     const badge = document.createElement('button');
     badge.className = 'tb-panel-badge';
     badge.innerHTML = `${Icons.shield} <span class="tb-panel-badge-text">0/0</span>`;
     badge.addEventListener('click', () => this._toggleMinimized());
 
-    // ── Expanded header ───────────────────────────────────────────────────────
+    // Header
     const header = document.createElement('div');
     header.className = 'tb-panel-header';
 
     const title = document.createElement('span');
     title.className = 'tb-panel-title';
-    title.textContent = '封鎖進度';
+    title.textContent = 'Block Progress';
 
     const minimizeBtn = document.createElement('button');
     minimizeBtn.className = 'tb-panel-minimize-btn';
     minimizeBtn.innerHTML = Icons.minus;
-    minimizeBtn.title = '最小化';
+    minimizeBtn.title = 'Minimize';
     minimizeBtn.addEventListener('click', () => this._toggleMinimized());
 
     header.appendChild(title);
     header.appendChild(minimizeBtn);
 
-    // ── Progress bar ──────────────────────────────────────────────────────────
+    // Progress bar
     const progressBar = document.createElement('div');
     progressBar.className = 'tb-panel-progress-bar';
 
     const progressFill = document.createElement('div');
     progressFill.className = 'tb-panel-progress-fill';
+    progressFill.style.width = '0%';
     progressBar.appendChild(progressFill);
 
-    // ── Item list ─────────────────────────────────────────────────────────────
+    // Item list
     const body = document.createElement('div');
     body.className = 'tb-panel-body';
     body.setAttribute('aria-live', 'polite');
-    body.setAttribute('aria-relevant', 'additions removals');
 
-    // ── Pause/resume button ───────────────────────────────────────────────────
+    // Pause button
     const pauseBtn = document.createElement('button');
     pauseBtn.className = 'tb-panel-pause-btn';
-    pauseBtn.innerHTML = `${Icons.pause}<span>暫停</span>`;
-    pauseBtn.addEventListener('click', () => this._togglePause(pauseBtn));
+    pauseBtn.innerHTML = `${Icons.pause}<span>Pause</span>`;
+    pauseBtn.addEventListener('click', () => this._togglePause());
 
-    // ── Cooldown area (injected once, updated on interval) ────────────────────
+    // Footer with action buttons
+    const footer = document.createElement('div');
+    footer.className = 'tb-panel-footer';
+
+    const clearCompletedBtn = document.createElement('button');
+    clearCompletedBtn.className = 'tb-panel-action-btn';
+    clearCompletedBtn.innerHTML = `${Icons.check}<span>Clear Done</span>`;
+    clearCompletedBtn.title = 'Clear completed items';
+    clearCompletedBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: MessageType.CLEAR_COMPLETED });
+    });
+
+    const clearAllBtn = document.createElement('button');
+    clearAllBtn.className = 'tb-panel-action-btn tb-panel-action-btn--danger';
+    clearAllBtn.innerHTML = `${Icons.x}<span>Clear All</span>`;
+    clearAllBtn.title = 'Clear all items (including queued)';
+    clearAllBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: MessageType.CLEAR_QUEUE });
+    });
+
+    footer.appendChild(clearCompletedBtn);
+    footer.appendChild(clearAllBtn);
+
+    // Cooldown area
     const cooldownArea = document.createElement('div');
     cooldownArea.className = 'tb-panel-cooldown-area';
 
+    // Assemble
     panel.appendChild(badge);
     panel.appendChild(header);
     panel.appendChild(progressBar);
     panel.appendChild(body);
     panel.appendChild(pauseBtn);
+    panel.appendChild(footer);
     panel.appendChild(cooldownArea);
 
-    document.body.appendChild(panel);
+    container.appendChild(panel);
 
+    // Store references
     this._el = panel;
     this._badge = badge;
     this._badgeText = badge.querySelector('.tb-panel-badge-text');
@@ -87,15 +133,12 @@ export class Panel {
     this._pauseBtn = pauseBtn;
     this._cooldownArea = cooldownArea;
 
-    // Start minimized (hidden entirely until first update with items)
-    panel.style.display = 'none';
+    // Start minimized
     this._applyMinimized();
   }
 
   /**
-   * Receive queue state and re-render panel content.
-   * @param {Array<{username: string, state: string}>} items
-   * @param {{ paused: boolean }} status
+   * Update panel with queue state.
    */
   update(items, status) {
     if (!this._el) return;
@@ -103,27 +146,25 @@ export class Panel {
     this._paused = status?.paused ?? false;
 
     const total = items.length;
-    const done = items.filter(
-      (i) => i.state === BlockState.BLOCKED
-    ).length;
+    const done = items.filter(i => i.state === BlockState.BLOCKED).length;
 
     // Show/hide panel
     if (total === 0) {
-      this._el.style.display = 'none';
+      this._el.classList.add('tb-panel-hidden');
       return;
     }
-    this._el.style.display = '';
+    this._el.classList.remove('tb-panel-hidden');
 
     // Badge text
     if (this._badgeText) {
       this._badgeText.textContent = `${done}/${total}`;
     }
 
-    // Progress bar fill
+    // Progress bar
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     this._progressFill.style.width = `${pct}%`;
 
-    // Pause button label
+    // Pause button
     this._updatePauseBtn();
 
     // Item list
@@ -134,22 +175,20 @@ export class Panel {
   }
 
   /**
-   * Start a 1-second interval countdown toward `timestamp`.
-   * Creates the cooldown button once; only updates the time span afterward.
-   * @param {number} timestamp  ms since epoch when cooldown ends
+   * Set cooldown end timestamp and start countdown.
    */
   setCooldownEnd(timestamp) {
     if (!this._el) return;
 
     this._cooldownEnd = timestamp;
 
-    // Create cooldown display once
+    // Create cooldown UI once
     if (!this._cooldownBtn) {
       const btn = document.createElement('div');
       btn.className = 'tb-panel-cooldown-btn';
 
       const label = document.createElement('span');
-      label.textContent = '冷卻中: ';
+      label.textContent = 'Cooldown: ';
 
       const timeSpan = document.createElement('span');
       timeSpan.className = 'tb-panel-cooldown-time';
@@ -159,10 +198,11 @@ export class Panel {
 
       const retryNowBtn = document.createElement('button');
       retryNowBtn.className = 'tb-panel-cooldown-retry-btn';
-      retryNowBtn.textContent = '立即重試';
+      retryNowBtn.textContent = 'Retry Now';
       retryNowBtn.addEventListener('click', () => {
         chrome.runtime.sendMessage({ type: MessageType.RESUME_QUEUE });
       });
+
       this._cooldownArea.appendChild(btn);
       this._cooldownArea.appendChild(retryNowBtn);
 
@@ -184,26 +224,21 @@ export class Panel {
       if (remaining <= 0) {
         clearInterval(this._cooldownInterval);
         this._cooldownInterval = null;
-        if (this._cooldownBtn) {
-          this._cooldownBtn.style.display = 'none';
-        }
-        if (this._retryNowBtn) {
-          this._retryNowBtn.style.display = 'none';
-        }
+        if (this._cooldownBtn) this._cooldownBtn.style.display = 'none';
+        if (this._retryNowBtn) this._retryNowBtn.style.display = 'none';
       }
     };
 
-    // Clear any existing interval before starting a new one
     if (this._cooldownInterval) {
       clearInterval(this._cooldownInterval);
     }
 
-    tick(); // immediate first render
+    tick();
     this._cooldownInterval = setInterval(tick, 1000);
   }
 
   /**
-   * Remove the panel from the DOM and clean up timers.
+   * Cleanup.
    */
   destroy() {
     if (this._cooldownInterval) {
@@ -216,7 +251,7 @@ export class Panel {
     }
   }
 
-  // ── Private ───────────────────────────────────────────────────────────────
+  // Private methods
 
   _toggleMinimized() {
     this._minimized = !this._minimized;
@@ -225,20 +260,15 @@ export class Panel {
 
   _applyMinimized() {
     if (!this._el) return;
-    if (this._minimized) {
-      this._el.classList.add('tb-panel-minimized');
-    } else {
-      this._el.classList.remove('tb-panel-minimized');
-    }
+    this._el.classList.toggle('tb-panel-minimized', this._minimized);
   }
 
-  _togglePause(btn) {
+  _togglePause() {
     if (this._paused) {
       chrome.runtime.sendMessage({ type: MessageType.RESUME_QUEUE });
     } else {
       chrome.runtime.sendMessage({ type: MessageType.PAUSE_QUEUE });
     }
-    // Optimistic UI flip; will be corrected on next update()
     this._paused = !this._paused;
     this._updatePauseBtn();
   }
@@ -246,17 +276,12 @@ export class Panel {
   _updatePauseBtn() {
     if (!this._pauseBtn) return;
     if (this._paused) {
-      this._pauseBtn.innerHTML = `${Icons.play}<span>繼續</span>`;
+      this._pauseBtn.innerHTML = `${Icons.play}<span>Resume</span>`;
     } else {
-      this._pauseBtn.innerHTML = `${Icons.pause}<span>暫停</span>`;
+      this._pauseBtn.innerHTML = `${Icons.pause}<span>Pause</span>`;
     }
   }
 
-  /**
-   * Render a single queue item row.
-   * @param {{ username: string, state: string }} item
-   * @returns {HTMLElement}
-   */
   _renderItem(item) {
     const row = document.createElement('div');
     row.className = 'tb-panel-item';
@@ -272,12 +297,12 @@ export class Panel {
     row.appendChild(nameEl);
     row.appendChild(statusEl);
 
-    // Action button for queued (cancel) and failed (retry)
+    // Action buttons
     if (item.state === BlockState.QUEUED) {
       const cancelBtn = document.createElement('button');
       cancelBtn.className = 'tb-panel-item-action';
       cancelBtn.innerHTML = Icons.x;
-      cancelBtn.title = '取消';
+      cancelBtn.title = 'Cancel';
       cancelBtn.addEventListener('click', () => {
         chrome.runtime.sendMessage({ type: MessageType.CANCEL_QUEUED, userId: item.userId });
       });
@@ -286,7 +311,7 @@ export class Panel {
       const retryBtn = document.createElement('button');
       retryBtn.className = 'tb-panel-item-action';
       retryBtn.innerHTML = Icons.refreshCw;
-      retryBtn.title = '重試';
+      retryBtn.title = 'Retry';
       retryBtn.addEventListener('click', () => {
         chrome.runtime.sendMessage({ type: MessageType.RETRY_FAILED, userId: item.userId });
       });
@@ -298,12 +323,12 @@ export class Panel {
 
   _stateLabel(state) {
     switch (state) {
-      case BlockState.QUEUED:    return '排隊中';
-      case BlockState.BLOCKING:  return '封鎖中...';
-      case BlockState.BLOCKED:   return '已封鎖';
-      case BlockState.UNBLOCKING: return '解除中...';
-      case BlockState.FAILED:    return '失敗';
-      default:                   return state;
+      case BlockState.QUEUED: return 'Queued';
+      case BlockState.BLOCKING: return 'Blocking...';
+      case BlockState.BLOCKED: return 'Blocked';
+      case BlockState.UNBLOCKING: return 'Unblocking...';
+      case BlockState.FAILED: return 'Failed';
+      default: return state;
     }
   }
 }

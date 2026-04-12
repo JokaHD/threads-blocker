@@ -1,105 +1,170 @@
-const PROCESSED_ATTR = 'data-tb-processed';
-const USERNAME_PATTERN = /^\/@([a-zA-Z0-9_.]+)$/;
+/**
+ * DOM Observer for detecting comments.
+ * Uses site adapter for Threads-specific logic.
+ */
+
+import { getSiteRule } from './site-adapter.js';
+
+const COMMENT_ID_ATTR = 'data-tb-comment-id';
 
 export class DOMObserver {
   constructor() {
     this._observer = null;
+    this._urlObserver = null;
     this._onNewComments = null;
-  }
-
-  extractUsername(href) {
-    const match = href.match(USERNAME_PATTERN);
-    return match ? match[1] : null;
+    this._debounceTimer = null;
+    this._lastUrl = location.href;
+    this._siteRule = null;
   }
 
   /**
-   * Find comments in the DOM. For each unique username, takes the first
-   * /@username link found (typically the avatar) and walks up to find
-   * the comment container.
+   * Initialize with site rule.
    */
-  findComments(root) {
-    const links = root.querySelectorAll('a[href^="/@"]');
+  init() {
+    this._siteRule = getSiteRule();
+    if (!this._siteRule) {
+      console.warn('[ThreadBlocker] No site rule matched for', location.href);
+    }
+  }
+
+  /**
+   * Find comments in the DOM.
+   * For each unique username (text link, not avatar), finds the container.
+   * @param {Element} root - Root element to search within
+   * @returns {Array<{username: string, container: Element, link: Element}>}
+   */
+  findComments(root = document.body) {
+    if (!this._siteRule) return [];
+
+    const links = root.querySelectorAll(this._siteRule.usernameSelector);
     const results = [];
     const seenUsernames = new Set();
 
     for (const link of links) {
       const href = link.getAttribute('href');
-      const username = this.extractUsername(href);
+      const username = this._siteRule.extractUsername(href);
       if (!username) continue;
+
+      // Skip avatar links (we want text links only)
+      if (this._siteRule.isAvatarLink(link)) continue;
+
+      // Skip duplicates
       if (seenUsernames.has(username)) continue;
       seenUsernames.add(username);
 
-      const container = this._findCommentContainer(link);
+      // Find container
+      const container = this._siteRule.findContainer(link);
       if (!container) continue;
-      if (container.hasAttribute(PROCESSED_ATTR)) continue;
 
-      // The first link per username is typically the avatar.
-      // Try to find a second text link for the same username.
-      let textLink = null;
-      const siblingLinks = container.querySelectorAll(`a[href="/@${username}"]`);
-      for (const sl of siblingLinks) {
-        if (sl !== link) { textLink = sl; break; }
-      }
+      // Skip already processed
+      if (container.hasAttribute(COMMENT_ID_ATTR)) continue;
 
       results.push({
         username,
-        element: container,
-        avatarLink: link,     // first link = avatar
-        textLink,             // second link = username text (may be null)
+        container,
+        link,
       });
     }
+
     return results;
   }
 
-  _findCommentContainer(linkElement) {
-    let el = linkElement.parentElement;
-    let depth = 0;
-    while (el && depth < 15) {
-      if (el === document.body) break;
-      const children = el.children.length;
-      // A comment container typically has multiple children (avatar col + content col)
-      if (children >= 3) {
-        return el;
-      }
-      el = el.parentElement;
-      depth++;
-    }
-    // Fallback: go up 5 levels
-    el = linkElement.parentElement;
-    for (let i = 0; i < 5; i++) {
-      if (el.parentElement && el.parentElement !== document.body) {
-        el = el.parentElement;
-      }
-    }
-    return el;
+  /**
+   * Mark a container as processed.
+   * @param {Element} container
+   * @param {string} username
+   */
+  markProcessed(container, username) {
+    container.setAttribute(COMMENT_ID_ATTR, username);
   }
 
-  startObserving(targetNode, onNewComments) {
+  /**
+   * Start observing DOM for new comments.
+   * @param {function} onNewComments - Callback with array of new comments
+   */
+  startObserving(onNewComments) {
+    if (!this._siteRule) {
+      this.init();
+    }
+
     this._onNewComments = onNewComments;
-    this._observer = new MutationObserver((mutations) => {
-      const newComments = [];
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (node.nodeType !== Node.ELEMENT_NODE) continue;
-          const comments = this.findComments(node);
-          newComments.push(...comments);
-        }
-      }
-      if (newComments.length > 0 && this._onNewComments) {
-        this._onNewComments(newComments);
+
+    // Main DOM observer with debounce
+    this._observer = new MutationObserver(() => {
+      clearTimeout(this._debounceTimer);
+      this._debounceTimer = setTimeout(() => this._scan(), 100);
+    });
+
+    this._observer.observe(
+      this._siteRule?.getObserveTarget() || document.body,
+      this._siteRule?.observeConfig || { childList: true, subtree: true }
+    );
+
+    // URL change observer for SPA navigation
+    this._urlObserver = new MutationObserver(() => {
+      if (location.href !== this._lastUrl) {
+        this._lastUrl = location.href;
+        this._handleRouteChange();
       }
     });
-    this._observer.observe(targetNode, { childList: true, subtree: true });
+
+    this._urlObserver.observe(document.body, { childList: true, subtree: true });
   }
 
+  /**
+   * Stop observing.
+   */
   stopObserving() {
     if (this._observer) {
       this._observer.disconnect();
       this._observer = null;
     }
+    if (this._urlObserver) {
+      this._urlObserver.disconnect();
+      this._urlObserver = null;
+    }
+    clearTimeout(this._debounceTimer);
   }
 
-  static markProcessed(element) {
-    element.setAttribute(PROCESSED_ATTR, 'true');
+  /**
+   * Scan for new comments and notify callback.
+   */
+  _scan() {
+    const comments = this.findComments();
+    if (comments.length > 0 && this._onNewComments) {
+      this._onNewComments(comments);
+    }
+  }
+
+  /**
+   * Handle SPA route change.
+   * Clear old markers and re-scan.
+   */
+  _handleRouteChange() {
+    console.log('[ThreadBlocker] Route changed to', location.href);
+
+    // Clear old markers
+    document.querySelectorAll(`[${COMMENT_ID_ATTR}]`).forEach(el => {
+      el.removeAttribute(COMMENT_ID_ATTR);
+      el.classList.remove('tb-blockmode-target', 'tb-selected');
+    });
+
+    // Re-scan after a short delay (let new content load)
+    setTimeout(() => this._scan(), 300);
+  }
+
+  /**
+   * Get all currently marked comments.
+   * @returns {Array<{username: string, container: Element}>}
+   */
+  getMarkedComments() {
+    const elements = document.querySelectorAll(`[${COMMENT_ID_ATTR}]`);
+    return Array.from(elements).map(el => ({
+      username: el.getAttribute(COMMENT_ID_ATTR),
+      container: el,
+    }));
   }
 }
+
+// Export attribute name for other modules
+export { COMMENT_ID_ATTR };

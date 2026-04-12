@@ -181,6 +181,23 @@ async function handleMessage(message, sender) {
       return { status: buildStatus() };
     }
 
+    case MessageType.CLEAR_QUEUE: {
+      // Clear all queue data
+      queue.clearAll();
+      await chrome.storage.local.remove(['blockQueue', 'queueNotify', 'cooldownEnd']);
+      rateLimitHandler._inCooldown = false;
+      rateLimitHandler._cooldownEnd = null;
+      console.log('[ThreadBlocker] Queue cleared (all)');
+      return { ok: true };
+    }
+
+    case MessageType.CLEAR_COMPLETED: {
+      // Clear only completed (BLOCKED) items
+      queue.clearCompleted();
+      console.log('[ThreadBlocker] Queue cleared (completed only)');
+      return { ok: true };
+    }
+
     default:
       return { error: `Unknown message type: ${type}` };
   }

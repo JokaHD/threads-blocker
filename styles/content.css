@@ -1,119 +1,56 @@
-/* Thread Blocker — Content Script Styles */
-
-:root {
-  --tb-primary: #2563EB;
-  --tb-danger: #DC2626;
-  --tb-success: #16A34A;
-  --tb-warning: #F59E0B;
-  --tb-radius-sm: 8px;
-  --tb-radius-md: 12px;
-  --tb-transition: 150ms ease;
-}
+/**
+ * Thread Blocker - Page-Side Styles
+ * Block mode visual feedback on comment containers.
+ */
 
 /* ============================================================
-   Spinner
-   ============================================================ */
-@keyframes tb-spin {
-  to { transform: rotate(360deg); }
-}
-.tb-spin { display: inline-block; animation: tb-spin 700ms linear infinite; }
-@media (prefers-reduced-motion: reduce) { .tb-spin { animation: none; } }
-
-/* ============================================================
-   FAB — Floating Action Button (bottom-right)
-   ============================================================ */
-.tb-fab {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 100000;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  border: none;
-  border-radius: 28px;
-  background: #222;
-  color: #ccc;
-  font-size: 15px;
-  font-weight: 600;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  transition: all var(--tb-transition);
-  pointer-events: auto;
-}
-
-.tb-fab svg {
-  width: 20px;
-  height: 20px;
-}
-
-.tb-fab:hover {
-  background: #333;
-  color: #fff;
-  transform: scale(1.03);
-}
-
-.tb-fab:active {
-  transform: scale(0.97);
-}
-
-.tb-fab-active {
-  background: var(--tb-danger) !important;
-  color: #fff !important;
-  box-shadow: 0 4px 20px rgba(220, 38, 38, 0.4);
-}
-
-.tb-fab-active:hover {
-  background: #B91C1C !important;
-}
-
-@media (prefers-color-scheme: light) {
-  .tb-fab {
-    background: #fff;
-    color: #333;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  }
-  .tb-fab:hover { background: #f5f5f5; color: #000; }
-}
-
-/* ============================================================
-   Block Mode — comment targets
+   Block Mode — cursor and pointer-events
    ============================================================ */
 
-/* When block mode is active, change cursor globally */
-body.tb-blockmode [data-tb-processed] {
+body.tb-blockmode [data-tb-comment-id] {
   cursor: crosshair !important;
+  position: relative;
 }
 
-/* Hoverable comment in block mode */
-[data-tb-processed].tb-blockmode-target {
-  transition: outline var(--tb-transition), background var(--tb-transition);
-  outline: 2px solid transparent;
+/* Disable all interactive elements inside comments in block mode */
+body.tb-blockmode [data-tb-comment-id] a,
+body.tb-blockmode [data-tb-comment-id] button,
+body.tb-blockmode [data-tb-comment-id] [role="button"],
+body.tb-blockmode [data-tb-comment-id] [data-pressable-container] {
+  pointer-events: none !important;
+}
+
+/* ============================================================
+   Hover state
+   ============================================================ */
+
+[data-tb-comment-id].tb-hover {
+  outline: 2px solid rgba(220, 38, 38, 0.6) !important;
   outline-offset: -2px;
+  background: rgba(220, 38, 38, 0.08) !important;
   border-radius: 8px;
 }
 
-[data-tb-processed].tb-blockmode-target:hover {
-  outline-color: rgba(220, 38, 38, 0.5);
-  background: rgba(220, 38, 38, 0.05) !important;
+/* ============================================================
+   Selected state
+   ============================================================ */
+
+[data-tb-comment-id].tb-selected {
+  outline: 2px solid #DC2626 !important;
+  outline-offset: -2px;
+  background: rgba(220, 38, 38, 0.15) !important;
+  border-radius: 8px;
 }
 
-/* Selected comment */
-[data-tb-processed].tb-blockmode-selected {
-  outline-color: var(--tb-danger) !important;
-  background: rgba(220, 38, 38, 0.12) !important;
-}
-
-[data-tb-processed].tb-blockmode-selected::after {
+/* Checkmark indicator */
+[data-tb-comment-id].tb-selected::after {
   content: '✓';
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 8px;
+  right: 8px;
   width: 24px;
   height: 24px;
-  background: var(--tb-danger);
+  background: #DC2626;
   color: #fff;
   border-radius: 50%;
   display: flex;
@@ -122,141 +59,5 @@ body.tb-blockmode [data-tb-processed] {
   font-size: 14px;
   font-weight: 700;
   pointer-events: none;
-}
-
-/* ============================================================
-   Toolbar (top bar, shows when items are selected)
-   ============================================================ */
-.tb-toolbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100001;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 20px;
-  background: rgba(20, 20, 20, 0.95);
-  color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 14px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transform: translateY(-100%);
-  transition: transform 250ms ease-out;
-}
-.tb-toolbar.tb-toolbar-visible { transform: translateY(0); }
-
-.tb-toolbar-label { flex: 1; font-weight: 600; color: #ccc; }
-
-.tb-toolbar-block-btn {
-  background: var(--tb-danger);
-  color: #fff;
-  border: none;
-  border-radius: var(--tb-radius-sm);
-  padding: 8px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--tb-transition);
-}
-.tb-toolbar-block-btn:hover { background: #B91C1C; }
-
-.tb-toolbar-clear-btn {
-  background: transparent;
-  color: #ccc;
-  border: 1px solid #555;
-  border-radius: var(--tb-radius-sm);
-  padding: 8px 18px;
-  font-size: 14px;
-  cursor: pointer;
-}
-.tb-toolbar-clear-btn:hover { border-color: #fff; color: #fff; }
-
-@media (prefers-color-scheme: light) {
-  .tb-toolbar { background: rgba(255,255,255,0.95); color: #333; }
-  .tb-toolbar-label { color: #666; }
-  .tb-toolbar-clear-btn { border-color: #ccc; color: #666; }
-  .tb-toolbar-clear-btn:hover { border-color: #333; color: #333; }
-}
-
-/* ============================================================
-   Panel (bottom-right, queue progress)
-   ============================================================ */
-.tb-panel {
-  position: fixed;
-  bottom: 80px; /* Above the FAB */
-  right: 16px;
-  z-index: 100000;
-  width: 300px;
-  max-height: 360px;
-  display: flex;
-  flex-direction: column;
-  background: rgba(25, 25, 25, 0.95);
-  border: 1px solid #333;
-  border-radius: var(--tb-radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 13px;
-  color: #e0e0e0;
-  overflow: hidden;
-}
-
-.tb-panel-header {
-  display: flex; align-items: center; gap: 8px; padding: 10px 12px;
-  background: rgba(35, 35, 35, 0.9); border-bottom: 1px solid #333; flex-shrink: 0;
-}
-.tb-panel-title { flex: 1; font-weight: 600; }
-.tb-panel-minimize-btn {
-  background: transparent; border: none; color: #888; cursor: pointer;
-  padding: 2px 4px; border-radius: 4px; font-size: 14px; line-height: 1;
-}
-.tb-panel-minimize-btn:hover { color: #e0e0e0; background: #333; }
-
-.tb-panel-body { flex: 1; overflow-y: auto; padding: 8px 0; min-height: 0; }
-.tb-panel-progress { padding: 8px 12px 4px; flex-shrink: 0; }
-.tb-panel-progress-bar { width: 100%; height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
-.tb-panel-progress-fill { height: 100%; background: var(--tb-primary); border-radius: 2px; transition: width 300ms ease; }
-
-.tb-panel-item-list { list-style: none; margin: 0; padding: 0; }
-.tb-panel-item { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid #2a2a2a; }
-.tb-panel-item:last-child { border-bottom: none; }
-.tb-panel-item-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tb-panel-item-status { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
-
-.tb-panel-item-status--queued { background: rgba(245,158,11,0.15); color: var(--tb-warning); }
-.tb-panel-item-status--blocking { background: rgba(220,38,38,0.15); color: var(--tb-danger); }
-.tb-panel-item-status--blocked { background: rgba(22,163,74,0.15); color: var(--tb-success); }
-.tb-panel-item-status--unblocking { background: rgba(100,116,139,0.15); color: #94A3B8; }
-.tb-panel-item-status--failed { background: rgba(220,38,38,0.15); color: var(--tb-danger); }
-
-.tb-panel-pause-btn {
-  width: 100%; padding: 8px; background: #222; border: none;
-  border-top: 1px solid #333; color: #888; font-size: 12px; cursor: pointer; flex-shrink: 0;
-}
-.tb-panel-pause-btn:hover { background: #333; color: #e0e0e0; }
-
-.tb-panel.tb-panel-minimized { width: 48px; height: 48px; max-height: 48px; border-radius: 50%; cursor: pointer; }
-.tb-panel.tb-panel-minimized .tb-panel-header,
-.tb-panel.tb-panel-minimized .tb-panel-body,
-.tb-panel.tb-panel-minimized .tb-panel-progress,
-.tb-panel.tb-panel-minimized .tb-panel-pause-btn { display: none; }
-.tb-panel-badge { display: none; }
-.tb-panel.tb-panel-minimized .tb-panel-badge {
-  display: flex; align-items: center; justify-content: center;
-  width: 100%; height: 100%; background: var(--tb-primary); color: #fff;
-  font-size: 14px; font-weight: 700;
-}
-
-@media (prefers-color-scheme: light) {
-  .tb-panel { background: rgba(255,255,255,0.95); border-color: #e0e0e0; color: #333; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
-  .tb-panel-header { background: #f8f8f8; border-bottom-color: #e0e0e0; }
-  .tb-panel-progress-bar { background: #e0e0e0; }
-  .tb-panel-item { border-bottom-color: #e0e0e0; }
-  .tb-panel-pause-btn { background: #f8f8f8; border-top-color: #e0e0e0; color: #666; }
-  .tb-panel-pause-btn:hover { background: #e0e0e0; color: #333; }
+  z-index: 10000;
 }

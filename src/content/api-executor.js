@@ -11,35 +11,48 @@ export class APIExecutor {
 
   async processTask(task) {
     const { userId, username, action } = task;
+
     try {
-      const token = await this._tokenProvider.getToken();
       const fn = action === 'block' ? this._api.blockUser : this._api.unblockUser;
-      let result;
-      try {
-        result = await fn(userId, token);
-      } catch (err) {
-        if (err.status === 401) {
-          this._tokenProvider.invalidate();
-          const newToken = await this._tokenProvider.refreshToken();
-          result = await fn(userId, newToken);
-        } else {
-          throw err;
-        }
+
+      let result = await fn(userId);
+
+      // Handle 401 - refresh tokens and retry
+      if (!result.success && result.status === 401) {
+        console.log('[ThreadBlocker] Got 401, refreshing tokens...');
+        this._tokenProvider.invalidate();
+        await this._tokenProvider.refreshTokens();
+        result = await fn(userId);
       }
-      await chrome.runtime.sendMessage({
-        type: MessageType.TASK_RESULT,
-        userId,
-        success: true,
-      });
+
+      if (result.success) {
+        await chrome.runtime.sendMessage({
+          type: MessageType.TASK_RESULT,
+          userId,
+          success: true,
+        });
+      } else {
+        await chrome.runtime.sendMessage({
+          type: MessageType.TASK_RESULT,
+          userId,
+          success: false,
+          error: {
+            status: result.status || 0,
+            message: result.error || 'Unknown error',
+            isNetworkError: !result.status,
+          },
+        });
+      }
     } catch (err) {
+      console.error('[ThreadBlocker] Task error:', err);
       await chrome.runtime.sendMessage({
         type: MessageType.TASK_RESULT,
         userId,
         success: false,
         error: {
-          status: err.status || 0,
+          status: 0,
           message: err.message,
-          isNetworkError: !err.status,
+          isNetworkError: true,
         },
       });
     }
@@ -48,24 +61,46 @@ export class APIExecutor {
   async startPolling() {
     if (this._running) return;
     this._running = true;
+
+    console.log('[ThreadBlocker] Starting task polling...');
+
     while (this._running) {
-      if (this._paused) { await this._sleep(1000); continue; }
+      if (this._paused) {
+        await this._sleep(1000);
+        continue;
+      }
+
       const response = await chrome.runtime.sendMessage({ type: MessageType.GET_NEXT_TASK });
+
       if (response?.task) {
+        console.log('[ThreadBlocker] Processing task:', response.task);
         await this.processTask(response.task);
         await this._sleep(Timing.BLOCK_INTERVAL);
       } else if (response?.cooldownEnd) {
+        console.log('[ThreadBlocker] Queue is in cooldown');
         this._running = false;
         break;
       } else {
+        console.log('[ThreadBlocker] No more tasks');
         this._running = false;
         break;
       }
     }
   }
 
-  stopPolling() { this._running = false; }
-  pause() { this._paused = true; }
-  resume() { this._paused = false; }
-  _sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+  stopPolling() {
+    this._running = false;
+  }
+
+  pause() {
+    this._paused = true;
+  }
+
+  resume() {
+    this._paused = false;
+  }
+
+  _sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 }
