@@ -18,8 +18,8 @@ beforeEach(() => {
   setupChromeMocks();
 
   tokenProvider = {
-    getToken: jest.fn().mockResolvedValue('test-token'),
-    refreshToken: jest.fn().mockResolvedValue('new-token'),
+    getTokens: jest.fn().mockResolvedValue({ csrftoken: 'test', fb_dtsg: 'dtsg', lsd: 'lsd' }),
+    refreshTokens: jest.fn().mockResolvedValue({ csrftoken: 'new', fb_dtsg: 'dtsg2', lsd: 'lsd2' }),
     invalidate: jest.fn(),
   };
 
@@ -37,8 +37,7 @@ describe('processTask', () => {
 
     await executor.processTask(task);
 
-    expect(tokenProvider.getToken).toHaveBeenCalled();
-    expect(apiFunctions.blockUser).toHaveBeenCalledWith('123', 'test-token');
+    expect(apiFunctions.blockUser).toHaveBeenCalledWith('123');
     expect(mockRuntime.sendMessage).toHaveBeenCalledWith({
       type: MessageType.TASK_RESULT,
       userId: '123',
@@ -46,10 +45,30 @@ describe('processTask', () => {
     });
   });
 
-  it('reports failure on fetch error', async () => {
-    const error = new Error('Network failure');
-    error.status = 0;
-    apiFunctions.blockUser.mockRejectedValue(error);
+  it('reports failure when API returns error', async () => {
+    apiFunctions.blockUser.mockResolvedValue({
+      success: false,
+      status: 500,
+      error: 'Server error',
+    });
+
+    const task = { userId: '456', username: 'bob', action: 'block' };
+    await executor.processTask(task);
+
+    expect(mockRuntime.sendMessage).toHaveBeenCalledWith({
+      type: MessageType.TASK_RESULT,
+      userId: '456',
+      success: false,
+      error: {
+        status: 500,
+        message: 'Server error',
+        isNetworkError: false,
+      },
+    });
+  });
+
+  it('reports failure on exception', async () => {
+    apiFunctions.blockUser.mockRejectedValue(new Error('Network failure'));
 
     const task = { userId: '456', username: 'bob', action: 'block' };
     await executor.processTask(task);
@@ -66,20 +85,17 @@ describe('processTask', () => {
     });
   });
 
-  it('refreshes token on 401 and retries', async () => {
-    const authError = new Error('Unauthorized');
-    authError.status = 401;
+  it('refreshes tokens on 401 and retries', async () => {
     apiFunctions.blockUser
-      .mockRejectedValueOnce(authError)
+      .mockResolvedValueOnce({ success: false, status: 401, error: 'Unauthorized' })
       .mockResolvedValueOnce({ success: true });
 
     const task = { userId: '789', username: 'carol', action: 'block' };
     await executor.processTask(task);
 
     expect(tokenProvider.invalidate).toHaveBeenCalled();
-    expect(tokenProvider.refreshToken).toHaveBeenCalled();
+    expect(tokenProvider.refreshTokens).toHaveBeenCalled();
     expect(apiFunctions.blockUser).toHaveBeenCalledTimes(2);
-    expect(apiFunctions.blockUser).toHaveBeenLastCalledWith('789', 'new-token');
     expect(mockRuntime.sendMessage).toHaveBeenCalledWith({
       type: MessageType.TASK_RESULT,
       userId: '789',
@@ -92,7 +108,7 @@ describe('processTask', () => {
 
     await executor.processTask(task);
 
-    expect(apiFunctions.unblockUser).toHaveBeenCalledWith('111', 'test-token');
+    expect(apiFunctions.unblockUser).toHaveBeenCalledWith('111');
     expect(apiFunctions.blockUser).not.toHaveBeenCalled();
     expect(mockRuntime.sendMessage).toHaveBeenCalledWith({
       type: MessageType.TASK_RESULT,

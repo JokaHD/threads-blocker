@@ -1,44 +1,56 @@
 /** @jest-environment jsdom */
 
-import { DOMObserver } from '../../src/content/dom-observer.js';
+import { DOMObserver, COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
+import { threadsSiteRule } from '../../src/content/site-adapter.js';
+
+// Mock location for jsdom
+beforeAll(() => {
+  delete window.location;
+  window.location = { href: 'https://www.threads.com/@user/post/123' };
+});
 
 describe('DOMObserver', () => {
   let observer;
 
   beforeEach(() => {
     observer = new DOMObserver();
+    observer.init();
     document.body.innerHTML = '';
   });
 
-  // ── extractUsername ────────────────────────────────────────────────────────
+  afterEach(() => {
+    observer.stopObserving();
+  });
 
-  describe('extractUsername', () => {
+  // ── Site Adapter extractUsername ─────────────────────────────────────────────
+
+  describe('threadsSiteRule.extractUsername', () => {
     it('parses a simple /@username href', () => {
-      expect(observer.extractUsername('/@johndoe')).toBe('johndoe');
+      expect(threadsSiteRule.extractUsername('/@johndoe')).toBe('johndoe');
     });
 
     it('parses usernames with underscores and dots', () => {
-      expect(observer.extractUsername('/@john.doe_123')).toBe('john.doe_123');
+      expect(threadsSiteRule.extractUsername('/@john.doe_123')).toBe('john.doe_123');
     });
 
     it('returns null for /explore', () => {
-      expect(observer.extractUsername('/explore')).toBeNull();
+      expect(threadsSiteRule.extractUsername('/explore')).toBeNull();
     });
 
     it('returns null for an external URL', () => {
-      expect(observer.extractUsername('https://example.com/@user')).toBeNull();
+      expect(threadsSiteRule.extractUsername('https://example.com/@user')).toBeNull();
     });
 
     it('returns null for bare @username (missing leading slash)', () => {
-      expect(observer.extractUsername('@johndoe')).toBeNull();
+      expect(threadsSiteRule.extractUsername('@johndoe')).toBeNull();
     });
 
     it('returns null for empty string', () => {
-      expect(observer.extractUsername('')).toBeNull();
+      expect(threadsSiteRule.extractUsername('')).toBeNull();
     });
 
     it('returns null for /@username/post/123 (extra path segments)', () => {
-      expect(observer.extractUsername('/@johndoe/post/123')).toBeNull();
+      expect(threadsSiteRule.extractUsername('/@johndoe/post/123')).toBeNull();
     });
   });
 
@@ -50,6 +62,7 @@ describe('DOMObserver', () => {
         <div class="comment">
           <a href="/@alice">Alice</a>
           <p>Some comment text</p>
+          <span>extra</span>
         </div>
       `;
       const comments = observer.findComments(document.body);
@@ -60,8 +73,8 @@ describe('DOMObserver', () => {
     it('detects multiple comments', () => {
       document.body.innerHTML = `
         <div class="feed">
-          <div class="comment"><a href="/@alice">Alice</a><p>text</p></div>
-          <div class="comment"><a href="/@bob">Bob</a><p>text</p></div>
+          <div class="comment"><a href="/@alice">Alice</a><p>text</p><span>x</span></div>
+          <div class="comment"><a href="/@bob">Bob</a><p>text</p><span>x</span></div>
         </div>
       `;
       const comments = observer.findComments(document.body);
@@ -74,6 +87,7 @@ describe('DOMObserver', () => {
         <div class="nav">
           <a href="/explore">Explore</a>
           <span>other</span>
+          <span>x</span>
         </div>
       `;
       const comments = observer.findComments(document.body);
@@ -85,45 +99,48 @@ describe('DOMObserver', () => {
         <div>
           <a href="/settings">Settings</a>
           <span>x</span>
+          <span>y</span>
         </div>
       `;
       const comments = observer.findComments(document.body);
       expect(comments).toHaveLength(0);
     });
 
-    it('ignores already-processed elements (data-tb-processed)', () => {
+    it('ignores already-processed elements', () => {
       document.body.innerHTML = `
-        <div class="comment" data-tb-processed="true">
+        <div class="comment" ${COMMENT_ID_ATTR}="alice">
           <a href="/@alice">Alice</a>
           <p>Some comment text</p>
+          <span>extra</span>
         </div>
       `;
       const comments = observer.findComments(document.body);
       expect(comments).toHaveLength(0);
     });
 
-    it('returns element and linkElement references', () => {
+    it('returns container and link references', () => {
       document.body.innerHTML = `
         <div class="comment">
           <a href="/@carol">Carol</a>
           <p>hello</p>
+          <span>world</span>
         </div>
       `;
       const comments = observer.findComments(document.body);
-      expect(comments[0].element).toBeInstanceOf(Element);
-      expect(comments[0].linkElement).toBeInstanceOf(Element);
-      expect(comments[0].linkElement.tagName).toBe('A');
+      expect(comments[0].container).toBeInstanceOf(Element);
+      expect(comments[0].link).toBeInstanceOf(Element);
+      expect(comments[0].link.tagName).toBe('A');
     });
   });
 
   // ── markProcessed ─────────────────────────────────────────────────────────
 
   describe('markProcessed', () => {
-    it('sets data-tb-processed="true" on the element', () => {
+    it('sets data-tb-comment-id on the element', () => {
       document.body.innerHTML = `<div id="target"></div>`;
       const el = document.getElementById('target');
-      DOMObserver.markProcessed(el);
-      expect(el.getAttribute('data-tb-processed')).toBe('true');
+      observer.markProcessed(el, 'testuser');
+      expect(el.getAttribute(COMMENT_ID_ATTR)).toBe('testuser');
     });
 
     it('causes findComments to skip a previously detected element', () => {
@@ -131,11 +148,12 @@ describe('DOMObserver', () => {
         <div class="comment">
           <a href="/@dave">Dave</a>
           <p>text</p>
+          <span>x</span>
         </div>
       `;
       const first = observer.findComments(document.body);
       expect(first).toHaveLength(1);
-      DOMObserver.markProcessed(first[0].element);
+      observer.markProcessed(first[0].container, first[0].username);
       const second = observer.findComments(document.body);
       expect(second).toHaveLength(0);
     });
@@ -146,16 +164,16 @@ describe('DOMObserver', () => {
   describe('startObserving / stopObserving', () => {
     it('calls onNewComments when new comment nodes are added', async () => {
       const received = [];
-      observer.startObserving(document.body, (comments) => {
+      observer.startObserving((comments) => {
         received.push(...comments);
       });
 
       const div = document.createElement('div');
-      div.innerHTML = '<a href="/@eve">Eve</a><span>text</span>';
+      div.innerHTML = '<a href="/@eve">Eve</a><span>text</span><span>x</span>';
       document.body.appendChild(div);
 
-      // MutationObserver callbacks fire asynchronously; wait a microtask
-      await new Promise((r) => setTimeout(r, 0));
+      // MutationObserver callbacks fire asynchronously; wait for debounce
+      await new Promise((r) => setTimeout(r, 150));
 
       expect(received.length).toBeGreaterThan(0);
       expect(received[0].username).toBe('eve');
@@ -165,17 +183,31 @@ describe('DOMObserver', () => {
 
     it('does not call onNewComments after stopObserving', async () => {
       const received = [];
-      observer.startObserving(document.body, (comments) => {
+      observer.startObserving((comments) => {
         received.push(...comments);
       });
       observer.stopObserving();
 
       const div = document.createElement('div');
-      div.innerHTML = '<a href="/@frank">Frank</a><span>text</span>';
+      div.innerHTML = '<a href="/@frank">Frank</a><span>text</span><span>x</span>';
       document.body.appendChild(div);
 
-      await new Promise((r) => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 150));
       expect(received).toHaveLength(0);
+    });
+  });
+
+  // ── getMarkedComments ────────────────────────────────────────────────────
+
+  describe('getMarkedComments', () => {
+    it('returns all marked comments', () => {
+      document.body.innerHTML = `
+        <div ${COMMENT_ID_ATTR}="user1">User 1</div>
+        <div ${COMMENT_ID_ATTR}="user2">User 2</div>
+      `;
+      const marked = observer.getMarkedComments();
+      expect(marked).toHaveLength(2);
+      expect(marked.map(m => m.username).sort()).toEqual(['user1', 'user2']);
     });
   });
 });
