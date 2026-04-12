@@ -9,7 +9,10 @@
     "watch": "node esbuild.config.js --watch",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
-    "test:coverage": "node --experimental-vm-modules node_modules/.bin/jest --coverage"
+    "test:coverage": "node --experimental-vm-modules node_modules/.bin/jest --coverage",
+    "test:e2e": "npx playwright test",
+    "test:e2e:headed": "npx playwright test --headed",
+    "test:all": "npm run test:coverage && npm run test:e2e"
   },
   "jest": {
     "collectCoverageFrom": [
@@ -29,15 +32,26 @@
         "displayName": "node",
         "testEnvironment": "node",
         "transform": {},
-        "setupFiles": ["./tests/jest-setup.js"],
-        "testMatch": ["**/tests/unit/**/*.test.js"],
-        "testPathIgnorePatterns": ["dom-observer", "token-provider", "id-resolver", "site-adapter"]
+        "setupFiles": [
+          "./tests/jest-setup.js"
+        ],
+        "testMatch": [
+          "**/tests/unit/**/*.test.js"
+        ],
+        "testPathIgnorePatterns": [
+          "dom-observer",
+          "token-provider",
+          "id-resolver",
+          "site-adapter"
+        ]
       },
       {
         "displayName": "jsdom",
         "testEnvironment": "jsdom",
         "transform": {},
-        "setupFiles": ["./tests/jest-setup.js"],
+        "setupFiles": [
+          "./tests/jest-setup.js"
+        ],
         "testMatch": [
           "**/tests/unit/dom-observer.test.js",
           "**/tests/unit/token-provider.test.js",
@@ -48,9 +62,10 @@
     ]
   },
   "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "@playwright/test": "^1.59.1",
     "esbuild": "^0.21.0",
     "jest": "^29.7.0",
-    "@jest/globals": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0"
   }
 }
