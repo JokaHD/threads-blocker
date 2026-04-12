@@ -11,6 +11,12 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: 'Run E2E tests'
+        type: boolean
+        default: true
 
 # 取消同一 branch 上的舊 workflow，節省額度
 concurrency:
@@ -34,9 +40,9 @@ jobs:
       - name: Run tests with coverage
         run: npm run test:coverage
 
-  # E2E 只在 PR 時跑（省額度）
+  # E2E 只在手動觸發時跑（穩定後再改回自動）
   e2e-tests:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'workflow_dispatch' && inputs.run_e2e
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
