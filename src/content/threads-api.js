@@ -2,14 +2,9 @@
  * Threads API - GraphQL mutations for blocking/unblocking users.
  */
 
-const API_ENDPOINT = 'https://www.threads.com/api/graphql';
-const IG_APP_ID = '238260118697367';
+import { ThreadsAPI } from '../shared/constants.js';
 
-// GraphQL mutation doc IDs (reverse engineered)
-const DOC_IDS = {
-  block: '26803837702651619',
-  unblock: '26247169961577940',
-};
+const { ENDPOINT: API_ENDPOINT, IG_APP_ID, DOC_IDS } = ThreadsAPI;
 
 /**
  * Block a user on Threads.
@@ -81,7 +76,7 @@ async function makeGraphQLRequest(docId, variables, tokens, friendlyName) {
   });
 
   const headers = {
-    'accept': '*/*',
+    accept: '*/*',
     'content-type': 'application/x-www-form-urlencoded',
     'x-csrftoken': csrftoken,
     'x-fb-friendly-name': friendlyName,
@@ -119,7 +114,6 @@ async function makeGraphQLRequest(docId, variables, tokens, friendlyName) {
     // Check for successful response
     // The exact response structure may vary, but we check for no errors
     return { success: true, data };
-
   } catch (err) {
     return {
       success: false,

@@ -7,7 +7,10 @@ test.describe('Block Flow', () => {
     await injectFakeScripts(page);
   });
 
-  test('clicking block button on comment queues block request', async ({ context, extensionPage: page }) => {
+  test('clicking block button on comment queues block request', async ({
+    context: _context,
+    extensionPage: page,
+  }) => {
     await setupApiMocks(page, 'blockSuccess');
 
     // Navigate to a post with comments
@@ -29,7 +32,7 @@ test.describe('Block Flow', () => {
     expect(hasInlineControls).toBeDefined();
   });
 
-  test('panel shows queue status', async ({ context, extensionPage: page }) => {
+  test('panel shows queue status', async ({ context: _context, extensionPage: page }) => {
     await setupApiMocks(page, 'blockSuccess');
     await page.goto('https://www.threads.com/');
 

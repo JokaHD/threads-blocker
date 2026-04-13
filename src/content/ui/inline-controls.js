@@ -151,7 +151,7 @@ export class InlineControls {
     document.body.classList.remove('tb-blockmode');
 
     // Remove all visual states
-    document.querySelectorAll(`[${COMMENT_ID_ATTR}]`).forEach(el => {
+    document.querySelectorAll(`[${COMMENT_ID_ATTR}]`).forEach((el) => {
       el.classList.remove('tb-hover', 'tb-selected');
     });
 
@@ -160,7 +160,7 @@ export class InlineControls {
   }
 
   _updateHighlights() {
-    document.querySelectorAll(`[${COMMENT_ID_ATTR}]`).forEach(el => {
+    document.querySelectorAll(`[${COMMENT_ID_ATTR}]`).forEach((el) => {
       const username = el.getAttribute(COMMENT_ID_ATTR);
       const isSelected = this._selection.isSelected(username);
       el.classList.toggle('tb-selected', isSelected);

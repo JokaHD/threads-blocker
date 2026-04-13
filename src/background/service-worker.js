@@ -7,8 +7,8 @@ import {
   loadCooldownEnd,
   clearCooldown,
 } from './persistence.js';
-import { MessageType, } from '../shared/messages.js';
-import { ErrorType, Timing } from '../shared/constants.js';
+import { MessageType } from '../shared/messages.js';
+import { ErrorType } from '../shared/constants.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -121,7 +121,7 @@ async function handleMessage(message, sender) {
 
       // Failure path
       const errorType = rateLimitHandler.classifyError(errPayload ?? {});
-      const currentRetries = retryCount ?? (queue.getItem(userId)?.retries ?? 0);
+      const currentRetries = retryCount ?? queue.getItem(userId)?.retries ?? 0;
       const retryDelay = rateLimitHandler.getRetryDelay(errorType, currentRetries);
 
       if (errorType === ErrorType.RATE_LIMIT && retryDelay === null) {
@@ -178,7 +178,9 @@ async function handleMessage(message, sender) {
         await clearCooldown();
       }
       queue.resume();
-      await chrome.storage.local.set({ queueNotify: { ts: Date.now(), items: queue.getAll(), status: buildStatus() } });
+      await chrome.storage.local.set({
+        queueNotify: { ts: Date.now(), items: queue.getAll(), status: buildStatus() },
+      });
       return { ok: true };
     }
 
@@ -219,6 +221,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     rateLimitHandler.clearCooldown();
     await clearCooldown();
     queue.resume();
-    await chrome.storage.local.set({ queueNotify: { ts: Date.now(), items: queue.getAll(), status: buildStatus() } });
+    await chrome.storage.local.set({
+      queueNotify: { ts: Date.now(), items: queue.getAll(), status: buildStatus() },
+    });
   }
 });

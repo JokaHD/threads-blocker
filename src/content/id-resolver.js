@@ -56,12 +56,14 @@ export class IDResolver {
       const response = await fetch(`https://www.threads.com/@${username}`, {
         credentials: 'include',
         headers: {
-          'Accept': 'text/html',
+          Accept: 'text/html',
         },
       });
 
       if (!response.ok) {
-        console.warn(`[ThreadBlocker] Failed to fetch profile for @${username}: ${response.status}`);
+        console.warn(
+          `[ThreadBlocker] Failed to fetch profile for @${username}: ${response.status}`
+        );
         return null;
       }
 
@@ -76,7 +78,9 @@ export class IDResolver {
       }
 
       // Pattern 2: "pk":"12345" or "id":"12345" near username
-      const match2 = html.match(new RegExp(`"username"\\s*:\\s*"${username}"[^}]*"(?:pk|id)"\\s*:\\s*"?(\\d+)"?`));
+      const match2 = html.match(
+        new RegExp(`"username"\\s*:\\s*"${username}"[^}]*"(?:pk|id)"\\s*:\\s*"?(\\d+)"?`)
+      );
       if (match2) {
         console.log(`[ThreadBlocker] Found user_id for @${username}: ${match2[1]}`);
         return match2[1];
@@ -98,7 +102,6 @@ export class IDResolver {
 
       console.warn(`[ThreadBlocker] Could not find user_id for @${username} in profile page`);
       return null;
-
     } catch (err) {
       console.error(`[ThreadBlocker] Error fetching user_id for @${username}:`, err);
       return null;
@@ -115,14 +118,18 @@ export class IDResolver {
       const text = script.textContent || '';
 
       // Pattern: username followed by user_id/pk/id
-      const pattern = new RegExp(`"username"\\s*:\\s*"${username}"[^}]*"(?:pk|id|user_id)"\\s*:\\s*"?(\\d+)"?`);
+      const pattern = new RegExp(
+        `"username"\\s*:\\s*"${username}"[^}]*"(?:pk|id|user_id)"\\s*:\\s*"?(\\d+)"?`
+      );
       const match = text.match(pattern);
       if (match) {
         return match[1];
       }
 
       // Reverse pattern: id followed by username
-      const pattern2 = new RegExp(`"(?:pk|id|user_id)"\\s*:\\s*"?(\\d+)"?[^}]*"username"\\s*:\\s*"${username}"`);
+      const pattern2 = new RegExp(
+        `"(?:pk|id|user_id)"\\s*:\\s*"?(\\d+)"?[^}]*"username"\\s*:\\s*"${username}"`
+      );
       const match2 = text.match(pattern2);
       if (match2) {
         return match2[1];

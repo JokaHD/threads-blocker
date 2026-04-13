@@ -7,7 +7,7 @@ test.describe('Error Handling', () => {
     await injectFakeScripts(page);
   });
 
-  test('handles rate limit gracefully', async ({ context, extensionPage: page }) => {
+  test('handles rate limit gracefully', async ({ context: _context, extensionPage: page }) => {
     await setupApiMocks(page, 'blockRateLimit');
     await page.goto('https://www.threads.com/');
 
@@ -18,7 +18,7 @@ test.describe('Error Handling', () => {
     expect(shadowHost).toBeTruthy();
   });
 
-  test('handles network errors gracefully', async ({ context, extensionPage: page }) => {
+  test('handles network errors gracefully', async ({ context: _context, extensionPage: page }) => {
     await setupApiMocks(page, 'networkError');
     await page.goto('https://www.threads.com/');
 

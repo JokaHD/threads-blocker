@@ -36,8 +36,12 @@ export class RateLimitHandler {
     chrome.alarms.clear(ALARM_NAME);
   }
 
-  isInCooldown() { return this._inCooldown; }
-  getCooldownEnd() { return this._cooldownEnd; }
+  isInCooldown() {
+    return this._inCooldown;
+  }
+  getCooldownEnd() {
+    return this._cooldownEnd;
+  }
 
   static ALARM_NAME = ALARM_NAME;
 }

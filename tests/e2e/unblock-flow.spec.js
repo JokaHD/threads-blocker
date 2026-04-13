@@ -7,7 +7,10 @@ test.describe('Unblock Flow', () => {
     await injectFakeScripts(page);
   });
 
-  test('extension loads with unblock API ready', async ({ context, extensionPage: page }) => {
+  test('extension loads with unblock API ready', async ({
+    context: _context,
+    extensionPage: page,
+  }) => {
     await setupApiMocks(page, 'unblockSuccess');
     await page.goto('https://www.threads.com/');
 

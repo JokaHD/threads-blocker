@@ -1,4 +1,3 @@
-import { jest } from '@jest/globals';
 import { setupChromeMocks, resetChromeMocks } from '../setup.js';
 import { ErrorType, Timing } from '../../src/shared/constants.js';
 
@@ -107,10 +106,9 @@ describe('startCooldown', () => {
 
   it('creates a chrome alarm with COOLDOWN_MINUTES delay', () => {
     handler.startCooldown();
-    expect(chrome.alarms.create).toHaveBeenCalledWith(
-      RateLimitHandler.ALARM_NAME,
-      { delayInMinutes: Timing.COOLDOWN_MINUTES }
-    );
+    expect(chrome.alarms.create).toHaveBeenCalledWith(RateLimitHandler.ALARM_NAME, {
+      delayInMinutes: Timing.COOLDOWN_MINUTES,
+    });
   });
 });
 

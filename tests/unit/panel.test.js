@@ -56,7 +56,6 @@ describe('Panel', () => {
       const el = container.querySelector('.tb-panel');
       expect(el.classList.contains('tb-panel-minimized')).toBe(true);
     });
-
   });
 
   describe('update', () => {
@@ -78,10 +77,13 @@ describe('Panel', () => {
 
     test('updates badge text with progress', () => {
       panel.init();
-      panel.update([
-        { userId: '1', username: 'user1', state: BlockState.BLOCKED },
-        { userId: '2', username: 'user2', state: BlockState.QUEUED },
-      ], {});
+      panel.update(
+        [
+          { userId: '1', username: 'user1', state: BlockState.BLOCKED },
+          { userId: '2', username: 'user2', state: BlockState.QUEUED },
+        ],
+        {}
+      );
 
       const badge = container.querySelector('.tb-panel-badge-text');
       expect(badge.textContent).toBe('1/2');
@@ -89,12 +91,15 @@ describe('Panel', () => {
 
     test('updates progress bar width', () => {
       panel.init();
-      panel.update([
-        { userId: '1', username: 'user1', state: BlockState.BLOCKED },
-        { userId: '2', username: 'user2', state: BlockState.BLOCKED },
-        { userId: '3', username: 'user3', state: BlockState.QUEUED },
-        { userId: '4', username: 'user4', state: BlockState.QUEUED },
-      ], {});
+      panel.update(
+        [
+          { userId: '1', username: 'user1', state: BlockState.BLOCKED },
+          { userId: '2', username: 'user2', state: BlockState.BLOCKED },
+          { userId: '3', username: 'user3', state: BlockState.QUEUED },
+          { userId: '4', username: 'user4', state: BlockState.QUEUED },
+        ],
+        {}
+      );
 
       const fill = container.querySelector('.tb-panel-progress-fill');
       expect(fill.style.width).toBe('50%');
@@ -102,10 +107,13 @@ describe('Panel', () => {
 
     test('renders items in body', () => {
       panel.init();
-      panel.update([
-        { userId: '1', username: 'user1', state: BlockState.QUEUED },
-        { userId: '2', username: 'user2', state: BlockState.BLOCKED },
-      ], {});
+      panel.update(
+        [
+          { userId: '1', username: 'user1', state: BlockState.QUEUED },
+          { userId: '2', username: 'user2', state: BlockState.BLOCKED },
+        ],
+        {}
+      );
 
       const items = container.querySelectorAll('.tb-panel-item');
       expect(items.length).toBe(2);
@@ -167,7 +175,9 @@ describe('Panel', () => {
   describe('pause toggle', () => {
     test('sends pause message when clicked', () => {
       panel.init();
-      panel.update([{ userId: '1', username: 'user1', state: BlockState.QUEUED }], { paused: false });
+      panel.update([{ userId: '1', username: 'user1', state: BlockState.QUEUED }], {
+        paused: false,
+      });
 
       const pauseBtn = container.querySelector('.tb-panel-pause-btn');
       pauseBtn.click();
@@ -179,7 +189,9 @@ describe('Panel', () => {
 
     test('sends resume message when paused', () => {
       panel.init();
-      panel.update([{ userId: '1', username: 'user1', state: BlockState.QUEUED }], { paused: true });
+      panel.update([{ userId: '1', username: 'user1', state: BlockState.QUEUED }], {
+        paused: true,
+      });
 
       const pauseBtn = container.querySelector('.tb-panel-pause-btn');
       pauseBtn.click();
@@ -192,11 +204,15 @@ describe('Panel', () => {
     test('updates button text based on pause state', () => {
       panel.init();
 
-      panel.update([{ userId: '1', username: 'user1', state: BlockState.QUEUED }], { paused: false });
+      panel.update([{ userId: '1', username: 'user1', state: BlockState.QUEUED }], {
+        paused: false,
+      });
       let pauseBtn = container.querySelector('.tb-panel-pause-btn');
       expect(pauseBtn.textContent).toContain('Pause');
 
-      panel.update([{ userId: '1', username: 'user1', state: BlockState.QUEUED }], { paused: true });
+      panel.update([{ userId: '1', username: 'user1', state: BlockState.QUEUED }], {
+        paused: true,
+      });
       pauseBtn = container.querySelector('.tb-panel-pause-btn');
       expect(pauseBtn.textContent).toContain('Resume');
     });
@@ -206,7 +222,9 @@ describe('Panel', () => {
     test('clear completed sends message', () => {
       panel.init();
 
-      const clearCompletedBtn = container.querySelector('.tb-panel-action-btn:not(.tb-panel-action-btn--danger)');
+      const clearCompletedBtn = container.querySelector(
+        '.tb-panel-action-btn:not(.tb-panel-action-btn--danger)'
+      );
       clearCompletedBtn.click();
 
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({

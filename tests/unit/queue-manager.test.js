@@ -98,7 +98,7 @@ describe('getNextTask', () => {
   it('returns an UNBLOCKING item (with _unblockInFlight guard)', () => {
     qm.enqueue({ userId: '1', username: 'alice' });
     qm.getNextTask(); // → BLOCKING
-    qm.onTaskComplete('1', true);  // → BLOCKED
+    qm.onTaskComplete('1', true); // → BLOCKED
     qm.requestUnblock('1'); // → UNBLOCKING
     // Now getNextTask should pick up UNBLOCKING
     const task = qm.getNextTask();
@@ -154,7 +154,7 @@ describe('onTaskComplete', () => {
   it('transitions BLOCKING+PENDING_CANCEL → UNBLOCKING and returns true', () => {
     qm.enqueue({ userId: '1', username: 'alice' });
     qm.getNextTask(); // → BLOCKING
-    qm.cancel('1');   // sets PENDING_CANCEL
+    qm.cancel('1'); // sets PENDING_CANCEL
     const shouldUnblock = qm.onTaskComplete('1', true);
     expect(shouldUnblock).toBe(true);
     expect(qm.getItem('1').state).toBe(BlockState.UNBLOCKING);
@@ -270,8 +270,8 @@ describe('toJSON / loadFrom', () => {
   it('reverts UNBLOCKING → BLOCKED on load', () => {
     qm.enqueue({ userId: '1', username: 'alice' });
     qm.getNextTask();
-    qm.onTaskComplete('1', true);  // → BLOCKED
-    qm.requestUnblock('1');        // → UNBLOCKING
+    qm.onTaskComplete('1', true); // → BLOCKED
+    qm.requestUnblock('1'); // → UNBLOCKING
     const json = qm.toJSON();
     const qm2 = new QueueManager();
     qm2.loadFrom(json);

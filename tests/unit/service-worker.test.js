@@ -3,7 +3,13 @@
  * We test the handleMessage logic by simulating messages.
  */
 
-import { setupChromeMocks, resetChromeMocks, mockStorage, mockAlarms, mockRuntime } from '../setup.js';
+import {
+  setupChromeMocks,
+  resetChromeMocks,
+  mockStorage,
+  mockAlarms,
+  mockRuntime,
+} from '../setup.js';
 import { RateLimitHandler } from '../../src/background/rate-limit-handler.js';
 import { MessageType } from '../../src/shared/messages.js';
 
@@ -29,12 +35,17 @@ describe('Service Worker', () => {
     // Clear queue state between tests
     if (messageHandler) {
       const testSender = { url: 'https://www.threads.com/' };
-      await new Promise(resolve => messageHandler({ type: MessageType.CLEAR_QUEUE }, testSender, resolve));
+      await new Promise((resolve) =>
+        messageHandler({ type: MessageType.CLEAR_QUEUE }, testSender, resolve)
+      );
     }
   });
 
   // Helper to send a message and get the response
-  async function sendMessage(message, sender = { tab: { id: 1 }, url: 'https://www.threads.com/' }) {
+  async function sendMessage(
+    message,
+    sender = { tab: { id: 1 }, url: 'https://www.threads.com/' }
+  ) {
     return new Promise((resolve) => {
       messageHandler(message, sender, resolve);
     });
@@ -42,17 +53,23 @@ describe('Service Worker', () => {
 
   describe('REGISTER_EXECUTOR', () => {
     test('registers executor tab', async () => {
-      const response = await sendMessage({
-        type: MessageType.REGISTER_EXECUTOR,
-      }, { tab: { id: 42 }, url: 'https://www.threads.com/' });
+      const response = await sendMessage(
+        {
+          type: MessageType.REGISTER_EXECUTOR,
+        },
+        { tab: { id: 42 }, url: 'https://www.threads.com/' }
+      );
 
       expect(response).toEqual({ ok: true, executorTabId: 42 });
     });
 
     test('handles missing tab', async () => {
-      const response = await sendMessage({
-        type: MessageType.REGISTER_EXECUTOR,
-      }, { url: 'https://www.threads.com/' });
+      const response = await sendMessage(
+        {
+          type: MessageType.REGISTER_EXECUTOR,
+        },
+        { url: 'https://www.threads.com/' }
+      );
 
       expect(response).toEqual({ ok: true, executorTabId: null });
     });
@@ -454,7 +471,7 @@ describe('Service Worker', () => {
       mockAlarms._trigger({ name: RateLimitHandler.ALARM_NAME });
 
       // Wait a tick for async handler
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
 
       // Verify cooldown is cleared
       status = await sendMessage({ type: MessageType.GET_QUEUE_STATUS });

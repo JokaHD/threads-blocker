@@ -81,11 +81,11 @@ describe('IDResolver', () => {
     });
 
     it('deduplicates concurrent requests', async () => {
-      let resolveCount = 0;
+      let fetchCount = 0;
       mockFetchResponse = {
         ok: true,
         text: async () => {
-          resolveCount++;
+          fetchCount++;
           return '"user_id":"222"';
         },
       };
@@ -101,6 +101,7 @@ describe('IDResolver', () => {
       expect(r2).toBe('222');
       expect(r3).toBe('222');
       expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(fetchCount).toBe(1);
     });
   });
 
