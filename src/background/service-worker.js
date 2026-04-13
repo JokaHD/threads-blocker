@@ -68,6 +68,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handleMessage(message, sender) {
+  // Validate sender - must be from threads.com or extension internal
+  const url = sender.url || '';
+  const isThreads = url.includes('threads.com');
+  const isExtension = url.startsWith('chrome-extension://');
+  if (!isThreads && !isExtension) {
+    console.warn('[ThreadBlocker] Rejected message from:', url);
+    return { error: 'Invalid sender' };
+  }
+
   const { type } = message;
 
   switch (type) {

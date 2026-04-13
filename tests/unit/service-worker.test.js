@@ -28,12 +28,13 @@ describe('Service Worker', () => {
     resetChromeMocks();
     // Clear queue state between tests
     if (messageHandler) {
-      await new Promise(resolve => messageHandler({ type: MessageType.CLEAR_QUEUE }, {}, resolve));
+      const testSender = { url: 'https://www.threads.com/' };
+      await new Promise(resolve => messageHandler({ type: MessageType.CLEAR_QUEUE }, testSender, resolve));
     }
   });
 
   // Helper to send a message and get the response
-  async function sendMessage(message, sender = { tab: { id: 1 } }) {
+  async function sendMessage(message, sender = { tab: { id: 1 }, url: 'https://www.threads.com/' }) {
     return new Promise((resolve) => {
       messageHandler(message, sender, resolve);
     });
@@ -43,7 +44,7 @@ describe('Service Worker', () => {
     test('registers executor tab', async () => {
       const response = await sendMessage({
         type: MessageType.REGISTER_EXECUTOR,
-      }, { tab: { id: 42 } });
+      }, { tab: { id: 42 }, url: 'https://www.threads.com/' });
 
       expect(response).toEqual({ ok: true, executorTabId: 42 });
     });
@@ -51,7 +52,7 @@ describe('Service Worker', () => {
     test('handles missing tab', async () => {
       const response = await sendMessage({
         type: MessageType.REGISTER_EXECUTOR,
-      }, {});
+      }, { url: 'https://www.threads.com/' });
 
       expect(response).toEqual({ ok: true, executorTabId: null });
     });
