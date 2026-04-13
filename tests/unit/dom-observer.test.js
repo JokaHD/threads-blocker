@@ -3,12 +3,6 @@
 import { DOMObserver, COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
 import { threadsSiteRule } from '../../src/content/site-adapter.js';
 
-// Mock location for jsdom
-beforeAll(() => {
-  delete window.location;
-  window.location = { href: 'https://www.threads.com/@user/post/123' };
-});
-
 describe('DOMObserver', () => {
   let observer;
 

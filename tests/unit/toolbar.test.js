@@ -8,7 +8,7 @@ import { MessageType } from '../../src/shared/messages.js';
 // Mock chrome.runtime
 global.chrome = {
   runtime: {
-    sendMessage: jest.fn(),
+    sendMessage: jest.fn().mockResolvedValue({}),
   },
 };
 

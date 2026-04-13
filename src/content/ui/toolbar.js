@@ -105,7 +105,7 @@ export class Toolbar {
     chrome.runtime.sendMessage({
       type: MessageType.ENQUEUE_BLOCK_BATCH,
       entries,
-    });
+    }).catch(e => console.error('[ThreadBlocker] Enqueue batch failed:', e.message));
 
     this._selection.clearSelection();
 
