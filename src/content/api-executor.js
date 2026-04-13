@@ -7,6 +7,7 @@ export class APIExecutor {
     this._api = apiFunctions;
     this._running = false;
     this._paused = false;
+    this._pollingPromise = null;
   }
 
   async processTask(task) {
@@ -58,10 +59,20 @@ export class APIExecutor {
     }
   }
 
-  async startPolling() {
-    if (this._running) return;
-    this._running = true;
+  startPolling() {
+    // Return existing promise if already polling
+    if (this._pollingPromise) return this._pollingPromise;
 
+    this._running = true;
+    this._pollingPromise = this._pollLoop().finally(() => {
+      this._pollingPromise = null;
+      this._running = false;
+    });
+
+    return this._pollingPromise;
+  }
+
+  async _pollLoop() {
     console.log('[ThreadBlocker] Starting task polling...');
 
     while (this._running) {
@@ -78,11 +89,9 @@ export class APIExecutor {
         await this._sleep(Timing.BLOCK_INTERVAL);
       } else if (response?.cooldownEnd) {
         console.log('[ThreadBlocker] Queue is in cooldown');
-        this._running = false;
         break;
       } else {
         console.log('[ThreadBlocker] No more tasks');
-        this._running = false;
         break;
       }
     }
