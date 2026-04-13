@@ -54,10 +54,11 @@ const apiExecutor = new APIExecutor(tokenProvider, {
 });
 
 // Register with Service Worker
-chrome.runtime.sendMessage({ type: MessageType.REGISTER_EXECUTOR });
+chrome.runtime.sendMessage({ type: MessageType.REGISTER_EXECUTOR })
+  .catch(e => console.warn('[ThreadBlocker] Register executor failed:', e.message));
 
 // Listen for queue updates via storage.onChanged
-chrome.storage.onChanged.addListener((changes, area) => {
+function handleStorageChange(changes, area) {
   if (area !== 'local' || !changes.queueNotify) return;
   const { items, status } = changes.queueNotify.newValue || {};
   if (!items) return;
@@ -73,7 +74,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (status.paused && status.cooldownEnd) {
     panel.setCooldownEnd(status.cooldownEnd);
   }
-});
+}
+chrome.storage.onChanged.addListener(handleStorageChange);
 
 // Process discovered comments
 function processComment(comment) {

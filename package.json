@@ -52,6 +52,9 @@
       {
         "displayName": "jsdom",
         "testEnvironment": "jsdom",
+        "testEnvironmentOptions": {
+          "url": "https://www.threads.com/@test"
+        },
         "transform": {},
         "setupFiles": [
           "./tests/jest-setup.js"
@@ -72,8 +75,8 @@
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@playwright/test": "^1.59.1",
-    "esbuild": "^0.21.0",
+    "esbuild": "^0.28.0",
     "jest": "^29.7.0",
-    "jest-environment-jsdom": "^29.7.0"
+    "jest-environment-jsdom": "^30.3.0"
   }
 }

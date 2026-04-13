@@ -92,45 +92,83 @@ export class Sidebar {
     const isSelected = this._selection.isSelected(username);
     row.classList.toggle('tb-sidebar-row-selected', isSelected);
 
-    const buttonHtml = this._renderButtonHtml(username, user.state);
-    row.innerHTML = `
-      <span class="tb-sidebar-username" title="@${username}">@${username}</span>
-      ${buttonHtml}
-    `;
+    // Clear existing content
+    row.innerHTML = '';
 
-    // Bind button click
-    const btn = row.querySelector('.tb-sidebar-btn');
-    if (btn) {
-      btn.addEventListener('click', () => this._handleClick(username));
-    }
-
-    // Click on username to scroll to their comment
-    const nameEl = row.querySelector('.tb-sidebar-username');
+    // Create username element (safe - uses textContent)
+    const nameEl = document.createElement('span');
+    nameEl.className = 'tb-sidebar-username';
+    nameEl.title = `@${username}`;
+    nameEl.textContent = `@${username}`;
     nameEl.addEventListener('click', () => {
       user.element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
+    row.appendChild(nameEl);
+
+    // Create button element
+    const btn = this._createButton(username, user.state);
+    if (btn) {
+      btn.addEventListener('click', () => this._handleClick(username));
+      row.appendChild(btn);
+    }
   }
 
-  _renderButtonHtml(username, state) {
+  _createButton(username, state) {
     const base = 'tb-sidebar-btn';
+    let el;
+    let className;
+    let ariaLabel;
+    let iconHtml;
+
     switch (state) {
       case BlockState.IDLE:
-        return `<button class="${base} tb-sbtn-idle" aria-label="封鎖 @${username}">${Icons.ban}</button>`;
+        el = document.createElement('button');
+        className = `${base} tb-sbtn-idle`;
+        ariaLabel = `封鎖 @${username}`;
+        iconHtml = Icons.ban;
+        break;
       case BlockState.QUEUED:
-        return `<button class="${base} tb-sbtn-queued" aria-label="取消排隊 @${username}">${Icons.x}</button>`;
+        el = document.createElement('button');
+        className = `${base} tb-sbtn-queued`;
+        ariaLabel = `取消排隊 @${username}`;
+        iconHtml = Icons.x;
+        break;
       case BlockState.BLOCKING:
-        return `<span class="${base} tb-sbtn-blocking">${Icons.loader}</span>`;
-      case BlockState.BLOCKED:
-        return `<button class="${base} tb-sbtn-blocked" aria-label="已封鎖 @${username}，點擊解除">${Icons.check}</button>`;
-      case UIState.CONFIRM_UNBLOCK:
-        return `<button class="${base} tb-sbtn-confirm" aria-label="確定解除？">↩</button>`;
       case BlockState.UNBLOCKING:
-        return `<span class="${base} tb-sbtn-blocking">${Icons.loader}</span>`;
+        el = document.createElement('span');
+        className = `${base} tb-sbtn-blocking`;
+        iconHtml = Icons.loader;
+        break;
+      case BlockState.BLOCKED:
+        el = document.createElement('button');
+        className = `${base} tb-sbtn-blocked`;
+        ariaLabel = `已封鎖 @${username}，點擊解除`;
+        iconHtml = Icons.check;
+        break;
+      case UIState.CONFIRM_UNBLOCK:
+        el = document.createElement('button');
+        className = `${base} tb-sbtn-confirm`;
+        ariaLabel = '確定解除？';
+        el.textContent = '↩';
+        break;
       case BlockState.FAILED:
-        return `<button class="${base} tb-sbtn-failed" aria-label="重試">${Icons.refreshCw}</button>`;
+        el = document.createElement('button');
+        className = `${base} tb-sbtn-failed`;
+        ariaLabel = '重試';
+        iconHtml = Icons.refreshCw;
+        break;
       default:
-        return `<button class="${base} tb-sbtn-idle" aria-label="封鎖 @${username}">${Icons.ban}</button>`;
+        el = document.createElement('button');
+        className = `${base} tb-sbtn-idle`;
+        ariaLabel = `封鎖 @${username}`;
+        iconHtml = Icons.ban;
     }
+
+    el.className = className;
+    if (ariaLabel) el.setAttribute('aria-label', ariaLabel);
+    if (iconHtml) el.innerHTML = iconHtml; // Icons are static SVGs from constants
+
+    return el;
   }
 
   async _handleClick(username) {
@@ -148,12 +186,13 @@ export class Sidebar {
         type: state === BlockState.FAILED ? MessageType.RETRY_FAILED : MessageType.ENQUEUE_BLOCK,
         username,
         userId: user.userId,
-      });
+      }).catch(e => console.warn('[ThreadBlocker] Enqueue failed:', e.message));
       return;
     }
 
     if (state === BlockState.QUEUED) {
-      chrome.runtime.sendMessage({ type: MessageType.CANCEL_QUEUED, userId: user.userId });
+      chrome.runtime.sendMessage({ type: MessageType.CANCEL_QUEUED, userId: user.userId })
+        .catch(e => console.warn('[ThreadBlocker] Cancel failed:', e.message));
       return;
     }
 
@@ -167,7 +206,8 @@ export class Sidebar {
     }
 
     if (state === UIState.CONFIRM_UNBLOCK) {
-      chrome.runtime.sendMessage({ type: MessageType.REQUEST_UNBLOCK, userId: user.userId });
+      chrome.runtime.sendMessage({ type: MessageType.REQUEST_UNBLOCK, userId: user.userId })
+        .catch(e => console.warn('[ThreadBlocker] Unblock request failed:', e.message));
       return;
     }
   }

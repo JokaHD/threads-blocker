@@ -96,7 +96,8 @@ export class Panel {
     clearCompletedBtn.innerHTML = `${Icons.check}<span>Clear Done</span>`;
     clearCompletedBtn.title = 'Clear completed items';
     clearCompletedBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ type: MessageType.CLEAR_COMPLETED });
+      chrome.runtime.sendMessage({ type: MessageType.CLEAR_COMPLETED })
+        .catch(e => console.warn('[ThreadBlocker] Clear completed failed:', e.message));
     });
 
     const clearAllBtn = document.createElement('button');
@@ -104,7 +105,8 @@ export class Panel {
     clearAllBtn.innerHTML = `${Icons.x}<span>Clear All</span>`;
     clearAllBtn.title = 'Clear all items (including queued)';
     clearAllBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ type: MessageType.CLEAR_QUEUE });
+      chrome.runtime.sendMessage({ type: MessageType.CLEAR_QUEUE })
+        .catch(e => console.warn('[ThreadBlocker] Clear queue failed:', e.message));
     });
 
     footer.appendChild(clearCompletedBtn);
@@ -201,7 +203,8 @@ export class Panel {
       retryNowBtn.className = 'tb-panel-cooldown-retry-btn';
       retryNowBtn.textContent = 'Retry Now';
       retryNowBtn.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ type: MessageType.RESUME_QUEUE });
+        chrome.runtime.sendMessage({ type: MessageType.RESUME_QUEUE })
+          .catch(e => console.warn('[ThreadBlocker] Resume failed:', e.message));
       });
 
       this._cooldownArea.appendChild(btn);
@@ -265,11 +268,9 @@ export class Panel {
   }
 
   _togglePause() {
-    if (this._paused) {
-      chrome.runtime.sendMessage({ type: MessageType.RESUME_QUEUE });
-    } else {
-      chrome.runtime.sendMessage({ type: MessageType.PAUSE_QUEUE });
-    }
+    const type = this._paused ? MessageType.RESUME_QUEUE : MessageType.PAUSE_QUEUE;
+    chrome.runtime.sendMessage({ type })
+      .catch(e => console.warn('[ThreadBlocker] Toggle pause failed:', e.message));
     this._paused = !this._paused;
     this._updatePauseBtn();
   }
@@ -305,7 +306,8 @@ export class Panel {
       cancelBtn.innerHTML = Icons.x;
       cancelBtn.title = 'Cancel';
       cancelBtn.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ type: MessageType.CANCEL_QUEUED, userId: item.userId });
+        chrome.runtime.sendMessage({ type: MessageType.CANCEL_QUEUED, userId: item.userId })
+          .catch(e => console.warn('[ThreadBlocker] Cancel failed:', e.message));
       });
       row.appendChild(cancelBtn);
     } else if (item.state === BlockState.FAILED) {
@@ -314,7 +316,8 @@ export class Panel {
       retryBtn.innerHTML = Icons.refreshCw;
       retryBtn.title = 'Retry';
       retryBtn.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ type: MessageType.RETRY_FAILED, userId: item.userId });
+        chrome.runtime.sendMessage({ type: MessageType.RETRY_FAILED, userId: item.userId })
+          .catch(e => console.warn('[ThreadBlocker] Retry failed:', e.message));
       });
       row.appendChild(retryBtn);
     }

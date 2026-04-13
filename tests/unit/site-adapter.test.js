@@ -85,23 +85,19 @@ describe('threadsSiteRule', () => {
 });
 
 describe('getSiteRule', () => {
-  const originalLocation = global.location;
-
-  afterEach(() => {
-    global.location = originalLocation;
-  });
-
-  it('returns threadsSiteRule for threads.com', () => {
-    delete global.location;
-    global.location = { href: 'https://www.threads.com/@test' };
-
+  // URL is set to https://www.threads.com/@test via testEnvironmentOptions
+  it('returns threadsSiteRule for threads.com (current environment)', () => {
     expect(getSiteRule()).toBe(threadsSiteRule);
   });
 
-  it('returns null for other sites', () => {
-    delete global.location;
-    global.location = { href: 'https://www.example.com/' };
+  // Test match regex directly for other URL scenarios
+  it('match regex returns true for threads.com URLs', () => {
+    expect(threadsSiteRule.match.test('https://www.threads.com/')).toBe(true);
+    expect(threadsSiteRule.match.test('https://www.threads.com/@user')).toBe(true);
+  });
 
-    expect(getSiteRule()).toBeNull();
+  it('match regex returns false for other URLs', () => {
+    expect(threadsSiteRule.match.test('https://www.example.com/')).toBe(false);
+    expect(threadsSiteRule.match.test('https://threads.net/')).toBe(false);
   });
 });

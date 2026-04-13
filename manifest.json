@@ -3,6 +3,9 @@
   "name": "Threads Blocker",
   "version": "1.0.0",
   "description": "在 Threads 留言區快速批量封鎖帳號",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "permissions": [
     "storage",
     "alarms"
