@@ -46,7 +46,9 @@
           "icons",
           "toolbar",
           "panel",
-          "inline-controls"
+          "inline-controls",
+          "shadow-host",
+          "sidebar"
         ]
       },
       {
@@ -67,7 +69,9 @@
           "**/tests/unit/icons.test.js",
           "**/tests/unit/toolbar.test.js",
           "**/tests/unit/panel.test.js",
-          "**/tests/unit/inline-controls.test.js"
+          "**/tests/unit/inline-controls.test.js",
+          "**/tests/unit/shadow-host.test.js",
+          "**/tests/unit/sidebar.test.js"
         ]
       }
     ]
