@@ -26,11 +26,13 @@ export class QueueManager {
   // ── Enqueue ───────────────────────────────────────────────────────────────
 
   enqueue({ userId, username }) {
-    if (this._items.has(userId)) return;
-    this._items.set(userId, {
+    // For RESOLVING items, use username as temporary key
+    const key = userId ?? `pending:${username}`;
+    if (this._items.has(key)) return;
+    this._items.set(key, {
       userId,
       username,
-      state: BlockState.QUEUED,
+      state: userId ? BlockState.QUEUED : BlockState.RESOLVING,
       flags: [],
       error: null,
       errorType: null,
@@ -44,6 +46,39 @@ export class QueueManager {
     for (const user of users) {
       this.enqueue(user);
     }
+  }
+
+  /**
+   * Update a RESOLVING item with its resolved userId.
+   * Transitions item from RESOLVING to QUEUED (or removes if resolution failed).
+   */
+  updateResolvedUser(username, userId) {
+    const pendingKey = `pending:${username}`;
+    const item = this._items.get(pendingKey);
+    if (!item) return;
+
+    if (!userId) {
+      // Resolution failed - remove item
+      this._items.delete(pendingKey);
+      this._notify();
+      return;
+    }
+
+    // Remove pending entry and add with real userId
+    this._items.delete(pendingKey);
+
+    // Skip if already exists with this userId
+    if (this._items.has(userId)) {
+      this._notify();
+      return;
+    }
+
+    this._items.set(userId, {
+      ...item,
+      userId,
+      state: BlockState.QUEUED,
+    });
+    this._notify();
   }
 
   // ── Task dispatching ──────────────────────────────────────────────────────
@@ -92,6 +127,17 @@ export class QueueManager {
       if (!item.flags.includes(QueueFlag.PENDING_CANCEL)) {
         item.flags.push(QueueFlag.PENDING_CANCEL);
       }
+      this._notify();
+    }
+  }
+
+  /**
+   * Cancel a RESOLVING item by username.
+   */
+  cancelResolving(username) {
+    const pendingKey = `pending:${username}`;
+    if (this._items.has(pendingKey)) {
+      this._items.delete(pendingKey);
       this._notify();
     }
   }

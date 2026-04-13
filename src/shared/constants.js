@@ -1,6 +1,7 @@
 // Queue item states (managed by Service Worker)
 export const BlockState = {
   IDLE: 'idle',
+  RESOLVING: 'resolving', // userId not yet resolved
   QUEUED: 'queued',
   BLOCKING: 'blocking',
   BLOCKED: 'blocked',

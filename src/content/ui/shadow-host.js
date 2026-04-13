@@ -351,6 +351,11 @@ function getExtensionStyles() {
       flex-shrink: 0;
     }
 
+    .tb-panel-item-status--resolving {
+      background: rgba(100, 116, 139, 0.15);
+      color: #94A3B8;
+    }
+
     .tb-panel-item-status--queued {
       background: rgba(245, 158, 11, 0.15);
       color: var(--tb-warning);

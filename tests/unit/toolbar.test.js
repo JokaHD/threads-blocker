@@ -116,7 +116,7 @@ describe('Toolbar', () => {
       expect(mockIdResolver.resolve).not.toHaveBeenCalled();
     });
 
-    test('resolves user IDs and sends batch message', async () => {
+    test('immediately enqueues batch with null userIds, then resolves async', async () => {
       toolbar.init();
       mockSelectionManager.getSelected.mockReturnValue(['user1', 'user2']);
       mockIdResolver.resolve.mockResolvedValueOnce('id1').mockResolvedValueOnce('id2');
@@ -124,20 +124,34 @@ describe('Toolbar', () => {
       const blockBtn = container.querySelector('.tb-toolbar-block-btn');
       blockBtn.click();
 
-      await new Promise((r) => setTimeout(r, 10));
-
-      expect(mockIdResolver.resolve).toHaveBeenCalledTimes(2);
+      // Immediately sends batch with null userIds
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: MessageType.ENQUEUE_BLOCK_BATCH,
         entries: [
-          { username: 'user1', userId: 'id1' },
-          { username: 'user2', userId: 'id2' },
+          { username: 'user1', userId: null },
+          { username: 'user2', userId: null },
         ],
       });
       expect(mockSelectionManager.clearSelection).toHaveBeenCalled();
+
+      // Wait for async resolution
+      await new Promise((r) => setTimeout(r, 10));
+
+      // Then sends UPDATE_RESOLVED_USER for each user
+      expect(mockIdResolver.resolve).toHaveBeenCalledTimes(2);
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: MessageType.UPDATE_RESOLVED_USER,
+        username: 'user1',
+        userId: 'id1',
+      });
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: MessageType.UPDATE_RESOLVED_USER,
+        username: 'user2',
+        userId: 'id2',
+      });
     });
 
-    test('skips users that cannot be resolved', async () => {
+    test('sends UPDATE_RESOLVED_USER with null userId when resolution fails', async () => {
       toolbar.init();
       mockSelectionManager.getSelected.mockReturnValue(['user1', 'user2']);
       mockIdResolver.resolve.mockResolvedValueOnce('id1').mockResolvedValueOnce(null);
@@ -148,31 +162,31 @@ describe('Toolbar', () => {
 
       await new Promise((r) => setTimeout(r, 10));
 
+      // Batch is sent immediately with all users
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: MessageType.ENQUEUE_BLOCK_BATCH,
-        entries: [{ username: 'user1', userId: 'id1' }],
+        entries: [
+          { username: 'user1', userId: null },
+          { username: 'user2', userId: null },
+        ],
+      });
+
+      // UPDATE_RESOLVED_USER sent for both, even failed one
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: MessageType.UPDATE_RESOLVED_USER,
+        username: 'user1',
+        userId: 'id1',
+      });
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: MessageType.UPDATE_RESOLVED_USER,
+        username: 'user2',
+        userId: null,
       });
       expect(warnSpy).toHaveBeenCalled();
       warnSpy.mockRestore();
     });
 
-    test('does not send message if no IDs resolved', async () => {
-      toolbar.init();
-      mockSelectionManager.getSelected.mockReturnValue(['user1']);
-      mockIdResolver.resolve.mockResolvedValue(null);
-
-      const errorSpy = jest.spyOn(console, 'error').mockImplementation();
-      const blockBtn = container.querySelector('.tb-toolbar-block-btn');
-      blockBtn.click();
-
-      await new Promise((r) => setTimeout(r, 10));
-
-      expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
-      expect(errorSpy).toHaveBeenCalledWith('[ThreadBlocker] No valid user IDs found');
-      errorSpy.mockRestore();
-    });
-
-    test('dispatches tb-exit-block-mode event after blocking', async () => {
+    test('dispatches tb-exit-block-mode event immediately', () => {
       toolbar.init();
       mockSelectionManager.getSelected.mockReturnValue(['user1']);
       mockIdResolver.resolve.mockResolvedValue('id1');
@@ -183,8 +197,7 @@ describe('Toolbar', () => {
       const blockBtn = container.querySelector('.tb-toolbar-block-btn');
       blockBtn.click();
 
-      await new Promise((r) => setTimeout(r, 10));
-
+      // Event is dispatched immediately, not after ID resolution
       expect(eventSpy).toHaveBeenCalled();
       window.removeEventListener('tb-exit-block-mode', eventSpy);
     });

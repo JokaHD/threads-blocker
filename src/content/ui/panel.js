@@ -304,7 +304,18 @@ export class Panel {
     row.appendChild(statusEl);
 
     // Action buttons
-    if (item.state === BlockState.QUEUED) {
+    if (item.state === BlockState.RESOLVING) {
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'tb-panel-item-action';
+      cancelBtn.innerHTML = Icons.x;
+      cancelBtn.title = 'Cancel';
+      cancelBtn.addEventListener('click', () => {
+        chrome.runtime
+          .sendMessage({ type: MessageType.CANCEL_RESOLVING, username: item.username })
+          .catch((e) => console.warn('[ThreadBlocker] Cancel resolving failed:', e.message));
+      });
+      row.appendChild(cancelBtn);
+    } else if (item.state === BlockState.QUEUED) {
       const cancelBtn = document.createElement('button');
       cancelBtn.className = 'tb-panel-item-action';
       cancelBtn.innerHTML = Icons.x;
@@ -333,6 +344,8 @@ export class Panel {
 
   _stateLabel(state) {
     switch (state) {
+      case BlockState.RESOLVING:
+        return 'Resolving...';
       case BlockState.QUEUED:
         return 'Queued';
       case BlockState.BLOCKING:

@@ -5,6 +5,8 @@ export const MessageType = {
   TASK_RESULT: 'taskResult',
   ENQUEUE_BLOCK: 'enqueueBlock',
   ENQUEUE_BLOCK_BATCH: 'enqueueBlockBatch',
+  UPDATE_RESOLVED_USER: 'updateResolvedUser',
+  CANCEL_RESOLVING: 'cancelResolving',
   CANCEL_QUEUED: 'cancelQueued',
   REQUEST_UNBLOCK: 'requestUnblock',
   RETRY_FAILED: 'retryFailed',
