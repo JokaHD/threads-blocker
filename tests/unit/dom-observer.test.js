@@ -201,7 +201,7 @@ describe('DOMObserver', () => {
       `;
       const marked = observer.getMarkedComments();
       expect(marked).toHaveLength(2);
-      expect(marked.map(m => m.username).sort()).toEqual(['user1', 'user2']);
+      expect(marked.map((m) => m.username).sort()).toEqual(['user1', 'user2']);
     });
   });
 });

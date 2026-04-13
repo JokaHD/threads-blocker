@@ -7,8 +7,17 @@ import { Icons } from '../../src/content/ui/icons.js';
 describe('Icons', () => {
   test('exports all required icons', () => {
     const requiredIcons = [
-      'ban', 'x', 'check', 'loader', 'undo',
-      'alertTriangle', 'refreshCw', 'shield', 'minus', 'pause', 'play'
+      'ban',
+      'x',
+      'check',
+      'loader',
+      'undo',
+      'alertTriangle',
+      'refreshCw',
+      'shield',
+      'minus',
+      'pause',
+      'play',
     ];
 
     for (const name of requiredIcons) {
@@ -18,7 +27,7 @@ describe('Icons', () => {
   });
 
   test('icons are valid SVG strings', () => {
-    for (const [name, svg] of Object.entries(Icons)) {
+    for (const svg of Object.values(Icons)) {
       expect(svg).toMatch(/^<svg.*<\/svg>$/);
       expect(svg).toContain('viewBox="0 0 24 24"');
     }

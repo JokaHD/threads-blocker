@@ -1,4 +1,3 @@
-import { jest } from '@jest/globals';
 import { threadsSiteRule, getSiteRule } from '../../src/content/site-adapter.js';
 
 describe('threadsSiteRule', () => {
@@ -32,7 +31,10 @@ describe('threadsSiteRule', () => {
 
   describe('isAvatarLink', () => {
     it('detects avatar link by Chinese text', () => {
-      const link = { textContent: '個人檔案', getBoundingClientRect: () => ({ width: 60, height: 60 }) };
+      const link = {
+        textContent: '個人檔案',
+        getBoundingClientRect: () => ({ width: 60, height: 60 }),
+      };
       expect(threadsSiteRule.isAvatarLink(link)).toBe(true);
     });
 
@@ -42,7 +44,10 @@ describe('threadsSiteRule', () => {
     });
 
     it('returns false for text link', () => {
-      const link = { textContent: 'username', getBoundingClientRect: () => ({ width: 80, height: 20 }) };
+      const link = {
+        textContent: 'username',
+        getBoundingClientRect: () => ({ width: 80, height: 20 }),
+      };
       expect(threadsSiteRule.isAvatarLink(link)).toBe(false);
     });
   });

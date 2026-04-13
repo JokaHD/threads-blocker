@@ -182,17 +182,20 @@ export class Sidebar {
       if (!user.userId) {
         user.userId = await this._idResolver.resolve(username, user.element);
       }
-      chrome.runtime.sendMessage({
-        type: state === BlockState.FAILED ? MessageType.RETRY_FAILED : MessageType.ENQUEUE_BLOCK,
-        username,
-        userId: user.userId,
-      }).catch(e => console.warn('[ThreadBlocker] Enqueue failed:', e.message));
+      chrome.runtime
+        .sendMessage({
+          type: state === BlockState.FAILED ? MessageType.RETRY_FAILED : MessageType.ENQUEUE_BLOCK,
+          username,
+          userId: user.userId,
+        })
+        .catch((e) => console.warn('[ThreadBlocker] Enqueue failed:', e.message));
       return;
     }
 
     if (state === BlockState.QUEUED) {
-      chrome.runtime.sendMessage({ type: MessageType.CANCEL_QUEUED, userId: user.userId })
-        .catch(e => console.warn('[ThreadBlocker] Cancel failed:', e.message));
+      chrome.runtime
+        .sendMessage({ type: MessageType.CANCEL_QUEUED, userId: user.userId })
+        .catch((e) => console.warn('[ThreadBlocker] Cancel failed:', e.message));
       return;
     }
 
@@ -206,8 +209,9 @@ export class Sidebar {
     }
 
     if (state === UIState.CONFIRM_UNBLOCK) {
-      chrome.runtime.sendMessage({ type: MessageType.REQUEST_UNBLOCK, userId: user.userId })
-        .catch(e => console.warn('[ThreadBlocker] Unblock request failed:', e.message));
+      chrome.runtime
+        .sendMessage({ type: MessageType.REQUEST_UNBLOCK, userId: user.userId })
+        .catch((e) => console.warn('[ThreadBlocker] Unblock request failed:', e.message));
       return;
     }
   }

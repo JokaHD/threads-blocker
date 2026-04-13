@@ -144,7 +144,7 @@ export class DOMObserver {
     console.log('[ThreadBlocker] Route changed to', location.href);
 
     // Clear old markers
-    document.querySelectorAll(`[${COMMENT_ID_ATTR}]`).forEach(el => {
+    document.querySelectorAll(`[${COMMENT_ID_ATTR}]`).forEach((el) => {
       el.removeAttribute(COMMENT_ID_ATTR);
       el.classList.remove('tb-blockmode-target', 'tb-selected');
     });
@@ -159,7 +159,7 @@ export class DOMObserver {
    */
   getMarkedComments() {
     const elements = document.querySelectorAll(`[${COMMENT_ID_ATTR}]`);
-    return Array.from(elements).map(el => ({
+    return Array.from(elements).map((el) => ({
       username: el.getAttribute(COMMENT_ID_ATTR),
       container: el,
     }));

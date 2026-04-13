@@ -58,7 +58,7 @@ describe('shadow-host', () => {
 
     test('reuses existing host element on page reload', () => {
       // First call creates the host
-      const root1 = getShadowRoot();
+      getShadowRoot();
 
       // Simulate module reload by clearing internal state
       // We can't easily do this, so we test by destroying and checking existing detection

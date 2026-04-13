@@ -169,9 +169,15 @@ export class QueueManager {
 
   // ── Pause / Resume ────────────────────────────────────────────────────────
 
-  pause() { this._paused = true; }
-  resume() { this._paused = false; }
-  isPaused() { return this._paused; }
+  pause() {
+    this._paused = true;
+  }
+  resume() {
+    this._paused = false;
+  }
+  isPaused() {
+    return this._paused;
+  }
 
   // ── Queries ───────────────────────────────────────────────────────────────
 

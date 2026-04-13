@@ -26,7 +26,9 @@ describe('Toolbar', () => {
 
     // Mock selection manager
     mockSelectionManager = {
-      onChange: jest.fn((cb) => { onChangeCallback = cb; }),
+      onChange: jest.fn((cb) => {
+        onChangeCallback = cb;
+      }),
       getSelected: jest.fn(() => []),
       clearSelection: jest.fn(),
     };
@@ -67,7 +69,6 @@ describe('Toolbar', () => {
       toolbar.init();
       expect(mockSelectionManager.onChange).toHaveBeenCalledTimes(1);
     });
-
   });
 
   describe('selection changes', () => {
@@ -118,14 +119,12 @@ describe('Toolbar', () => {
     test('resolves user IDs and sends batch message', async () => {
       toolbar.init();
       mockSelectionManager.getSelected.mockReturnValue(['user1', 'user2']);
-      mockIdResolver.resolve
-        .mockResolvedValueOnce('id1')
-        .mockResolvedValueOnce('id2');
+      mockIdResolver.resolve.mockResolvedValueOnce('id1').mockResolvedValueOnce('id2');
 
       const blockBtn = container.querySelector('.tb-toolbar-block-btn');
       blockBtn.click();
 
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
 
       expect(mockIdResolver.resolve).toHaveBeenCalledTimes(2);
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
@@ -141,15 +140,13 @@ describe('Toolbar', () => {
     test('skips users that cannot be resolved', async () => {
       toolbar.init();
       mockSelectionManager.getSelected.mockReturnValue(['user1', 'user2']);
-      mockIdResolver.resolve
-        .mockResolvedValueOnce('id1')
-        .mockResolvedValueOnce(null);
+      mockIdResolver.resolve.mockResolvedValueOnce('id1').mockResolvedValueOnce(null);
 
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       const blockBtn = container.querySelector('.tb-toolbar-block-btn');
       blockBtn.click();
 
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
 
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: MessageType.ENQUEUE_BLOCK_BATCH,
@@ -168,7 +165,7 @@ describe('Toolbar', () => {
       const blockBtn = container.querySelector('.tb-toolbar-block-btn');
       blockBtn.click();
 
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
 
       expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
       expect(errorSpy).toHaveBeenCalledWith('[ThreadBlocker] No valid user IDs found');
@@ -186,7 +183,7 @@ describe('Toolbar', () => {
       const blockBtn = container.querySelector('.tb-toolbar-block-btn');
       blockBtn.click();
 
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
 
       expect(eventSpy).toHaveBeenCalled();
       window.removeEventListener('tb-exit-block-mode', eventSpy);

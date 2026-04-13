@@ -46,7 +46,6 @@ describe('InlineControls', () => {
       expect(fab).not.toBeNull();
       expect(fab.textContent).toContain('Block Mode');
     });
-
   });
 
   describe('block mode toggle', () => {

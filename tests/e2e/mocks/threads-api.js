@@ -65,7 +65,8 @@ export async function injectFakeScripts(page) {
     // - "LSD",[],{"token":"..."}
     const script = document.createElement('script');
     // The pattern matching looks for literal strings, so embed them directly
-    script.textContent = '"DTSGInitialData",[],{"token":"test-dtsg-token"} "LSD",[],{"token":"test-lsd-token"}';
+    script.textContent =
+      '"DTSGInitialData",[],{"token":"test-dtsg-token"} "LSD",[],{"token":"test-lsd-token"}';
     script.setAttribute('data-testid', 'fake-tokens');
     document.head.appendChild(script);
   });

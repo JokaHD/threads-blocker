@@ -54,8 +54,9 @@ const apiExecutor = new APIExecutor(tokenProvider, {
 });
 
 // Register with Service Worker
-chrome.runtime.sendMessage({ type: MessageType.REGISTER_EXECUTOR })
-  .catch(e => console.warn('[ThreadBlocker] Register executor failed:', e.message));
+chrome.runtime
+  .sendMessage({ type: MessageType.REGISTER_EXECUTOR })
+  .catch((e) => console.warn('[ThreadBlocker] Register executor failed:', e.message));
 
 // Listen for queue updates via storage.onChanged
 function handleStorageChange(changes, area) {
@@ -132,11 +133,3 @@ if (document.readyState === 'loading') {
     console.warn('[ThreadBlocker] Failed to fetch initial states:', e);
   }
 })();
-
-// TODO: beforeunload warning disabled - needs fix
-// window.addEventListener('beforeunload', (e) => {
-//   if (activeTaskCount > 0) {
-//     e.preventDefault();
-//     e.returnValue = '';
-//   }
-// });

@@ -17,7 +17,7 @@ const { TokenProvider } = await import('../../src/content/token-provider.js');
 beforeEach(() => {
   mockScripts = [];
   // Clear cookies
-  document.cookie.split(';').forEach(c => {
+  document.cookie.split(';').forEach((c) => {
     document.cookie = c.trim().split('=')[0] + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT';
   });
 });
@@ -47,7 +47,9 @@ describe('TokenProvider', () => {
 
       const provider = new TokenProvider();
 
-      await expect(provider.getTokens()).rejects.toThrow('Unable to extract csrftoken from cookies');
+      await expect(provider.getTokens()).rejects.toThrow(
+        'Unable to extract csrftoken from cookies'
+      );
     });
 
     it('extracts fb_dtsg from DTSGInitialData pattern', async () => {

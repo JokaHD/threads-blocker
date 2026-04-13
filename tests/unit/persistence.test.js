@@ -1,4 +1,3 @@
-import { jest } from '@jest/globals';
 import { setupChromeMocks, resetChromeMocks } from '../setup.js';
 
 // Set up chrome mocks before importing the module under test

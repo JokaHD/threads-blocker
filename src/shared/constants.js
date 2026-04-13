@@ -42,6 +42,16 @@ export const Limits = {
   MAX_SCROLL_RECORD: 500,
 };
 
+// Threads API configuration
+export const ThreadsAPI = {
+  ENDPOINT: 'https://www.threads.com/api/graphql',
+  IG_APP_ID: '238260118697367',
+  DOC_IDS: {
+    block: '26803837702651619',
+    unblock: '26247169961577940',
+  },
+};
+
 // Design tokens
 export const Colors = {
   PRIMARY: '#2563EB',

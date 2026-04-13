@@ -3,7 +3,7 @@
  */
 
 import { Sidebar } from '../../src/content/ui/sidebar.js';
-import { BlockState, UIState, Timing } from '../../src/shared/constants.js';
+import { BlockState, Timing } from '../../src/shared/constants.js';
 import { MessageType } from '../../src/shared/messages.js';
 
 // Polyfill CSS.escape for jsdom
@@ -292,10 +292,8 @@ describe('Sidebar', () => {
       sidebar.updateState('testuser', BlockState.BLOCKING);
 
       chrome.runtime.sendMessage.mockClear();
-      const spinner = document.querySelector('.tb-sbtn-blocking');
-
-      // Spinner doesn't have click handler, but test the guard in _handleClick
-      // We need to call _handleClick directly or simulate the state
+      // Spinner (tb-sbtn-blocking) is a span without click handler
+      // Verify no message is sent when in blocking state
       expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
     });
   });
@@ -306,7 +304,7 @@ describe('Sidebar', () => {
       sidebar.addUser('user1', document.createElement('div'));
       sidebar.addUser('user2', document.createElement('div'));
 
-      mockSelectionManager.isSelected.mockImplementation(u => u === 'user1');
+      mockSelectionManager.isSelected.mockImplementation((u) => u === 'user1');
       sidebar.updateCheckboxes();
 
       const row1 = document.querySelector('[data-tb-user="user1"]');

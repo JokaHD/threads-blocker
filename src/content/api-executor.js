@@ -11,7 +11,7 @@ export class APIExecutor {
   }
 
   async processTask(task) {
-    const { userId, username, action } = task;
+    const { userId, action } = task;
 
     try {
       const fn = action === 'block' ? this._api.blockUser : this._api.unblockUser;

@@ -39,7 +39,7 @@ export const mockAlarms = {
 // Mock chrome.runtime
 const messageListeners = [];
 export const mockRuntime = {
-  sendMessage: jest.fn((msg) => {
+  sendMessage: jest.fn((_msg) => {
     return Promise.resolve();
   }),
   onMessage: {
@@ -68,12 +68,14 @@ export function resetChromeMocks() {
 
 // Mock fetch
 export let mockFetchResponse = { ok: true, json: async () => ({}) };
-export const mockFetch = jest.fn(() => Promise.resolve({
-  ok: mockFetchResponse.ok,
-  status: mockFetchResponse.status || 200,
-  json: mockFetchResponse.json || (async () => ({})),
-  text: mockFetchResponse.text || (async () => ''),
-}));
+export const mockFetch = jest.fn(() =>
+  Promise.resolve({
+    ok: mockFetchResponse.ok,
+    status: mockFetchResponse.status || 200,
+    json: mockFetchResponse.json || (async () => ({})),
+    text: mockFetchResponse.text || (async () => ''),
+  })
+);
 
 export function setMockFetchResponse(response) {
   mockFetchResponse = response;

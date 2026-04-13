@@ -19,7 +19,7 @@ export function getDebugState() {
   let avatarLinks = 0;
   let textLinks = 0;
 
-  allLinks.forEach(link => {
+  allLinks.forEach((link) => {
     const href = link.getAttribute('href');
     if (!usernamePattern.test(href)) return;
     const rect = link.getBoundingClientRect();
@@ -82,14 +82,21 @@ export function getDebugState() {
     blockMode: document.body.classList.contains('tb-blockmode'),
 
     // Sample comments (first 3)
-    commentSamples: Array.from(markedComments).slice(0, 3).map(el => ({
-      username: el.getAttribute('data-tb-comment-id'),
-      selected: el.classList.contains('tb-selected'),
-      rect: (() => {
-        const r = el.getBoundingClientRect();
-        return { top: Math.round(r.top), left: Math.round(r.left), width: Math.round(r.width), height: Math.round(r.height) };
-      })(),
-    })),
+    commentSamples: Array.from(markedComments)
+      .slice(0, 3)
+      .map((el) => ({
+        username: el.getAttribute('data-tb-comment-id'),
+        selected: el.classList.contains('tb-selected'),
+        rect: (() => {
+          const r = el.getBoundingClientRect();
+          return {
+            top: Math.round(r.top),
+            left: Math.round(r.left),
+            width: Math.round(r.width),
+            height: Math.round(r.height),
+          };
+        })(),
+      })),
   };
 }
 
