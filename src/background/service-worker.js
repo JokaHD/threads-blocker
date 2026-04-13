@@ -97,6 +97,12 @@ async function handleMessage(message, sender) {
       return { ok: true };
     }
 
+    case MessageType.UPDATE_RESOLVED_USER: {
+      const { username, userId } = message;
+      queue.updateResolvedUser(username, userId);
+      return { ok: true };
+    }
+
     case MessageType.GET_NEXT_TASK: {
       if (rateLimitHandler.isInCooldown()) {
         return { task: null, cooldownEnd: rateLimitHandler.getCooldownEnd() };
@@ -149,6 +155,11 @@ async function handleMessage(message, sender) {
 
       // No more retries → mark as permanently failed
       queue.onTaskComplete(userId, false, { type: errorType, message: errPayload?.message });
+      return { ok: true };
+    }
+
+    case MessageType.CANCEL_RESOLVING: {
+      queue.cancelResolving(message.username);
       return { ok: true };
     }
 

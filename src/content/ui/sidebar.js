@@ -127,6 +127,11 @@ export class Sidebar {
         ariaLabel = `封鎖 @${username}`;
         iconHtml = Icons.ban;
         break;
+      case BlockState.RESOLVING:
+        el = document.createElement('span');
+        className = `${base} tb-sbtn-resolving`;
+        iconHtml = Icons.loader;
+        break;
       case BlockState.QUEUED:
         el = document.createElement('button');
         className = `${base} tb-sbtn-queued`;

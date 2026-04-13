@@ -77,30 +77,16 @@ export class Toolbar {
 
   /**
    * Handle block all selected users.
+   * Immediately enqueues all users (as RESOLVING), then resolves userIds async.
    */
-  async _handleBlockAll() {
+  _handleBlockAll() {
     const selected = this._selection.getSelected();
     if (selected.length === 0) return;
 
-    console.log(`[ThreadBlocker] Resolving user IDs for ${selected.length} users...`);
+    console.log(`[ThreadBlocker] Enqueueing ${selected.length} users (resolving IDs async)...`);
 
-    // Build list of { username, userId } entries
-    const entries = [];
-    for (const username of selected) {
-      const userId = await this._idResolver.resolve(username);
-      if (userId) {
-        entries.push({ username, userId });
-      } else {
-        console.warn(`[ThreadBlocker] Skipping @${username} - could not resolve user_id`);
-      }
-    }
-
-    if (entries.length === 0) {
-      console.error('[ThreadBlocker] No valid user IDs found');
-      return;
-    }
-
-    console.log(`[ThreadBlocker] Enqueueing ${entries.length} users for blocking`);
+    // Immediately enqueue all users with userId=null (RESOLVING state)
+    const entries = selected.map((username) => ({ username, userId: null }));
 
     chrome.runtime
       .sendMessage({
@@ -109,9 +95,33 @@ export class Toolbar {
       })
       .catch((e) => console.error('[ThreadBlocker] Enqueue batch failed:', e.message));
 
+    // Clear selection and exit block mode immediately (non-blocking)
     this._selection.clearSelection();
-
-    // Exit block mode via custom event
     window.dispatchEvent(new CustomEvent('tb-exit-block-mode'));
+
+    // Resolve userIds asynchronously in background
+    this._resolveUsersAsync(selected);
+  }
+
+  /**
+   * Resolve userIds for a list of usernames and update the queue.
+   */
+  async _resolveUsersAsync(usernames) {
+    for (const username of usernames) {
+      const userId = await this._idResolver.resolve(username);
+      if (userId) {
+        console.log(`[ThreadBlocker] Resolved @${username} -> ${userId}`);
+      } else {
+        console.warn(`[ThreadBlocker] Failed to resolve @${username}`);
+      }
+
+      chrome.runtime
+        .sendMessage({
+          type: MessageType.UPDATE_RESOLVED_USER,
+          username,
+          userId,
+        })
+        .catch((e) => console.warn('[ThreadBlocker] Update resolved user failed:', e.message));
+    }
   }
 }
