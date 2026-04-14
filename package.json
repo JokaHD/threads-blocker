@@ -82,7 +82,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@jest/globals": "^29.7.0",
+    "@jest/globals": "^30.3.0",
     "@playwright/test": "^1.59.1",
     "esbuild": "^0.28.0",
     "eslint": "^10.2.0",
