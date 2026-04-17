@@ -96,7 +96,10 @@ export class InlineControls {
     window.addEventListener('tb-route-change', () => this._handleRouteChange());
 
     // Listen for selection changes to update card
-    this._selection.onChange(() => this._updateCard());
+    this._selection.onChange(() => {
+      this._updateCard();
+      this._updateHighlights();
+    });
 
     // Create confirmation dialog
     this._createConfirmDialog(container);
