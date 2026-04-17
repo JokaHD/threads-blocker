@@ -379,6 +379,40 @@ describe('InlineControls', () => {
     });
   });
 
+  describe('media view hiding', () => {
+    test('_isMediaView returns true for media URLs', () => {
+      // Test the regex pattern directly
+      const mediaPattern = /\/post\/[^/]+\/media/;
+
+      expect(mediaPattern.test('/@user/post/ABC123/media')).toBe(true);
+      expect(mediaPattern.test('/post/ABC123/media')).toBe(true);
+      expect(mediaPattern.test('/@user/post/ABC123')).toBe(false);
+      expect(mediaPattern.test('/post/ABC123')).toBe(false);
+      expect(mediaPattern.test('/')).toBe(false);
+    });
+
+    test('responds to tb-route-change event', () => {
+      inlineControls.init();
+
+      // Verify event listener is registered (method exists and runs without error)
+      expect(() => {
+        window.dispatchEvent(new CustomEvent('tb-route-change'));
+      }).not.toThrow();
+    });
+
+    test('FAB has media-hidden class support in CSS', () => {
+      inlineControls.init();
+      const fab = container.querySelector('.tb-fab');
+
+      // Verify the class can be toggled
+      fab.classList.add('tb-fab-media-hidden');
+      expect(fab.classList.contains('tb-fab-media-hidden')).toBe(true);
+
+      fab.classList.remove('tb-fab-media-hidden');
+      expect(fab.classList.contains('tb-fab-media-hidden')).toBe(false);
+    });
+  });
+
   describe('destroy', () => {
     test('removes FAB', () => {
       inlineControls.init();

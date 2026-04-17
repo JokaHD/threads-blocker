@@ -92,11 +92,43 @@ export class InlineControls {
     // Listen for exit block mode event (from toolbar after blocking)
     window.addEventListener('tb-exit-block-mode', () => this._exitBlockMode());
 
+    // Listen for route changes to hide UI on media view
+    window.addEventListener('tb-route-change', () => this._handleRouteChange());
+
     // Listen for selection changes to update card
     this._selection.onChange(() => this._updateCard());
 
     // Create confirmation dialog
     this._createConfirmDialog(container);
+
+    // Check initial URL
+    this._handleRouteChange();
+  }
+
+  /**
+   * Check if current URL is a media lightbox view.
+   */
+  _isMediaView() {
+    return /\/post\/[^/]+\/media/.test(window.location.pathname);
+  }
+
+  /**
+   * Handle route change - hide UI on media view.
+   */
+  _handleRouteChange() {
+    const isMedia = this._isMediaView();
+
+    if (this._fab) {
+      this._fab.classList.toggle('tb-fab-media-hidden', isMedia);
+    }
+    if (this._card) {
+      this._card.classList.toggle('tb-card-media-hidden', isMedia);
+    }
+
+    // Exit block mode if navigating to media view while in block mode
+    if (isMedia && this._blockMode) {
+      this._exitBlockMode();
+    }
   }
 
   _createCard(container) {

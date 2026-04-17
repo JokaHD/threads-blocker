@@ -181,6 +181,10 @@ function getExtensionStyles() {
       pointer-events: none;
     }
 
+    .tb-fab.tb-fab-media-hidden {
+      display: none;
+    }
+
     /* ============================================================
        Card — Block Mode Control Card
        ============================================================ */
@@ -205,6 +209,10 @@ function getExtensionStyles() {
       opacity: 1;
       transform: scale(1);
       visibility: visible;
+    }
+
+    .tb-card.tb-card-media-hidden {
+      display: none;
     }
 
     /* Count Area - Big Number */

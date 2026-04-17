@@ -149,6 +149,9 @@ export class DOMObserver {
       el.classList.remove('tb-blockmode-target', 'tb-selected');
     });
 
+    // Dispatch route change event for other components
+    window.dispatchEvent(new CustomEvent('tb-route-change', { detail: { url: location.href } }));
+
     // Re-scan after a short delay (let new content load)
     setTimeout(() => this._scan(), 300);
   }
