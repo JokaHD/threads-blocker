@@ -1,6 +1,7 @@
 node_modules/
 dist/
-docs/superpowers/
+docs/
 coverage/
 test-results/
 playwright-report/
+CLAUDE.md

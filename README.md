@@ -108,7 +108,3 @@ Use of automation tools may violate the Terms of Service of certain platforms. B
 ## License
 
 [MIT](LICENSE)
-
-## Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
