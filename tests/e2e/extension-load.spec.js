@@ -18,7 +18,7 @@ test.describe('Extension Loading', () => {
     expect(shadowHost).toBeTruthy();
   });
 
-  test('shows FAB (toolbar) in Shadow DOM', async ({ context, extensionPage: page }) => {
+  test('shows FAB and Card in Shadow DOM', async ({ context, extensionPage: page }) => {
     await injectFakeTokens(context);
     await injectFakeScripts(page);
     await setupApiMocks(page);
@@ -28,14 +28,16 @@ test.describe('Extension Loading', () => {
     // Wait for Shadow DOM host
     await page.waitForSelector('#tb-shadow-host', { timeout: 10000, state: 'attached' });
 
-    // Check for toolbar inside Shadow DOM
-    const hasToolbar = await page.evaluate(() => {
+    // Check for FAB and Card inside Shadow DOM
+    const hasUI = await page.evaluate(() => {
       const host = document.querySelector('#tb-shadow-host');
       if (!host || !host.shadowRoot) return false;
-      return !!host.shadowRoot.querySelector('.tb-toolbar');
+      const hasFab = !!host.shadowRoot.querySelector('.tb-fab');
+      const hasCard = !!host.shadowRoot.querySelector('.tb-card');
+      return hasFab && hasCard;
     });
 
-    expect(hasToolbar).toBe(true);
+    expect(hasUI).toBe(true);
   });
 
   test('does not load on non-threads sites', async ({ context }) => {

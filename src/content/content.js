@@ -2,7 +2,7 @@
  * Thread Blocker - Content Script Entry Point
  *
  * Architecture:
- * - Shadow DOM host contains all extension UI (FAB, toolbar, panel)
+ * - Shadow DOM host contains all extension UI (FAB, card, panel)
  * - DOM observer detects comments using site adapter
  * - Block mode applies highlight classes to page DOM
  * - Communication with service worker via chrome.runtime.sendMessage
@@ -15,7 +15,6 @@ import { APIExecutor } from './api-executor.js';
 import { SelectionManager } from './selection-manager.js';
 import { getShadowRoot } from './ui/shadow-host.js';
 import { InlineControls } from './ui/inline-controls.js';
-import { Toolbar } from './ui/toolbar.js';
 import { Panel } from './ui/panel.js';
 import { MessageType } from '../shared/messages.js';
 import { installDebugGlobal } from './debug.js';
@@ -34,7 +33,6 @@ const idResolver = new IDResolver();
 const tokenProvider = new TokenProvider();
 const selectionManager = new SelectionManager();
 const inlineControls = new InlineControls(selectionManager, idResolver);
-const toolbar = new Toolbar(selectionManager, idResolver);
 const panel = new Panel();
 
 // Wrap API functions to use tokenProvider
@@ -103,7 +101,6 @@ domObserver.startObserving((newComments) => {
 
 // Initialize UI (all in Shadow DOM)
 inlineControls.init();
-toolbar.init();
 panel.init();
 
 // Install debug global

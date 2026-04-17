@@ -138,7 +138,7 @@ function getExtensionStyles() {
     }
 
     /* ============================================================
-       FAB — Floating Action Button
+       FAB — Floating Action Button (entry point)
        ============================================================ */
     .tb-fab {
       position: fixed;
@@ -147,16 +147,16 @@ function getExtensionStyles() {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 12px 20px;
+      padding: 14px 22px;
       border: none;
-      border-radius: 28px;
+      border-radius: 16px;
       background: var(--tb-bg);
       color: var(--tb-text);
       font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-      transition: all var(--tb-transition);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      transition: all 200ms ease;
       pointer-events: auto;
     }
 
@@ -168,83 +168,143 @@ function getExtensionStyles() {
     .tb-fab:hover {
       background: var(--tb-bg-hover);
       transform: scale(1.03);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
     }
 
     .tb-fab:active {
       transform: scale(0.97);
     }
 
-    .tb-fab.tb-fab-active {
-      background: var(--tb-danger);
-      color: #fff;
-      box-shadow: 0 4px 20px rgba(220, 38, 38, 0.4);
-    }
-
-    .tb-fab.tb-fab-active:hover {
-      background: var(--tb-danger-hover);
+    .tb-fab.tb-fab-hidden {
+      opacity: 0;
+      transform: scale(0.9);
+      pointer-events: none;
     }
 
     /* ============================================================
-       Toolbar — top bar when items selected
+       Card — Block Mode Control Card
        ============================================================ */
-    .tb-toolbar {
+    .tb-card {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 20px;
+      bottom: 100px;
+      right: 24px;
+      min-width: 160px;
       background: var(--tb-bg);
-      color: var(--tb-text);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      transform: translateY(-100%);
-      transition: transform 250ms ease-out;
+      border: 1px solid var(--tb-border);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      padding: 20px;
       pointer-events: auto;
+      opacity: 0;
+      transform: scale(0.9);
+      visibility: hidden;
+      transition: all 200ms ease;
     }
 
-    .tb-toolbar.tb-toolbar-visible {
-      transform: translateY(0);
+    .tb-card.tb-card-visible {
+      opacity: 1;
+      transform: scale(1);
+      visibility: visible;
     }
 
-    .tb-toolbar-count {
-      flex: 1;
-      font-weight: 600;
+    /* Count Area - Big Number */
+    .tb-card-count-area {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .tb-card-count-num {
+      display: block;
+      font-size: 48px;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--tb-text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tb-card-count-label {
+      display: block;
+      font-size: 14px;
       color: var(--tb-text-muted);
+      margin-top: 4px;
     }
 
-    .tb-toolbar-block-btn {
+    /* Actions (shown when count > 0) */
+    .tb-card-actions {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .tb-card-actions.tb-card-actions-visible {
+      display: flex;
+    }
+
+    .tb-card-block-btn {
+      width: 100%;
+      padding: 14px 20px;
       background: var(--tb-danger);
       color: #fff;
       border: none;
       border-radius: var(--tb-radius-sm);
-      padding: 8px 18px;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 600;
-      cursor: pointer;
-      transition: background var(--tb-transition);
-    }
-
-    .tb-toolbar-block-btn:hover {
-      background: var(--tb-danger-hover);
-    }
-
-    .tb-toolbar-clear-btn {
-      background: transparent;
-      color: var(--tb-text-muted);
-      border: 1px solid var(--tb-border);
-      border-radius: var(--tb-radius-sm);
-      padding: 8px 18px;
-      font-size: 14px;
       cursor: pointer;
       transition: all var(--tb-transition);
     }
 
-    .tb-toolbar-clear-btn:hover {
-      border-color: var(--tb-text);
+    .tb-card-block-btn:hover {
+      background: var(--tb-danger-hover);
+    }
+
+    .tb-card-block-btn:active {
+      transform: scale(0.97);
+    }
+
+    .tb-card-links {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .tb-card-link {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--tb-text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      padding: 8px;
+      transition: color var(--tb-transition);
+    }
+
+    .tb-card-link:hover {
+      color: var(--tb-text);
+    }
+
+    .tb-card-link:last-child {
+      text-align: right;
+    }
+
+    /* Exit Only (shown when count = 0) */
+    .tb-card-exit-only {
+      display: none;
+      width: 100%;
+      background: none;
+      border: none;
+      color: var(--tb-text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      padding: 8px;
+      text-align: center;
+      transition: color var(--tb-transition);
+    }
+
+    .tb-card-exit-only.tb-card-exit-only-visible {
+      display: block;
+    }
+
+    .tb-card-exit-only:hover {
       color: var(--tb-text);
     }
 
@@ -564,6 +624,102 @@ function getExtensionStyles() {
 
     .tb-overlay-hidden {
       display: none;
+    }
+
+    /* ============================================================
+       Confirm Dialog — exit block mode confirmation
+       ============================================================ */
+    .tb-confirm-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 200ms ease, visibility 200ms ease;
+    }
+
+    .tb-confirm-backdrop.tb-confirm-visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .tb-confirm-dialog {
+      background: var(--tb-bg);
+      border: 1px solid var(--tb-border);
+      border-radius: var(--tb-radius-md);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+      padding: 20px;
+      max-width: 320px;
+      width: calc(100% - 32px);
+      transform: scale(0.95);
+      transition: transform 200ms ease;
+    }
+
+    .tb-confirm-backdrop.tb-confirm-visible .tb-confirm-dialog {
+      transform: scale(1);
+    }
+
+    .tb-confirm-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--tb-text);
+    }
+
+    .tb-confirm-message {
+      font-size: 14px;
+      color: var(--tb-text-muted);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .tb-confirm-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    .tb-confirm-btn {
+      min-height: 44px;
+      min-width: 80px;
+      padding: 10px 20px;
+      border-radius: var(--tb-radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--tb-transition);
+    }
+
+    .tb-confirm-btn:active {
+      transform: scale(0.97);
+    }
+
+    .tb-confirm-btn-cancel {
+      background: transparent;
+      color: var(--tb-text-muted);
+      border: 1px solid var(--tb-border);
+    }
+
+    .tb-confirm-btn-cancel:hover {
+      border-color: var(--tb-text);
+      color: var(--tb-text);
+    }
+
+    .tb-confirm-btn-confirm {
+      background: var(--tb-danger);
+      color: #fff;
+      border: none;
+    }
+
+    .tb-confirm-btn-confirm:hover {
+      background: var(--tb-danger-hover);
     }
   `;
 }

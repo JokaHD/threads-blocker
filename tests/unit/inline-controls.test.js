@@ -23,6 +23,9 @@ describe('InlineControls', () => {
       isSelected: jest.fn(() => false),
       clearSelection: jest.fn(),
       recordSeen: jest.fn(),
+      count: jest.fn(() => 0),
+      getSelected: jest.fn(() => []),
+      onChange: jest.fn(),
     };
 
     mockIdResolver = {
@@ -53,22 +56,26 @@ describe('InlineControls', () => {
       inlineControls.init();
 
       const fab = container.querySelector('.tb-fab');
+      const card = container.querySelector('.tb-card');
       fab.click();
 
-      expect(fab.classList.contains('tb-fab-active')).toBe(true);
-      expect(fab.textContent).toContain('Exit Block Mode');
+      expect(fab.classList.contains('tb-fab-hidden')).toBe(true);
+      expect(card.classList.contains('tb-card-visible')).toBe(true);
       expect(document.body.classList.contains('tb-blockmode')).toBe(true);
     });
 
-    test('exits block mode when FAB clicked again', () => {
+    test('exits block mode when exit link clicked', () => {
       inlineControls.init();
 
       const fab = container.querySelector('.tb-fab');
+      const card = container.querySelector('.tb-card');
       fab.click(); // Enter
-      fab.click(); // Exit
 
-      expect(fab.classList.contains('tb-fab-active')).toBe(false);
-      expect(fab.textContent).toContain('Block Mode');
+      const exitLink = container.querySelector('.tb-card-exit-only');
+      exitLink.click(); // Exit
+
+      expect(fab.classList.contains('tb-fab-hidden')).toBe(false);
+      expect(card.classList.contains('tb-card-visible')).toBe(false);
       expect(document.body.classList.contains('tb-blockmode')).toBe(false);
     });
 
@@ -77,9 +84,117 @@ describe('InlineControls', () => {
 
       const fab = container.querySelector('.tb-fab');
       fab.click(); // Enter
-      fab.click(); // Exit
+
+      const exitLink = container.querySelector('.tb-card-exit-only');
+      exitLink.click(); // Exit
 
       expect(mockSelectionManager.clearSelection).toHaveBeenCalled();
+    });
+
+    test('shows confirmation dialog when exiting with selections', () => {
+      mockSelectionManager.count.mockReturnValue(3);
+      inlineControls.init();
+
+      const fab = container.querySelector('.tb-fab');
+      const card = container.querySelector('.tb-card');
+      fab.click(); // Enter
+
+      // With selections, use the exit link in actions area
+      const exitLink = container.querySelector('.tb-card-links .tb-card-link:last-child');
+      exitLink.click(); // Try to exit
+
+      const confirmDialog = container.querySelector('.tb-confirm-backdrop');
+      expect(confirmDialog.classList.contains('tb-confirm-visible')).toBe(true);
+      // Should NOT exit yet
+      expect(card.classList.contains('tb-card-visible')).toBe(true);
+    });
+
+    test('exits block mode when confirm dialog confirmed', () => {
+      mockSelectionManager.count.mockReturnValue(3);
+      inlineControls.init();
+
+      const fab = container.querySelector('.tb-fab');
+      const card = container.querySelector('.tb-card');
+      fab.click(); // Enter
+
+      const exitLink = container.querySelector('.tb-card-links .tb-card-link:last-child');
+      exitLink.click(); // Try to exit - shows dialog
+
+      const confirmBtn = container.querySelector('.tb-confirm-btn-confirm');
+      confirmBtn.click();
+
+      expect(card.classList.contains('tb-card-visible')).toBe(false);
+      expect(fab.classList.contains('tb-fab-hidden')).toBe(false);
+      expect(mockSelectionManager.clearSelection).toHaveBeenCalled();
+    });
+
+    test('stays in block mode when confirm dialog cancelled', () => {
+      mockSelectionManager.count.mockReturnValue(3);
+      inlineControls.init();
+
+      const fab = container.querySelector('.tb-fab');
+      const card = container.querySelector('.tb-card');
+      fab.click(); // Enter
+
+      const exitLink = container.querySelector('.tb-card-links .tb-card-link:last-child');
+      exitLink.click(); // Try to exit - shows dialog
+
+      const cancelBtn = container.querySelector('.tb-confirm-btn-cancel');
+      cancelBtn.click();
+
+      // Dialog should be hidden
+      const confirmDialog = container.querySelector('.tb-confirm-backdrop');
+      expect(confirmDialog.classList.contains('tb-confirm-visible')).toBe(false);
+      // Should stay in block mode
+      expect(card.classList.contains('tb-card-visible')).toBe(true);
+      expect(mockSelectionManager.clearSelection).not.toHaveBeenCalled();
+    });
+
+    test('closes confirm dialog when backdrop clicked', () => {
+      mockSelectionManager.count.mockReturnValue(3);
+      inlineControls.init();
+
+      const fab = container.querySelector('.tb-fab');
+      const card = container.querySelector('.tb-card');
+      fab.click(); // Enter
+
+      const exitLink = container.querySelector('.tb-card-links .tb-card-link:last-child');
+      exitLink.click(); // Try to exit - shows dialog
+
+      const backdrop = container.querySelector('.tb-confirm-backdrop');
+      backdrop.click();
+
+      expect(backdrop.classList.contains('tb-confirm-visible')).toBe(false);
+      expect(card.classList.contains('tb-card-visible')).toBe(true);
+    });
+
+    test('shows block button when items selected', () => {
+      inlineControls.init();
+
+      const fab = container.querySelector('.tb-fab');
+      fab.click(); // Enter
+
+      // Simulate selection change callback
+      mockSelectionManager.count.mockReturnValue(2);
+      const onChangeCallback = mockSelectionManager.onChange.mock.calls[0][0];
+      onChangeCallback();
+
+      const actions = container.querySelector('.tb-card-actions');
+      expect(actions.classList.contains('tb-card-actions-visible')).toBe(true);
+    });
+
+    test('updates count display when selection changes', () => {
+      inlineControls.init();
+
+      const fab = container.querySelector('.tb-fab');
+      fab.click(); // Enter
+
+      mockSelectionManager.count.mockReturnValue(5);
+      const onChangeCallback = mockSelectionManager.onChange.mock.calls[0][0];
+      onChangeCallback();
+
+      const countNum = container.querySelector('.tb-card-count-num');
+      expect(countNum.textContent).toBe('5');
     });
   });
 
