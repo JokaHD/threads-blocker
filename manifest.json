@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Threads Blocker",
   "version": "1.0.0",
-  "description": "在 Threads 留言區快速批量封鎖帳號",
+  "description": "在 Threads 留言區快速批次封鎖帳號",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
