@@ -1,8 +1,14 @@
-<svg width="128" height="128" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- 128px: standard version with rounded square bg -->
-  <rect x="0" y="0" width="64" height="64" rx="18" fill="#1a1a1a"/>
-  <circle cx="32" cy="28" r="10" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <path d="M14 58 C14 46, 50 46, 50 58" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <circle cx="50" cy="14" r="8" fill="#6366f1"/>
-  <line x1="45" y1="14" x2="55" y2="14" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 128px: 96x96 icon centered with 16px padding on each side -->
+  <!-- Content area: 16,16 to 112,112 (96x96) -->
+  <g transform="translate(16, 16)">
+    <!-- Scale 64 -> 96: factor 1.5 -->
+    <g transform="scale(1.5)">
+      <rect x="0" y="0" width="64" height="64" rx="18" fill="#1a1a1a"/>
+      <circle cx="32" cy="28" r="10" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M14 58 C14 46, 50 46, 50 58" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <circle cx="50" cy="14" r="8" fill="#6366f1"/>
+      <line x1="45" y1="14" x2="55" y2="14" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+  </g>
 </svg>
