@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run test:coverage
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # 從 git tag 取版號，同步寫入 manifest.json
+      - name: Sync version from tag to manifest
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          node -e "
+            const fs = require('fs');
+            const m = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+            m.version = '${VERSION}';
+            fs.writeFileSync('manifest.json', JSON.stringify(m, null, 2) + '\n');
+          "
+          echo "manifest.json version set to $VERSION"
+
+      - run: npm run build
+
+      # 打包 dist/ 為 zip
+      - name: Package extension
+        run: cd dist && zip -r ../threads-blocker-v${VERSION}.zip .
+
+      # 上傳到 Chrome Web Store
+      - name: Publish to Chrome Web Store
+        run: npx chrome-webstore-upload-cli upload --auto-publish --source threads-blocker-v${VERSION}.zip
+        env:
+          EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+
+      # 建立 GitHub Release
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            threads-blocker-v${VERSION}.zip \
+            --title "v${VERSION}" \
+            --generate-notes
