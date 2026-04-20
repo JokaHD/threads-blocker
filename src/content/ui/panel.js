@@ -6,7 +6,7 @@
 import { BlockState } from '../../shared/constants.js';
 import { MessageType } from '../../shared/messages.js';
 import { Icons } from './icons.js';
-import { getUIContainer } from './shadow-host.js';
+import { getStackContainer } from './shadow-host.js';
 
 export class Panel {
   constructor(container = null) {
@@ -33,7 +33,7 @@ export class Panel {
    * Create panel in Shadow DOM.
    */
   init() {
-    const container = this._container ?? getUIContainer();
+    const container = this._container ?? getStackContainer();
     if (!container) {
       console.error('[ThreadBlocker] Failed to get UI container');
       return;
