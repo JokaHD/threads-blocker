@@ -43,7 +43,7 @@ Coming soon.
 1. Navigate to any page on [threads.com](https://www.threads.com/)
 2. Click the **Block Mode** button (shield icon) in the bottom-right corner
 3. Click on comments to select users you want to block
-4. Click **Block Selected** in the toolbar that appears
+4. Click **Block** in the control card that appears
 5. Monitor progress in the panel
 
 ### Keyboard Shortcuts
@@ -63,23 +63,30 @@ npm run build
 # Watch mode (auto-rebuild on changes)
 npm run watch
 
-# Run unit tests
+# Run unit tests (Jest + jsdom)
 npm test
 
 # Run tests with coverage
 npm run test:coverage
 
-# Run E2E tests (requires xvfb on Linux)
+# Run E2E tests (Playwright + Chromium)
+# First-time setup: install browser binaries
+npx playwright install chromium
+# Run tests (opens a Chromium window)
 npm run test:e2e
+# Run all tests (unit + e2e)
+npm run test:all
 ```
+
+> **Note:** E2E tests run with `headless: false` by default — a Chromium browser window will open during the test run. On headless Linux (CI, WSL without display), set `DISPLAY` or use xvfb.
 
 ## Project Structure
 
 ```
 src/
 ├── background/       # Service worker (queue management, persistence)
-├── content/          # Content script (UI, DOM observation)
-│   └── ui/           # UI components (toolbar, panel, etc.)
+├── content/          # Content script (UI, DOM observation, API)
+│   └── ui/           # UI components (FAB, card, panel, shadow host)
 └── shared/           # Shared constants and message types
 
 tests/
