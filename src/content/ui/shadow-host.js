@@ -48,6 +48,11 @@ export function getShadowRoot() {
   uiContainer.className = 'tb-ui-container';
   shadowRoot.appendChild(uiContainer);
 
+  // Create stack container for FAB/Card/Panel
+  const stackContainer = document.createElement('div');
+  stackContainer.className = 'tb-stack';
+  uiContainer.appendChild(stackContainer);
+
   document.body.appendChild(host);
 
   return shadowRoot;
@@ -59,6 +64,14 @@ export function getShadowRoot() {
 export function getUIContainer() {
   const root = getShadowRoot();
   return root.querySelector('.tb-ui-container');
+}
+
+/**
+ * Get the stack container (flex column) for FAB, Card, and Panel.
+ */
+export function getStackContainer() {
+  const root = getShadowRoot();
+  return root.querySelector('.tb-stack');
 }
 
 /**
@@ -138,12 +151,29 @@ function getExtensionStyles() {
     }
 
     /* ============================================================
+       Stack — flex column container for Panel + Card/FAB
+       ============================================================ */
+    .tb-stack {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      width: 280px;
+      pointer-events: none;
+    }
+
+    .tb-stack > * {
+      pointer-events: auto;
+    }
+
+    /* ============================================================
        FAB — Floating Action Button (entry point)
        ============================================================ */
     .tb-fab {
-      position: fixed;
-      bottom: 100px;
-      right: 24px;
+      align-self: flex-end;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -157,7 +187,6 @@ function getExtensionStyles() {
       cursor: pointer;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
       transition: all 200ms ease;
-      pointer-events: auto;
     }
 
     .tb-fab svg {
@@ -176,9 +205,7 @@ function getExtensionStyles() {
     }
 
     .tb-fab.tb-fab-hidden {
-      opacity: 0;
-      transform: scale(0.9);
-      pointer-events: none;
+      display: none;
     }
 
     .tb-fab.tb-fab-media-hidden {
@@ -189,26 +216,16 @@ function getExtensionStyles() {
        Card — Block Mode Control Card
        ============================================================ */
     .tb-card {
-      position: fixed;
-      bottom: 100px;
-      right: 24px;
-      min-width: 160px;
+      display: none;
       background: var(--tb-bg);
       border: 1px solid var(--tb-border);
       border-radius: 16px;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
       padding: 20px;
-      pointer-events: auto;
-      opacity: 0;
-      transform: scale(0.9);
-      visibility: hidden;
-      transition: all 200ms ease;
     }
 
     .tb-card.tb-card-visible {
-      opacity: 1;
-      transform: scale(1);
-      visibility: visible;
+      display: block;
     }
 
     .tb-card.tb-card-media-hidden {
@@ -320,10 +337,7 @@ function getExtensionStyles() {
        Panel — queue progress (bottom-right, above FAB)
        ============================================================ */
     .tb-panel {
-      position: fixed;
-      bottom: 160px;
-      right: 16px;
-      width: 300px;
+      order: -1;
       max-height: 360px;
       display: flex;
       flex-direction: column;
@@ -334,7 +348,6 @@ function getExtensionStyles() {
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
       overflow: hidden;
-      pointer-events: auto;
     }
 
     .tb-panel-hidden {
@@ -579,6 +592,7 @@ function getExtensionStyles() {
 
     /* Minimized state */
     .tb-panel.tb-panel-minimized {
+      align-self: flex-end;
       width: 48px;
       height: 48px;
       max-height: 48px;

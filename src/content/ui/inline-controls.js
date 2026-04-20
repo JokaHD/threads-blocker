@@ -7,7 +7,7 @@
 import { BlockState } from '../../shared/constants.js';
 import { MessageType } from '../../shared/messages.js';
 import { Icons } from './icons.js';
-import { getUIContainer } from './shadow-host.js';
+import { getUIContainer, getStackContainer } from './shadow-host.js';
 import { COMMENT_ID_ATTR } from '../dom-observer.js';
 
 export class InlineControls {
@@ -28,8 +28,9 @@ export class InlineControls {
   }
 
   init() {
-    const container = this._container ?? getUIContainer();
-    if (!container) {
+    const stackContainer = this._container ?? getStackContainer();
+    const uiContainer = this._container ?? getUIContainer();
+    if (!stackContainer || !uiContainer) {
       console.error('[ThreadBlocker] Failed to get UI container');
       return;
     }
@@ -41,10 +42,10 @@ export class InlineControls {
     this._fab.title = 'Enter block mode: click comments to select';
     this._fab.setAttribute('aria-label', 'Enter block mode');
     this._fab.addEventListener('click', () => this._enterBlockMode());
-    container.appendChild(this._fab);
+    stackContainer.appendChild(this._fab);
 
     // Create Card (shown when in block mode)
-    this._createCard(container);
+    this._createCard(stackContainer);
 
     // Document-level click handler (always active, checks block mode)
     this._clickHandler = (e) => {
@@ -101,8 +102,8 @@ export class InlineControls {
       this._updateHighlights();
     });
 
-    // Create confirmation dialog
-    this._createConfirmDialog(container);
+    // Create confirmation dialog (in UI container, not stack)
+    this._createConfirmDialog(uiContainer);
 
     // Check initial URL
     this._handleRouteChange();
