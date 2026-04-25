@@ -155,7 +155,7 @@ function getExtensionStyles() {
        ============================================================ */
     .tb-stack {
       position: fixed;
-      bottom: 24px;
+      bottom: 112px;
       right: 24px;
       display: flex;
       flex-direction: column;
