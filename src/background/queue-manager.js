@@ -6,6 +6,13 @@ export class QueueManager {
     this._items = new Map();
     this._paused = false;
     this._listeners = [];
+    this._seqCounter = 0;
+  }
+
+  // Items are rendered and dispatched in `seq` order, not Map insertion order,
+  // so that `updateResolvedUser`'s delete+set re-key doesn't shuffle the panel.
+  _orderedItems() {
+    return Array.from(this._items.values()).sort((a, b) => a.seq - b.seq);
   }
 
   // ── Internal helpers ──────────────────────────────────────────────────────
@@ -33,6 +40,7 @@ export class QueueManager {
       userId,
       username,
       state: userId ? BlockState.QUEUED : BlockState.RESOLVING,
+      seq: this._seqCounter++,
       flags: [],
       error: null,
       errorType: null,
@@ -86,13 +94,15 @@ export class QueueManager {
   getNextTask() {
     if (this._paused) return null;
 
+    const ordered = this._orderedItems();
+
     // Only one active task at a time: check for in-progress BLOCKING
-    for (const item of this._items.values()) {
+    for (const item of ordered) {
       if (item.state === BlockState.BLOCKING) return null;
     }
 
     // First, look for a QUEUED item
-    for (const item of this._items.values()) {
+    for (const item of ordered) {
       if (item.state === BlockState.QUEUED) {
         item.state = BlockState.BLOCKING;
         this._notify();
@@ -101,7 +111,7 @@ export class QueueManager {
     }
 
     // Then, look for an UNBLOCKING item not already in-flight
-    for (const item of this._items.values()) {
+    for (const item of ordered) {
       if (item.state === BlockState.UNBLOCKING && !item._unblockInFlight) {
         item._unblockInFlight = true;
         this._notify();
@@ -232,7 +242,7 @@ export class QueueManager {
   }
 
   getAll() {
-    return Array.from(this._items.values());
+    return this._orderedItems();
   }
 
   getQueueStatus() {
@@ -251,8 +261,13 @@ export class QueueManager {
 
   loadFrom(items) {
     this._items.clear();
-    for (const raw of items) {
-      const item = { ...raw };
+    this._seqCounter = 0;
+    let maxSeq = -1;
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = { ...items[idx] };
+      // Backfill seq for legacy items stored before order tracking.
+      if (typeof item.seq !== 'number') item.seq = idx;
+      if (item.seq > maxSeq) maxSeq = item.seq;
       // Revert transient states on load
       if (item.state === BlockState.BLOCKING) {
         item.state = BlockState.QUEUED;
@@ -262,6 +277,7 @@ export class QueueManager {
       item._unblockInFlight = false;
       this._items.set(item.userId, item);
     }
+    this._seqCounter = maxSeq + 1;
     this._notify();
   }
 

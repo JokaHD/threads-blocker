@@ -279,6 +279,99 @@ describe('toJSON / loadFrom', () => {
   });
 });
 
+// ── order stability ──────────────────────────────────────────────────────────
+
+describe('item order', () => {
+  it('preserves insertion order across getAll()', () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.enqueue({ userId: '2', username: 'bob' });
+    qm.enqueue({ userId: '3', username: 'carol' });
+    const usernames = qm.getAll().map((i) => i.username);
+    expect(usernames).toEqual(['alice', 'bob', 'carol']);
+  });
+
+  it('keeps item position when RESOLVING resolves to QUEUED', () => {
+    // alice added without userId (RESOLVING), then bob and carol added with userId
+    qm.enqueue({ userId: null, username: 'alice' });
+    qm.enqueue({ userId: '2', username: 'bob' });
+    qm.enqueue({ userId: '3', username: 'carol' });
+
+    // alice resolves: should stay at position 0, not move to the end
+    qm.updateResolvedUser('alice', '1');
+
+    const usernames = qm.getAll().map((i) => i.username);
+    expect(usernames).toEqual(['alice', 'bob', 'carol']);
+    expect(qm.getItem('1').state).toBe(BlockState.QUEUED);
+  });
+
+  it('keeps position through QUEUED → BLOCKING → BLOCKED', () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.enqueue({ userId: '2', username: 'bob' });
+
+    qm.getNextTask(); // alice → BLOCKING
+    qm.onTaskComplete('1', true); // alice → BLOCKED
+
+    const usernames = qm.getAll().map((i) => i.username);
+    expect(usernames).toEqual(['alice', 'bob']);
+  });
+
+  it('processes resolved items in original insertion order (FIFO)', () => {
+    // Add 3 items, oldest first
+    qm.enqueue({ userId: null, username: 'alice' });
+    qm.enqueue({ userId: null, username: 'bob' });
+    qm.enqueue({ userId: '3', username: 'carol' });
+
+    // Resolve out of order: bob first, then alice
+    qm.updateResolvedUser('bob', '2');
+    qm.updateResolvedUser('alice', '1');
+
+    // Next task should still be alice (first inserted), not bob or carol
+    const task = qm.getNextTask();
+    expect(task.userId).toBe('1');
+    expect(task.username).toBe('alice');
+  });
+
+  it('drops failed resolution without affecting other items position', () => {
+    qm.enqueue({ userId: null, username: 'alice' });
+    qm.enqueue({ userId: '2', username: 'bob' });
+    qm.enqueue({ userId: '3', username: 'carol' });
+
+    // alice resolution fails → item removed
+    qm.updateResolvedUser('alice', null);
+
+    const usernames = qm.getAll().map((i) => i.username);
+    expect(usernames).toEqual(['bob', 'carol']);
+  });
+
+  it('preserves order across loadFrom', () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.enqueue({ userId: '2', username: 'bob' });
+    qm.enqueue({ userId: '3', username: 'carol' });
+
+    const json = qm.toJSON();
+    const qm2 = new QueueManager();
+    qm2.loadFrom(json);
+
+    const usernames = qm2.getAll().map((i) => i.username);
+    expect(usernames).toEqual(['alice', 'bob', 'carol']);
+  });
+
+  it('loadFrom assigns order to legacy items missing seq', () => {
+    // Simulate older stored format without seq
+    const legacy = [
+      { userId: '1', username: 'alice', state: BlockState.QUEUED, flags: [] },
+      { userId: '2', username: 'bob', state: BlockState.QUEUED, flags: [] },
+    ];
+    const qm2 = new QueueManager();
+    qm2.loadFrom(legacy);
+    // New items added after load go to the end
+    qm2.enqueue({ userId: '3', username: 'carol' });
+
+    const usernames = qm2.getAll().map((i) => i.username);
+    expect(usernames).toEqual(['alice', 'bob', 'carol']);
+  });
+});
+
 // ── onChange ─────────────────────────────────────────────────────────────────
 
 describe('onChange', () => {
