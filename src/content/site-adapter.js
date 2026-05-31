@@ -5,6 +5,22 @@
 
 const USERNAME_PATTERN = /^\/@([a-zA-Z0-9_.]+)$/;
 
+// Whitelist of pathnames where extension UI (FAB / block mode) is shown.
+// Anything not matching is treated as an unsupported page (e.g. /insights,
+// /messages/*, /search, /settings/*).
+const SUPPORTED_PATH_PATTERNS = [
+  /^\/$/,                       // home / feed
+  /^\/@[^/]+(\/.*)?$/,          // profile and post detail under a user
+  /^\/activity(\/.*)?$/,        // activity tab (with sub-tabs)
+  /^\/saved\/?$/,
+  /^\/following(\/.*)?$/,
+  /^\/ghost_posts\/?$/,
+  /^\/liked\/?$/,
+];
+
+// Media lightbox view — UI is hidden even though path is under /@*
+const MEDIA_VIEW_PATTERN = /\/post\/[^/]+\/media/;
+
 export const threadsSiteRule = {
   id: 'threads',
   match: /^https:\/\/www\.threads\.com\//,
@@ -89,6 +105,32 @@ export const threadsSiteRule = {
   observeConfig: {
     childList: true,
     subtree: true,
+  },
+
+  /**
+   * Check if the given pathname is in the supported (whitelisted) page set.
+   * Pages outside this list (e.g. /insights, /messages, /search, /settings)
+   * should hide all extension UI.
+   */
+  isSupportedPath(pathname) {
+    return SUPPORTED_PATH_PATTERNS.some((re) => re.test(pathname));
+  },
+
+  /**
+   * Check if the given pathname is the media lightbox view.
+   * On media view we hide UI to avoid covering the image.
+   */
+  isMediaPath(pathname) {
+    return MEDIA_VIEW_PATTERN.test(pathname);
+  },
+
+  /**
+   * Should extension UI (FAB / block mode card) be visible on this URL?
+   * True only when path is in the whitelist AND not a media lightbox.
+   */
+  isUIVisibleOnUrl(url = location.href) {
+    const pathname = new URL(url, location.origin).pathname;
+    return this.isSupportedPath(pathname) && !this.isMediaPath(pathname);
   },
 
   /**

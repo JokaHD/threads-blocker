@@ -9,6 +9,7 @@ import { MessageType } from '../../shared/messages.js';
 import { Icons } from './icons.js';
 import { getUIContainer, getStackContainer } from './shadow-host.js';
 import { COMMENT_ID_ATTR } from '../dom-observer.js';
+import { threadsSiteRule } from '../site-adapter.js';
 
 export class InlineControls {
   constructor(selectionManager, idResolver, container = null) {
@@ -113,24 +114,26 @@ export class InlineControls {
    * Check if current URL is a media lightbox view.
    */
   _isMediaView() {
-    return /\/post\/[^/]+\/media/.test(window.location.pathname);
+    return threadsSiteRule.isMediaPath(window.location.pathname);
   }
 
   /**
-   * Handle route change - hide UI on media view.
+   * Handle route change - hide UI on media view or on pages outside the
+   * whitelist (e.g. /insights, /messages, /search, /settings).
    */
   _handleRouteChange() {
-    const isMedia = this._isMediaView();
+    const visible = threadsSiteRule.isUIVisibleOnUrl(window.location.href);
+    const hidden = !visible;
 
     if (this._fab) {
-      this._fab.classList.toggle('tb-fab-media-hidden', isMedia);
+      this._fab.classList.toggle('tb-fab-route-hidden', hidden);
     }
     if (this._card) {
-      this._card.classList.toggle('tb-card-media-hidden', isMedia);
+      this._card.classList.toggle('tb-card-route-hidden', hidden);
     }
 
-    // Exit block mode if navigating to media view while in block mode
-    if (isMedia && this._blockMode) {
+    // Exit block mode if navigating away from a UI-visible page while active
+    if (hidden && this._blockMode) {
       this._exitBlockMode();
     }
   }
