@@ -60,8 +60,10 @@ jobs:
         run: cd dist && zip -r ../threads-blocker-v${VERSION}.zip .
 
       # 上傳到 Chrome Web Store
+      # Pin chrome-webstore-upload-cli to v3: v4 requires a publisherId we don't
+      # have configured as a secret; v3 still works for the EXTENSION_ID flow.
       - name: Publish to Chrome Web Store
-        run: npx chrome-webstore-upload-cli upload --auto-publish --source threads-blocker-v${VERSION}.zip
+        run: npx chrome-webstore-upload-cli@^3 upload --auto-publish --source threads-blocker-v${VERSION}.zip
         env:
           EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
           CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
