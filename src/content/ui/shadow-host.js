@@ -208,7 +208,7 @@ function getExtensionStyles() {
       display: none;
     }
 
-    .tb-fab.tb-fab-media-hidden {
+    .tb-fab.tb-fab-route-hidden {
       display: none;
     }
 
@@ -228,7 +228,7 @@ function getExtensionStyles() {
       display: block;
     }
 
-    .tb-card.tb-card-media-hidden {
+    .tb-card.tb-card-route-hidden {
       display: none;
     }
 

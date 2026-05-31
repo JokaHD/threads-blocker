@@ -400,16 +400,16 @@ describe('InlineControls', () => {
       }).not.toThrow();
     });
 
-    test('FAB has media-hidden class support in CSS', () => {
+    test('FAB has route-hidden class support in CSS', () => {
       inlineControls.init();
       const fab = container.querySelector('.tb-fab');
 
       // Verify the class can be toggled
-      fab.classList.add('tb-fab-media-hidden');
-      expect(fab.classList.contains('tb-fab-media-hidden')).toBe(true);
+      fab.classList.add('tb-fab-route-hidden');
+      expect(fab.classList.contains('tb-fab-route-hidden')).toBe(true);
 
-      fab.classList.remove('tb-fab-media-hidden');
-      expect(fab.classList.contains('tb-fab-media-hidden')).toBe(false);
+      fab.classList.remove('tb-fab-route-hidden');
+      expect(fab.classList.contains('tb-fab-route-hidden')).toBe(false);
     });
   });
 

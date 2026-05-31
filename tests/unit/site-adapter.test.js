@@ -29,6 +29,61 @@ describe('threadsSiteRule', () => {
     });
   });
 
+  describe('isSupportedPath', () => {
+    it('allows whitelisted paths', () => {
+      expect(threadsSiteRule.isSupportedPath('/')).toBe(true);
+      expect(threadsSiteRule.isSupportedPath('/@johndoe')).toBe(true);
+      expect(threadsSiteRule.isSupportedPath('/@johndoe/post/ABC123')).toBe(true);
+      expect(threadsSiteRule.isSupportedPath('/activity')).toBe(true);
+      expect(threadsSiteRule.isSupportedPath('/activity/replies')).toBe(true);
+      expect(threadsSiteRule.isSupportedPath('/saved')).toBe(true);
+      expect(threadsSiteRule.isSupportedPath('/following')).toBe(true);
+      expect(threadsSiteRule.isSupportedPath('/ghost_posts')).toBe(true);
+      expect(threadsSiteRule.isSupportedPath('/liked')).toBe(true);
+    });
+
+    it('blocks non-whitelisted paths', () => {
+      expect(threadsSiteRule.isSupportedPath('/insights')).toBe(false);
+      expect(threadsSiteRule.isSupportedPath('/messages')).toBe(false);
+      expect(threadsSiteRule.isSupportedPath('/messages/123')).toBe(false);
+      expect(threadsSiteRule.isSupportedPath('/search')).toBe(false);
+      expect(threadsSiteRule.isSupportedPath('/settings/privacy')).toBe(false);
+      expect(threadsSiteRule.isSupportedPath('/settings')).toBe(false);
+    });
+  });
+
+  describe('isMediaPath', () => {
+    it('detects media lightbox paths', () => {
+      expect(threadsSiteRule.isMediaPath('/@user/post/ABC/media')).toBe(true);
+      expect(threadsSiteRule.isMediaPath('/post/ABC/media')).toBe(true);
+    });
+
+    it('returns false for non-media paths', () => {
+      expect(threadsSiteRule.isMediaPath('/@user/post/ABC')).toBe(false);
+      expect(threadsSiteRule.isMediaPath('/')).toBe(false);
+    });
+  });
+
+  describe('isUIVisibleOnUrl', () => {
+    it('shows UI on whitelisted paths', () => {
+      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/')).toBe(true);
+      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/@user')).toBe(true);
+      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/@user/post/ABC')).toBe(true);
+      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/liked')).toBe(true);
+    });
+
+    it('hides UI on non-whitelisted paths', () => {
+      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/insights')).toBe(false);
+      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/messages/abc')).toBe(false);
+      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/search')).toBe(false);
+      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/settings/privacy')).toBe(false);
+    });
+
+    it('hides UI on media lightbox even when path is whitelisted', () => {
+      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/@user/post/ABC/media')).toBe(false);
+    });
+  });
+
   describe('isAvatarLink', () => {
     it('detects avatar link by Chinese text', () => {
       const link = {
