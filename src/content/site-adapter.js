@@ -7,7 +7,7 @@ const USERNAME_PATTERN = /^\/@([a-zA-Z0-9_.]+)$/;
 
 // Whitelist of pathnames where extension UI (FAB / block mode) is shown.
 // Anything not matching is treated as an unsupported page (e.g. /insights,
-// /messages/*, /search, /settings/*).
+// /messages/*, /settings/*).
 const SUPPORTED_PATH_PATTERNS = [
   /^\/$/,                       // home / feed
   /^\/@[^/]+(\/.*)?$/,          // profile and post detail under a user
@@ -16,6 +16,7 @@ const SUPPORTED_PATH_PATTERNS = [
   /^\/following(\/.*)?$/,
   /^\/ghost_posts\/?$/,
   /^\/liked\/?$/,
+  /^\/search(\/.*)?$/,          // search page (with sub-tabs)
 ];
 
 // Media lightbox view — UI is hidden even though path is under /@*
@@ -109,7 +110,7 @@ export const threadsSiteRule = {
 
   /**
    * Check if the given pathname is in the supported (whitelisted) page set.
-   * Pages outside this list (e.g. /insights, /messages, /search, /settings)
+   * Pages outside this list (e.g. /insights, /messages, /settings)
    * should hide all extension UI.
    */
   isSupportedPath(pathname) {

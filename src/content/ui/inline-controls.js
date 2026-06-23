@@ -119,7 +119,7 @@ export class InlineControls {
 
   /**
    * Handle route change - hide UI on media view or on pages outside the
-   * whitelist (e.g. /insights, /messages, /search, /settings).
+   * whitelist (e.g. /insights, /messages, /settings).
    */
   _handleRouteChange() {
     const visible = threadsSiteRule.isUIVisibleOnUrl(window.location.href);
