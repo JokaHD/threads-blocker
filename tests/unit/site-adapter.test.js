@@ -46,9 +46,13 @@ describe('threadsSiteRule', () => {
       expect(threadsSiteRule.isSupportedPath('/insights')).toBe(false);
       expect(threadsSiteRule.isSupportedPath('/messages')).toBe(false);
       expect(threadsSiteRule.isSupportedPath('/messages/123')).toBe(false);
-      expect(threadsSiteRule.isSupportedPath('/search')).toBe(false);
       expect(threadsSiteRule.isSupportedPath('/settings/privacy')).toBe(false);
       expect(threadsSiteRule.isSupportedPath('/settings')).toBe(false);
+    });
+
+    it('supports search page', () => {
+      expect(threadsSiteRule.isSupportedPath('/search')).toBe(true);
+      expect(threadsSiteRule.isSupportedPath('/search/recent')).toBe(true);
     });
   });
 
@@ -75,8 +79,12 @@ describe('threadsSiteRule', () => {
     it('hides UI on non-whitelisted paths', () => {
       expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/insights')).toBe(false);
       expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/messages/abc')).toBe(false);
-      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/search')).toBe(false);
       expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/settings/privacy')).toBe(false);
+    });
+
+    it('shows UI on search page', () => {
+      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/search')).toBe(true);
+      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/search/recent')).toBe(true);
     });
 
     it('hides UI on media lightbox even when path is whitelisted', () => {
