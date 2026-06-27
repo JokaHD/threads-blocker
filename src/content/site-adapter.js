@@ -11,7 +11,6 @@ const USERNAME_PATTERN = /^\/@([a-zA-Z0-9_.]+)$/;
 const SUPPORTED_PATH_PATTERNS = [
   /^\/$/,                       // home / feed
   /^\/@[^/]+(\/.*)?$/,          // profile and post detail under a user
-  /^\/activity(\/.*)?$/,        // activity tab (with sub-tabs)
   /^\/saved\/?$/,
   /^\/following(\/.*)?$/,
   /^\/ghost_posts\/?$/,
