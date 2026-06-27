@@ -73,6 +73,15 @@ export const threadsSiteRule = {
   },
 
   /**
+   * Single gate: should this link be excluded from comment scanning?
+   */
+  shouldExcludeLink(link) {
+    return this.isAvatarLink(link)
+      || this.isNavigationLink(link)
+      || this.isComposeAreaLink(link);
+  },
+
+  /**
    * Extract username from href.
    * Returns null if not a valid username link.
    */

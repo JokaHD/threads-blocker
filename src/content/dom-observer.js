@@ -45,18 +45,12 @@ export class DOMObserver {
       const username = this._siteRule.extractUsername(href);
       if (!username) continue;
 
-      // Skip avatar links (we want text links only)
-      if (this._siteRule.isAvatarLink(link)) continue;
-
-      // Skip links inside navigation containers (sidebar, nav bar)
-      if (this._siteRule.isNavigationLink?.(link)) continue;
-
-      // Skip links inside compose/post areas
-      if (this._siteRule.isComposeAreaLink?.(link)) continue;
-
       // Skip duplicates
       if (seenUsernames.has(username)) continue;
       seenUsernames.add(username);
+
+      // Skip non-comment links (avatars, navigation, compose areas)
+      if (this._siteRule.shouldExcludeLink(link)) continue;
 
       // Find container
       const container = this._siteRule.findContainer(link);
