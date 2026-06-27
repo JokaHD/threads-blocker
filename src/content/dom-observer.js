@@ -45,12 +45,12 @@ export class DOMObserver {
       const username = this._siteRule.extractUsername(href);
       if (!username) continue;
 
+      // Skip non-comment links (avatars, navigation, compose areas)
+      if (this._siteRule.shouldExcludeLink(link)) continue;
+
       // Skip duplicates
       if (seenUsernames.has(username)) continue;
       seenUsernames.add(username);
-
-      // Skip non-comment links (avatars, navigation, compose areas)
-      if (this._siteRule.shouldExcludeLink(link)) continue;
 
       // Find container
       const container = this._siteRule.findContainer(link);

@@ -60,16 +60,7 @@ export const threadsSiteRule = {
    * Check if a link is inside a compose/post area (contains editable elements).
    */
   isComposeAreaLink(link) {
-    let el = link.parentElement;
-    let depth = 0;
-    while (el && el !== document.body && depth < 5) {
-      if (el.querySelector('[role="textbox"], [contenteditable="true"], textarea')) {
-        return true;
-      }
-      el = el.parentElement;
-      depth++;
-    }
-    return false;
+    return !!link.closest('[role="textbox"], [contenteditable="true"], textarea, [data-composer]');
   },
 
   /**

@@ -154,7 +154,27 @@ describe('threadsSiteRule', () => {
   });
 
   describe('isComposeAreaLink', () => {
-    it('detects link near a textbox', () => {
+    it('detects link inside a textbox', () => {
+      const textbox = document.createElement('div');
+      textbox.setAttribute('role', 'textbox');
+      const link = document.createElement('a');
+      textbox.appendChild(link);
+      document.body.appendChild(textbox);
+      expect(threadsSiteRule.isComposeAreaLink(link)).toBe(true);
+      document.body.removeChild(textbox);
+    });
+
+    it('detects link inside contenteditable', () => {
+      const editable = document.createElement('div');
+      editable.setAttribute('contenteditable', 'true');
+      const link = document.createElement('a');
+      editable.appendChild(link);
+      document.body.appendChild(editable);
+      expect(threadsSiteRule.isComposeAreaLink(link)).toBe(true);
+      document.body.removeChild(editable);
+    });
+
+    it('returns false for link that is a sibling of a textbox', () => {
       const container = document.createElement('div');
       const link = document.createElement('a');
       const textbox = document.createElement('div');
@@ -162,19 +182,7 @@ describe('threadsSiteRule', () => {
       container.appendChild(link);
       container.appendChild(textbox);
       document.body.appendChild(container);
-      expect(threadsSiteRule.isComposeAreaLink(link)).toBe(true);
-      document.body.removeChild(container);
-    });
-
-    it('detects link near contenteditable', () => {
-      const container = document.createElement('div');
-      const link = document.createElement('a');
-      const editable = document.createElement('div');
-      editable.setAttribute('contenteditable', 'true');
-      container.appendChild(link);
-      container.appendChild(editable);
-      document.body.appendChild(container);
-      expect(threadsSiteRule.isComposeAreaLink(link)).toBe(true);
+      expect(threadsSiteRule.isComposeAreaLink(link)).toBe(false);
       document.body.removeChild(container);
     });
 
