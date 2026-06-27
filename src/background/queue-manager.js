@@ -227,8 +227,11 @@ export class QueueManager {
 
   _resetTransientStates() {
     let changed = false;
-    for (const item of this._items.values()) {
-      if (item.state === BlockState.BLOCKING) {
+    for (const [key, item] of this._items) {
+      if (item.state === BlockState.RESOLVING) {
+        this._items.delete(key);
+        changed = true;
+      } else if (item.state === BlockState.BLOCKING) {
         item.state = BlockState.QUEUED;
         changed = true;
       } else if (item.state === BlockState.UNBLOCKING) {
@@ -289,7 +292,8 @@ export class QueueManager {
       if (typeof item.seq !== 'number') item.seq = idx;
       if (item.seq > maxSeq) maxSeq = item.seq;
       item._unblockInFlight = false;
-      this._items.set(item.userId, item);
+      const key = item.userId ?? `pending:${item.username}`;
+      this._items.set(key, item);
     }
     this._seqCounter = maxSeq + 1;
     this._resetTransientStates();
