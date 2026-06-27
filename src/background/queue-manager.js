@@ -223,17 +223,25 @@ export class QueueManager {
     this._notify();
   }
 
-  // ── Orphan recovery ────────────────────────────────────────────────────────
+  // ── Transient state recovery ────────────────────────────────────────────────
 
-  resetOrphanedTasks() {
+  _resetTransientStates() {
     let changed = false;
     for (const item of this._items.values()) {
       if (item.state === BlockState.BLOCKING) {
         item.state = BlockState.QUEUED;
         changed = true;
+      } else if (item.state === BlockState.UNBLOCKING) {
+        item.state = BlockState.BLOCKED;
+        item._unblockInFlight = false;
+        changed = true;
       }
     }
-    if (changed) this._notify();
+    return changed;
+  }
+
+  resetOrphanedTasks() {
+    if (this._resetTransientStates()) this._notify();
   }
 
   // ── Pause / Resume ────────────────────────────────────────────────────────
@@ -278,19 +286,13 @@ export class QueueManager {
     let maxSeq = -1;
     for (let idx = 0; idx < items.length; idx++) {
       const item = { ...items[idx] };
-      // Backfill seq for legacy items stored before order tracking.
       if (typeof item.seq !== 'number') item.seq = idx;
       if (item.seq > maxSeq) maxSeq = item.seq;
-      // Revert transient states on load
-      if (item.state === BlockState.BLOCKING) {
-        item.state = BlockState.QUEUED;
-      } else if (item.state === BlockState.UNBLOCKING) {
-        item.state = BlockState.BLOCKED;
-      }
       item._unblockInFlight = false;
       this._items.set(item.userId, item);
     }
     this._seqCounter = maxSeq + 1;
+    this._resetTransientStates();
     this._notify();
   }
 
