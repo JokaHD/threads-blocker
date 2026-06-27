@@ -267,6 +267,30 @@ describe('toJSON / loadFrom', () => {
     expect(qm2.getItem('1').state).toBe(BlockState.QUEUED);
   });
 
+  it('removes RESOLVING items on load', () => {
+    qm.enqueue({ userId: null, username: 'alice' });
+    qm.enqueue({ userId: '2', username: 'bob' });
+    const json = qm.toJSON();
+    const qm2 = new QueueManager();
+    qm2.loadFrom(json);
+    expect(qm2.getAll().length).toBe(1);
+    expect(qm2.getAll()[0].username).toBe('bob');
+  });
+
+  it('re-keys RESOLVING items correctly so cancelResolving works before reset', () => {
+    qm.enqueue({ userId: null, username: 'alice' });
+    const json = qm.toJSON();
+    const qm2 = new QueueManager();
+    // Bypass _resetTransientStates to test the key fix in isolation
+    const origReset = QueueManager.prototype._resetTransientStates;
+    QueueManager.prototype._resetTransientStates = function () { return false; };
+    qm2.loadFrom(json);
+    QueueManager.prototype._resetTransientStates = origReset;
+    // cancelResolving should find the item by pending:username key
+    qm2.cancelResolving('alice');
+    expect(qm2.getAll().length).toBe(0);
+  });
+
   it('reverts UNBLOCKING → BLOCKED on load', () => {
     qm.enqueue({ userId: '1', username: 'alice' });
     qm.getNextTask();
@@ -276,6 +300,34 @@ describe('toJSON / loadFrom', () => {
     const qm2 = new QueueManager();
     qm2.loadFrom(json);
     expect(qm2.getItem('1').state).toBe(BlockState.BLOCKED);
+  });
+});
+
+// ── resetOrphanedTasks ──────────────────────────────────────────────────────
+
+describe('resetOrphanedTasks', () => {
+  it('removes RESOLVING items', () => {
+    qm.enqueue({ userId: null, username: 'alice' });
+    qm.enqueue({ userId: '2', username: 'bob' });
+    qm.resetOrphanedTasks();
+    expect(qm.getAll().length).toBe(1);
+    expect(qm.getAll()[0].username).toBe('bob');
+  });
+
+  it('reverts BLOCKING → QUEUED', () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.getNextTask();
+    qm.resetOrphanedTasks();
+    expect(qm.getItem('1').state).toBe(BlockState.QUEUED);
+  });
+
+  it('does nothing when all states are stable', () => {
+    const listener = jest.fn();
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.onChange(listener);
+    listener.mockClear();
+    qm.resetOrphanedTasks();
+    expect(listener).not.toHaveBeenCalled();
   });
 });
 
