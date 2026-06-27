@@ -82,6 +82,7 @@ async function handleMessage(message, sender) {
   switch (type) {
     case MessageType.REGISTER_EXECUTOR: {
       executorTabId = sender.tab?.id ?? null;
+      queue.resetOrphanedTasks();
       return { ok: true, executorTabId };
     }
 

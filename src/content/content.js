@@ -125,6 +125,9 @@ if (document.readyState === 'loading') {
     const statusResponse = await chrome.runtime.sendMessage({ type: MessageType.GET_QUEUE_STATUS });
     if (statusResponse?.status) {
       panel.update(response?.items || [], statusResponse.status);
+      if (statusResponse.status.queued > 0 || statusResponse.status.unblocking > 0) {
+        apiExecutor.startPolling();
+      }
     }
   } catch (e) {
     console.warn('[ThreadBlocker] Failed to fetch initial states:', e);
