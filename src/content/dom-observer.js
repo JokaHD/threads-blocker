@@ -45,8 +45,8 @@ export class DOMObserver {
       const username = this._siteRule.extractUsername(href);
       if (!username) continue;
 
-      // Skip avatar links (we want text links only)
-      if (this._siteRule.isAvatarLink(link)) continue;
+      // Skip non-comment links (avatars, navigation, compose areas)
+      if (this._siteRule.shouldExcludeLink(link)) continue;
 
       // Skip duplicates
       if (seenUsernames.has(username)) continue;

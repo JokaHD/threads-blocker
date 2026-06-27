@@ -36,15 +36,40 @@ export const threadsSiteRule = {
    * Text links: text is the actual username.
    */
   isAvatarLink(link) {
-    // Check text content first (works in test environments too)
     const text = link.textContent?.trim();
     if (text === '個人檔案') return true;
 
-    // Fallback: check dimensions (avatar links are ~60x60)
+    // Image-only links (no text, just <img>) are always avatars
+    if (link.querySelector('img') && !text) return true;
+
     const rect = link.getBoundingClientRect();
     if (rect.width > 40 && rect.height > 40) return true;
 
     return false;
+  },
+
+  /**
+   * Check if a link is inside a navigation container (sidebar, nav bar).
+   * These should never be treated as comment authors.
+   */
+  isNavigationLink(link) {
+    return !!link.closest('nav, [role="navigation"]');
+  },
+
+  /**
+   * Check if a link is inside a compose/post area (contains editable elements).
+   */
+  isComposeAreaLink(link) {
+    return !!link.closest('[role="textbox"], [contenteditable="true"], textarea, [data-composer]');
+  },
+
+  /**
+   * Single gate: should this link be excluded from comment scanning?
+   */
+  shouldExcludeLink(link) {
+    return this.isAvatarLink(link)
+      || this.isNavigationLink(link)
+      || this.isComposeAreaLink(link);
   },
 
   /**
