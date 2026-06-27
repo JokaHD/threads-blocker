@@ -223,6 +223,19 @@ export class QueueManager {
     this._notify();
   }
 
+  // ── Orphan recovery ────────────────────────────────────────────────────────
+
+  resetOrphanedTasks() {
+    let changed = false;
+    for (const item of this._items.values()) {
+      if (item.state === BlockState.BLOCKING) {
+        item.state = BlockState.QUEUED;
+        changed = true;
+      }
+    }
+    if (changed) this._notify();
+  }
+
   // ── Pause / Resume ────────────────────────────────────────────────────────
 
   pause() {
