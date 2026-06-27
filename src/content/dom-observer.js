@@ -48,6 +48,12 @@ export class DOMObserver {
       // Skip avatar links (we want text links only)
       if (this._siteRule.isAvatarLink(link)) continue;
 
+      // Skip links inside navigation containers (sidebar, nav bar)
+      if (this._siteRule.isNavigationLink?.(link)) continue;
+
+      // Skip links inside compose/post areas
+      if (this._siteRule.isComposeAreaLink?.(link)) continue;
+
       // Skip duplicates
       if (seenUsernames.has(username)) continue;
       seenUsernames.add(username);

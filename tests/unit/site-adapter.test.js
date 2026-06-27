@@ -102,16 +102,89 @@ describe('threadsSiteRule', () => {
     });
 
     it('detects avatar link by dimensions', () => {
-      const link = { textContent: '', getBoundingClientRect: () => ({ width: 60, height: 60 }) };
+      const link = { textContent: '', querySelector: () => null, getBoundingClientRect: () => ({ width: 60, height: 60 }) };
+      expect(threadsSiteRule.isAvatarLink(link)).toBe(true);
+    });
+
+    it('detects image-only link as avatar', () => {
+      const link = document.createElement('a');
+      link.appendChild(document.createElement('img'));
+      link.getBoundingClientRect = () => ({ width: 32, height: 32 });
       expect(threadsSiteRule.isAvatarLink(link)).toBe(true);
     });
 
     it('returns false for text link', () => {
       const link = {
         textContent: 'username',
+        querySelector: () => null,
         getBoundingClientRect: () => ({ width: 80, height: 20 }),
       };
       expect(threadsSiteRule.isAvatarLink(link)).toBe(false);
+    });
+  });
+
+  describe('isNavigationLink', () => {
+    it('detects link inside nav element', () => {
+      const nav = document.createElement('nav');
+      const link = document.createElement('a');
+      nav.appendChild(link);
+      document.body.appendChild(nav);
+      expect(threadsSiteRule.isNavigationLink(link)).toBe(true);
+      document.body.removeChild(nav);
+    });
+
+    it('detects link inside role=navigation', () => {
+      const div = document.createElement('div');
+      div.setAttribute('role', 'navigation');
+      const link = document.createElement('a');
+      div.appendChild(link);
+      document.body.appendChild(div);
+      expect(threadsSiteRule.isNavigationLink(link)).toBe(true);
+      document.body.removeChild(div);
+    });
+
+    it('returns false for link outside navigation', () => {
+      const div = document.createElement('div');
+      const link = document.createElement('a');
+      div.appendChild(link);
+      document.body.appendChild(div);
+      expect(threadsSiteRule.isNavigationLink(link)).toBe(false);
+      document.body.removeChild(div);
+    });
+  });
+
+  describe('isComposeAreaLink', () => {
+    it('detects link near a textbox', () => {
+      const container = document.createElement('div');
+      const link = document.createElement('a');
+      const textbox = document.createElement('div');
+      textbox.setAttribute('role', 'textbox');
+      container.appendChild(link);
+      container.appendChild(textbox);
+      document.body.appendChild(container);
+      expect(threadsSiteRule.isComposeAreaLink(link)).toBe(true);
+      document.body.removeChild(container);
+    });
+
+    it('detects link near contenteditable', () => {
+      const container = document.createElement('div');
+      const link = document.createElement('a');
+      const editable = document.createElement('div');
+      editable.setAttribute('contenteditable', 'true');
+      container.appendChild(link);
+      container.appendChild(editable);
+      document.body.appendChild(container);
+      expect(threadsSiteRule.isComposeAreaLink(link)).toBe(true);
+      document.body.removeChild(container);
+    });
+
+    it('returns false for link in a regular comment', () => {
+      const container = document.createElement('div');
+      const link = document.createElement('a');
+      container.appendChild(link);
+      document.body.appendChild(container);
+      expect(threadsSiteRule.isComposeAreaLink(link)).toBe(false);
+      document.body.removeChild(container);
     });
   });
 
