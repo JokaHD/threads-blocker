@@ -34,8 +34,6 @@ describe('threadsSiteRule', () => {
       expect(threadsSiteRule.isSupportedPath('/')).toBe(true);
       expect(threadsSiteRule.isSupportedPath('/@johndoe')).toBe(true);
       expect(threadsSiteRule.isSupportedPath('/@johndoe/post/ABC123')).toBe(true);
-      expect(threadsSiteRule.isSupportedPath('/activity')).toBe(true);
-      expect(threadsSiteRule.isSupportedPath('/activity/replies')).toBe(true);
       expect(threadsSiteRule.isSupportedPath('/saved')).toBe(true);
       expect(threadsSiteRule.isSupportedPath('/following')).toBe(true);
       expect(threadsSiteRule.isSupportedPath('/ghost_posts')).toBe(true);
@@ -48,6 +46,8 @@ describe('threadsSiteRule', () => {
       expect(threadsSiteRule.isSupportedPath('/messages/123')).toBe(false);
       expect(threadsSiteRule.isSupportedPath('/settings/privacy')).toBe(false);
       expect(threadsSiteRule.isSupportedPath('/settings')).toBe(false);
+      expect(threadsSiteRule.isSupportedPath('/activity')).toBe(false);
+      expect(threadsSiteRule.isSupportedPath('/activity/replies')).toBe(false);
     });
 
     it('supports search page', () => {
