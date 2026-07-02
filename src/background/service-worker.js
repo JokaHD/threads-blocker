@@ -68,9 +68,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handleMessage(message, sender) {
-  // Validate sender - must be from threads.com or extension internal
+  // Validate sender - must be from www.threads.com or an extension page.
+  // Exact hostname match, not substring: `.includes('threads.com')` would
+  // accept `https://evil.com/#threads.com` if a future manifest change ever
+  // opened a path for such a sender.
   const url = sender.url || '';
-  const isThreads = url.includes('threads.com');
+  let isThreads = false;
+  try {
+    isThreads = new URL(url).hostname === 'www.threads.com';
+  } catch {
+    // Malformed URL — leave isThreads = false
+  }
   const isExtension = url.startsWith('chrome-extension://');
   if (!isThreads && !isExtension) {
     console.warn('[ThreadBlocker] Rejected message from:', url);

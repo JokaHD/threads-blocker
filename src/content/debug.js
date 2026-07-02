@@ -4,7 +4,7 @@
  */
 
 import { getSiteRule } from './site-adapter.js';
-import { shadowHostExists } from './ui/shadow-host.js';
+import { getShadowRoot, shadowHostExists } from './ui/shadow-host.js';
 
 /**
  * Get current debug state as JSON.
@@ -34,9 +34,11 @@ export function getDebugState() {
   const markedComments = document.querySelectorAll('[data-tb-comment-id]');
   const selectedComments = document.querySelectorAll('[data-tb-comment-id].tb-selected');
 
-  // Check shadow host
-  const shadowHost = document.getElementById('tb-shadow-host');
-  const shadowRoot = shadowHost?.shadowRoot;
+  // Check shadow host. With `mode: 'closed'` the shadow root is not reachable
+  // via `document.getElementById(...).shadowRoot`, so we go through the module
+  // that owns it — that's fine because debug.js runs in the extension's own
+  // isolated world, not in page context.
+  const shadowRoot = shadowHostExists() ? getShadowRoot() : null;
 
   // Check UI elements in shadow
   const fab = shadowRoot?.querySelector('.tb-fab');

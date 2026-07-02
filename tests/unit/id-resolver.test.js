@@ -39,7 +39,7 @@ describe('IDResolver', () => {
       mockScripts = [];
       mockFetchResponse = {
         ok: true,
-        text: async () => '"user_id":"12345678"',
+        text: async () => '{"username":"someuser","user_id":"12345678"}',
       };
 
       const resolver = new IDResolver();
@@ -52,8 +52,29 @@ describe('IDResolver', () => {
       );
     });
 
+    it('does not return unrelated user_id from fetched profile HTML', async () => {
+      // Regression: previously an unscoped /"user_id":"\d+"/ regex would
+      // return the first id-shaped field in the HTML, even if it belonged
+      // to a different account (e.g. a featured widget). Now every accepted
+      // match must include the target username.
+      mockScripts = [];
+      mockFetchResponse = {
+        ok: true,
+        text: async () =>
+          '{"featured":{"user_id":"999999999"},"profile":{"raw_name":"target","other":"x"}}',
+      };
+
+      const resolver = new IDResolver();
+      const userId = await resolver.resolve('target');
+
+      expect(userId).toBeNull();
+    });
+
     it('caches resolved user_id', async () => {
-      mockFetchResponse = { ok: true, text: async () => '"user_id":"111"' };
+      mockFetchResponse = {
+        ok: true,
+        text: async () => '{"username":"cacheduser","user_id":"111"}',
+      };
 
       const resolver = new IDResolver();
       await resolver.resolve('cacheduser');
@@ -86,7 +107,7 @@ describe('IDResolver', () => {
         ok: true,
         text: async () => {
           fetchCount++;
-          return '"user_id":"222"';
+          return '{"username":"concurrent","user_id":"222"}';
         },
       };
 
@@ -119,7 +140,10 @@ describe('IDResolver', () => {
 
   describe('clearCache', () => {
     it('clears all cached entries', async () => {
-      mockFetchResponse = { ok: true, text: async () => '"user_id":"444"' };
+      mockFetchResponse = {
+        ok: true,
+        text: async () => '{"username":"cached","user_id":"444"}',
+      };
 
       const resolver = new IDResolver();
       resolver.setCache('cached', '444');

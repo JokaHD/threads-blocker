@@ -14,12 +14,11 @@ let shadowRoot = null;
 export function getShadowRoot() {
   if (shadowRoot) return shadowRoot;
 
-  // Check if already exists (page reload, etc.)
+  // If an orphan host from a previous CS load is present, drop it before
+  // recreating — with `mode: 'closed'` we cannot recover the old shadow root
+  // via `.shadowRoot`, so replacement is the correct recovery.
   const existing = document.getElementById(SHADOW_HOST_ID);
-  if (existing?.shadowRoot) {
-    shadowRoot = existing.shadowRoot;
-    return shadowRoot;
-  }
+  if (existing) existing.remove();
 
   // Create host element
   const host = document.createElement('div');
@@ -35,8 +34,9 @@ export function getShadowRoot() {
     pointer-events: none;
   `;
 
-  // Attach shadow root
-  shadowRoot = host.attachShadow({ mode: 'open' });
+  // Attach shadow root. `mode: 'closed'` prevents page JS on threads.com from
+  // reaching into our UI via `document.getElementById('tb-shadow-host').shadowRoot`.
+  shadowRoot = host.attachShadow({ mode: 'closed' });
 
   // Inject styles
   const style = document.createElement('style');
