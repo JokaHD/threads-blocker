@@ -3,6 +3,14 @@
  * Threads API requires numeric user_id, not username.
  */
 
+// Threads usernames are validated upstream to /^[a-zA-Z0-9_.]+$/ — only `.` is
+// a regex metachar, so this handles it deterministically. Kept as a helper
+// (rather than a hard-coded pattern) so future format changes don't silently
+// re-open injection.
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export class IDResolver {
   constructor() {
     this._cache = new Map();
@@ -42,8 +50,15 @@ export class IDResolver {
 
   /**
    * Fetch user_id from profile page.
+   *
+   * IMPORTANT: every regex used here MUST include the target username so we
+   * never return an unrelated account's id (e.g. a featured widget's owner)
+   * as if it belonged to `username`. Silent mis-attribution here means the
+   * caller blocks the wrong account.
    */
   async _fetchUserId(username) {
+    const uname = escapeRegex(username);
+
     try {
       // Method 1: Try to find in page HTML (if we're on their profile or they're in feed)
       const fromPage = this._findInPage(username);
@@ -69,35 +84,29 @@ export class IDResolver {
 
       const html = await response.text();
 
-      // Look for user_id in various patterns
-      // Pattern 1: "user_id":"12345"
-      const match1 = html.match(/"user_id"\s*:\s*"(\d+)"/);
-      if (match1) {
-        console.log(`[ThreadBlocker] Found user_id for @${username}: ${match1[1]}`);
-        return match1[1];
-      }
-
-      // Pattern 2: "pk":"12345" or "id":"12345" near username
-      const match2 = html.match(
-        new RegExp(`"username"\\s*:\\s*"${username}"[^}]*"(?:pk|id)"\\s*:\\s*"?(\\d+)"?`)
+      // Pattern A: "username":"<uname>" ... "pk|id|user_id":"<digits>"
+      const patternA = html.match(
+        new RegExp(`"username"\\s*:\\s*"${uname}"[^}]*"(?:pk|id|user_id)"\\s*:\\s*"?(\\d+)"?`)
       );
-      if (match2) {
-        console.log(`[ThreadBlocker] Found user_id for @${username}: ${match2[1]}`);
-        return match2[1];
+      if (patternA) {
+        console.log(`[ThreadBlocker] Found user_id for @${username}: ${patternA[1]}`);
+        return patternA[1];
       }
 
-      // Pattern 3: userID or userId in script
-      const match3 = html.match(/"(?:userID|userId|user_id|profileID)"\s*:\s*"?(\d+)"?/);
-      if (match3) {
-        console.log(`[ThreadBlocker] Found user_id for @${username}: ${match3[1]}`);
-        return match3[1];
+      // Pattern B: "pk|id|user_id":"<digits>" ... "username":"<uname>"
+      const patternB = html.match(
+        new RegExp(`"(?:pk|id|user_id)"\\s*:\\s*"?(\\d+)"?[^}]*"username"\\s*:\\s*"${uname}"`)
+      );
+      if (patternB) {
+        console.log(`[ThreadBlocker] Found user_id for @${username}: ${patternB[1]}`);
+        return patternB[1];
       }
 
-      // Pattern 4: props containing id near username context
-      const match4 = html.match(new RegExp(`${username}[^}]{0,200}"id"\\s*:\\s*"?(\\d{10,})"?`));
-      if (match4) {
-        console.log(`[ThreadBlocker] Found user_id for @${username}: ${match4[1]}`);
-        return match4[1];
+      // Pattern C: fallback with wider gap — <uname> ... "id":"<10+ digits>"
+      const patternC = html.match(new RegExp(`${uname}[^}]{0,200}"id"\\s*:\\s*"?(\\d{10,})"?`));
+      if (patternC) {
+        console.log(`[ThreadBlocker] Found user_id for @${username}: ${patternC[1]}`);
+        return patternC[1];
       }
 
       console.warn(`[ThreadBlocker] Could not find user_id for @${username} in profile page`);
@@ -112,6 +121,8 @@ export class IDResolver {
    * Try to find user_id in current page HTML/scripts.
    */
   _findInPage(username) {
+    const uname = escapeRegex(username);
+
     // Look in script tags for user data
     const scripts = document.querySelectorAll('script');
     for (const script of scripts) {
@@ -119,7 +130,7 @@ export class IDResolver {
 
       // Pattern: username followed by user_id/pk/id
       const pattern = new RegExp(
-        `"username"\\s*:\\s*"${username}"[^}]*"(?:pk|id|user_id)"\\s*:\\s*"?(\\d+)"?`
+        `"username"\\s*:\\s*"${uname}"[^}]*"(?:pk|id|user_id)"\\s*:\\s*"?(\\d+)"?`
       );
       const match = text.match(pattern);
       if (match) {
@@ -128,7 +139,7 @@ export class IDResolver {
 
       // Reverse pattern: id followed by username
       const pattern2 = new RegExp(
-        `"(?:pk|id|user_id)"\\s*:\\s*"?(\\d+)"?[^}]*"username"\\s*:\\s*"${username}"`
+        `"(?:pk|id|user_id)"\\s*:\\s*"?(\\d+)"?[^}]*"username"\\s*:\\s*"${uname}"`
       );
       const match2 = text.match(pattern2);
       if (match2) {
