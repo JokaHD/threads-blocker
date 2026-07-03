@@ -29,9 +29,9 @@ describe('IDResolver', () => {
       mockScripts = [{ textContent: '{"username":"testuser","pk":"99999"}' }];
 
       const resolver = new IDResolver();
-      const userId = await resolver.resolve('testuser');
+      const result = await resolver.resolve('testuser');
 
-      expect(userId).toBe('99999');
+      expect(result).toEqual({ userId: '99999', transient: false });
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -43,9 +43,9 @@ describe('IDResolver', () => {
       };
 
       const resolver = new IDResolver();
-      const userId = await resolver.resolve('someuser');
+      const result = await resolver.resolve('someuser');
 
-      expect(userId).toBe('12345678');
+      expect(result).toEqual({ userId: '12345678', transient: false });
       expect(global.fetch).toHaveBeenCalledWith(
         'https://www.threads.com/@someuser',
         expect.any(Object)
@@ -65,9 +65,9 @@ describe('IDResolver', () => {
       };
 
       const resolver = new IDResolver();
-      const userId = await resolver.resolve('target');
+      const result = await resolver.resolve('target');
 
-      expect(userId).toBeNull();
+      expect(result).toEqual({ userId: null, transient: false });
     });
 
     it('caches resolved user_id', async () => {
@@ -83,22 +83,49 @@ describe('IDResolver', () => {
       expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
-    it('returns null on fetch error', async () => {
+    it('marks 404 as permanent (not transient)', async () => {
       mockFetchResponse = { ok: false, status: 404 };
 
       const resolver = new IDResolver();
-      const userId = await resolver.resolve('notfound');
+      const result = await resolver.resolve('notfound');
 
-      expect(userId).toBeNull();
+      expect(result).toEqual({ userId: null, transient: false });
     });
 
-    it('returns null if user_id not in response', async () => {
+    it('marks 5xx as transient (should retry)', async () => {
+      mockFetchResponse = { ok: false, status: 503 };
+
+      const resolver = new IDResolver();
+      const result = await resolver.resolve('serverdown');
+
+      expect(result).toEqual({ userId: null, transient: true });
+    });
+
+    it('marks 429 as transient (should retry)', async () => {
+      mockFetchResponse = { ok: false, status: 429 };
+
+      const resolver = new IDResolver();
+      const result = await resolver.resolve('ratelimited');
+
+      expect(result).toEqual({ userId: null, transient: true });
+    });
+
+    it('marks fetch throw (network offline) as transient', async () => {
+      global.fetch.mockRejectedValueOnce(new Error('Failed to fetch'));
+
+      const resolver = new IDResolver();
+      const result = await resolver.resolve('offline');
+
+      expect(result).toEqual({ userId: null, transient: true });
+    });
+
+    it('returns permanent miss if user_id not in response', async () => {
       mockFetchResponse = { ok: true, text: async () => '<html>no id here</html>' };
 
       const resolver = new IDResolver();
-      const userId = await resolver.resolve('nodata');
+      const result = await resolver.resolve('nodata');
 
-      expect(userId).toBeNull();
+      expect(result).toEqual({ userId: null, transient: false });
     });
 
     it('deduplicates concurrent requests', async () => {
@@ -118,9 +145,9 @@ describe('IDResolver', () => {
         resolver.resolve('concurrent'),
       ]);
 
-      expect(r1).toBe('222');
-      expect(r2).toBe('222');
-      expect(r3).toBe('222');
+      expect(r1.userId).toBe('222');
+      expect(r2.userId).toBe('222');
+      expect(r3.userId).toBe('222');
       expect(global.fetch).toHaveBeenCalledTimes(1);
       expect(fetchCount).toBe(1);
     });
@@ -131,9 +158,9 @@ describe('IDResolver', () => {
       const resolver = new IDResolver();
       resolver.setCache('preloaded', '333');
 
-      const userId = await resolver.resolve('preloaded');
+      const result = await resolver.resolve('preloaded');
 
-      expect(userId).toBe('333');
+      expect(result).toEqual({ userId: '333', transient: false });
       expect(global.fetch).not.toHaveBeenCalled();
     });
   });

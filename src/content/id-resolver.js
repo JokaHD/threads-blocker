@@ -19,13 +19,19 @@ export class IDResolver {
 
   /**
    * Resolve username to user_id.
+   * Discriminated return so the caller can tell network failure apart from
+   * "user genuinely doesn't exist" — the former should retry, the latter shouldn't.
+   *
    * @param {string} username
-   * @returns {Promise<string|null>} user_id or null if not found
+   * @returns {Promise<{userId: string|null, transient: boolean}>}
+   *   - `{ userId: '123', transient: false }` — resolved
+   *   - `{ userId: null,  transient: false }` — permanent miss (404, pattern not found)
+   *   - `{ userId: null,  transient: true  }` — transient (fetch throw, 5xx, 429)
    */
   async resolve(username) {
     // Check cache first
     if (this._cache.has(username)) {
-      return this._cache.get(username);
+      return { userId: this._cache.get(username), transient: false };
     }
 
     // Check if already fetching
@@ -38,11 +44,11 @@ export class IDResolver {
     this._pending.set(username, promise);
 
     try {
-      const userId = await promise;
-      if (userId) {
-        this._cache.set(username, userId);
+      const result = await promise;
+      if (result.userId) {
+        this._cache.set(username, result.userId);
       }
-      return userId;
+      return result;
     } finally {
       this._pending.delete(username);
     }
@@ -64,7 +70,7 @@ export class IDResolver {
       const fromPage = this._findInPage(username);
       if (fromPage) {
         console.log(`[ThreadBlocker] Found user_id for @${username} in page: ${fromPage}`);
-        return fromPage;
+        return { userId: fromPage, transient: false };
       }
 
       // Method 2: Fetch profile page and extract from script data
@@ -76,10 +82,12 @@ export class IDResolver {
       });
 
       if (!response.ok) {
+        // 5xx / 429 → transient; 4xx (esp. 404) → permanent
+        const transient = response.status >= 500 || response.status === 429;
         console.warn(
-          `[ThreadBlocker] Failed to fetch profile for @${username}: ${response.status}`
+          `[ThreadBlocker] Failed to fetch profile for @${username}: ${response.status} (transient=${transient})`
         );
-        return null;
+        return { userId: null, transient };
       }
 
       const html = await response.text();
@@ -90,7 +98,7 @@ export class IDResolver {
       );
       if (patternA) {
         console.log(`[ThreadBlocker] Found user_id for @${username}: ${patternA[1]}`);
-        return patternA[1];
+        return { userId: patternA[1], transient: false };
       }
 
       // Pattern B: "pk|id|user_id":"<digits>" ... "username":"<uname>"
@@ -99,21 +107,22 @@ export class IDResolver {
       );
       if (patternB) {
         console.log(`[ThreadBlocker] Found user_id for @${username}: ${patternB[1]}`);
-        return patternB[1];
+        return { userId: patternB[1], transient: false };
       }
 
       // Pattern C: fallback with wider gap — <uname> ... "id":"<10+ digits>"
       const patternC = html.match(new RegExp(`${uname}[^}]{0,200}"id"\\s*:\\s*"?(\\d{10,})"?`));
       if (patternC) {
         console.log(`[ThreadBlocker] Found user_id for @${username}: ${patternC[1]}`);
-        return patternC[1];
+        return { userId: patternC[1], transient: false };
       }
 
       console.warn(`[ThreadBlocker] Could not find user_id for @${username} in profile page`);
-      return null;
+      return { userId: null, transient: false };
     } catch (err) {
+      // fetch throw (network offline / DNS / CORS) → transient
       console.error(`[ThreadBlocker] Error fetching user_id for @${username}:`, err);
-      return null;
+      return { userId: null, transient: true };
     }
   }
 

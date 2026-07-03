@@ -254,21 +254,43 @@ export class InlineControls {
 
   /**
    * Resolve userIds for a list of usernames and update the queue.
+   *
+   * Transient failures (network offline / 5xx / 429) retry with exponential
+   * backoff. Permanent failures (404 / pattern not found) fall through and
+   * the item is deleted via `UPDATE_RESOLVED_USER: null`. If retries are
+   * exhausted while still transient, the item is left in RESOLVING so the
+   * user can retry manually via the panel — beats silently losing the
+   * selection during a brief offline blip.
    */
   async _resolveUsersAsync(usernames) {
     for (const username of usernames) {
-      const userId = await this._idResolver.resolve(username);
-      if (userId) {
-        console.log(`[ThreadBlocker] Resolved @${username} -> ${userId}`);
+      let result = { userId: null, transient: true };
+      for (let attempt = 0; attempt < 5; attempt++) {
+        result = await this._idResolver.resolve(username);
+        if (result.userId || !result.transient) break;
+        const delay = Math.min(1000 * Math.pow(2, attempt), 16000);
+        console.log(
+          `[ThreadBlocker] Transient resolve failure for @${username}, retry in ${delay}ms (${attempt + 1}/5)`
+        );
+        await new Promise((r) => setTimeout(r, delay));
+      }
+
+      if (result.userId) {
+        console.log(`[ThreadBlocker] Resolved @${username} -> ${result.userId}`);
+      } else if (result.transient) {
+        // 用光 retry 預算後仍 transient 失敗 — 不發 UPDATE_RESOLVED_USER,
+        // item 留在 RESOLVING (Panel 可手動 cancel)
+        console.warn(`[ThreadBlocker] Giving up on @${username} after retries (still transient)`);
+        continue;
       } else {
-        console.warn(`[ThreadBlocker] Failed to resolve @${username}`);
+        console.warn(`[ThreadBlocker] Failed to resolve @${username} (permanent)`);
       }
 
       chrome.runtime
         .sendMessage({
           type: MessageType.UPDATE_RESOLVED_USER,
           username,
-          userId,
+          userId: result.userId,
         })
         .catch((e) => console.warn('[ThreadBlocker] Update resolved user failed:', e.message));
     }
