@@ -60,11 +60,8 @@ chrome.runtime
 function handleStorageChange(changes, area) {
   if (area !== 'local' || !changes.queueNotify) return;
   const { items, status } = changes.queueNotify.newValue || {};
-  if (!items) return;
+  if (!items || !status) return;
 
-  for (const item of items) {
-    inlineControls.updateState(item.username, item.state);
-  }
   panel.update(items, status);
 
   if (status.queued > 0 || status.unblocking > 0) {
@@ -117,11 +114,6 @@ if (document.readyState === 'loading') {
 (async () => {
   try {
     const response = await chrome.runtime.sendMessage({ type: MessageType.GET_ALL_STATES });
-    if (response?.items) {
-      for (const item of response.items) {
-        inlineControls.updateState(item.username, item.state);
-      }
-    }
     const statusResponse = await chrome.runtime.sendMessage({ type: MessageType.GET_QUEUE_STATUS });
     if (statusResponse?.status) {
       panel.update(response?.items || [], statusResponse.status);

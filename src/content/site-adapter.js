@@ -9,13 +9,13 @@ const USERNAME_PATTERN = /^\/@([a-zA-Z0-9_.]+)$/;
 // Anything not matching is treated as an unsupported page (e.g. /insights,
 // /messages/*, /settings/*).
 const SUPPORTED_PATH_PATTERNS = [
-  /^\/$/,                       // home / feed
-  /^\/@[^/]+(\/.*)?$/,          // profile and post detail under a user
+  /^\/$/, // home / feed
+  /^\/@[^/]+(\/.*)?$/, // profile and post detail under a user
   /^\/saved\/?$/,
   /^\/following(\/.*)?$/,
   /^\/ghost_posts\/?$/,
   /^\/liked\/?$/,
-  /^\/search(\/.*)?$/,          // search page (with sub-tabs)
+  /^\/search(\/.*)?$/, // search page (with sub-tabs)
 ];
 
 // Media lightbox view — UI is hidden even though path is under /@*
@@ -66,9 +66,7 @@ export const threadsSiteRule = {
    * Single gate: should this link be excluded from comment scanning?
    */
   shouldExcludeLink(link) {
-    return this.isAvatarLink(link)
-      || this.isNavigationLink(link)
-      || this.isComposeAreaLink(link);
+    return this.isAvatarLink(link) || this.isNavigationLink(link) || this.isComposeAreaLink(link);
   },
 
   /**

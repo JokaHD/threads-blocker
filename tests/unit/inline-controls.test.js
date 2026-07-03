@@ -3,7 +3,6 @@
  */
 
 import { InlineControls } from '../../src/content/ui/inline-controls.js';
-import { BlockState } from '../../src/shared/constants.js';
 import { COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
 
 describe('InlineControls', () => {
@@ -327,26 +326,15 @@ describe('InlineControls', () => {
       expect(mockSelectionManager.recordSeen).toHaveBeenCalledWith('testuser');
     });
 
-    test('does not re-inject same user', () => {
+    test("inject calls recordSeen; dedup is SelectionManager's responsibility", () => {
       inlineControls.init();
 
       const commentContainer = document.createElement('div');
       inlineControls.inject({ username: 'testuser', container: commentContainer });
       inlineControls.inject({ username: 'testuser', container: commentContainer });
 
-      expect(mockSelectionManager.recordSeen).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('updateState', () => {
-    test('updates internal user state', () => {
-      inlineControls.init();
-
-      const commentContainer = document.createElement('div');
-      inlineControls.inject({ username: 'testuser', container: commentContainer });
-      inlineControls.updateState('testuser', BlockState.BLOCKED);
-
-      // State is internal, we verify it doesn't throw
+      // inline-controls no longer tracks users itself; it just forwards to selection
+      expect(mockSelectionManager.recordSeen).toHaveBeenCalled();
     });
   });
 
@@ -436,6 +424,51 @@ describe('InlineControls', () => {
       expect(mockSelectionManager.toggle).not.toHaveBeenCalled();
 
       comment.remove();
+    });
+  });
+
+  describe('selection lifecycle', () => {
+    test('inject re-applies highlight for an already-selected username in block mode', () => {
+      inlineControls.init();
+      inlineControls.setMultiSelectMode(true);
+      mockSelectionManager.isSelected.mockImplementation((u) => u === 'alice');
+
+      // 模擬 virtual scroll 回收後重新標記的容器
+      const el = document.createElement('div');
+      el.setAttribute(COMMENT_ID_ATTR, 'alice');
+      document.body.appendChild(el);
+
+      inlineControls.inject({ username: 'alice', container: el });
+
+      expect(el.classList.contains('tb-selected')).toBe(true);
+      el.remove();
+    });
+
+    test('inject does not highlight unselected usernames', () => {
+      inlineControls.init();
+      inlineControls.setMultiSelectMode(true);
+
+      const el = document.createElement('div');
+      el.setAttribute(COMMENT_ID_ATTR, 'bob');
+      document.body.appendChild(el);
+
+      inlineControls.inject({ username: 'bob', container: el });
+
+      expect(el.classList.contains('tb-selected')).toBe(false);
+      el.remove();
+    });
+
+    test('route change while in block mode exits block mode and clears selection', () => {
+      inlineControls.init();
+      inlineControls.setMultiSelectMode(true);
+      mockSelectionManager.clearSelection.mockClear();
+
+      window.dispatchEvent(
+        new CustomEvent('tb-route-change', { detail: { url: 'https://www.threads.com/@x/post/1' } })
+      );
+
+      expect(inlineControls.multiSelectMode).toBe(false);
+      expect(mockSelectionManager.clearSelection).toHaveBeenCalled();
     });
   });
 });

@@ -8,7 +8,7 @@ import {
   clearCooldown,
 } from './persistence.js';
 import { MessageType } from '../shared/messages.js';
-import { ErrorType } from '../shared/constants.js';
+import { ErrorType, BlockState } from '../shared/constants.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -56,12 +56,16 @@ async function init() {
   }
 }
 
-init();
+const initPromise = init().catch((err) => {
+  // init 失敗時降級為空 queue 繼續服務,不可讓所有後續訊息都拿到 rejected promise
+  console.error('[ThreadBlocker] SW init failed:', err);
+});
 
 // ── Message handler ───────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  handleMessage(message, sender)
+  initPromise
+    .then(() => handleMessage(message, sender))
     .then(sendResponse)
     .catch((err) => sendResponse({ error: err.message }));
   return true; // keep channel open for async response
@@ -117,11 +121,16 @@ async function handleMessage(message, sender) {
         return { task: null, cooldownEnd: rateLimitHandler.getCooldownEnd() };
       }
       const task = queue.getNextTask();
-      return { task };
+      if (task) return { task };
+      const nextRetryAt = queue.getNextRetryAt();
+      if (nextRetryAt !== null) {
+        return { task: null, retryAfter: Math.max(0, nextRetryAt - Date.now()) };
+      }
+      return { task: null };
     }
 
     case MessageType.TASK_RESULT: {
-      const { userId, success, error: errPayload, retryCount } = message;
+      const { userId, success, error: errPayload } = message;
 
       if (success) {
         const item = queue.getItem(userId);
@@ -135,8 +144,17 @@ async function handleMessage(message, sender) {
       }
 
       // Failure path
+      const failedItem = queue.getItem(userId);
+      if (!failedItem) return { ok: true };
+
+      if (failedItem.state === BlockState.UNBLOCKING) {
+        // Unblock failures don't retry — revert to BLOCKED so the user can try again
+        queue.onUnblockComplete(userId, false);
+        return { ok: true };
+      }
+
       const errorType = rateLimitHandler.classifyError(errPayload ?? {});
-      const currentRetries = retryCount ?? queue.getItem(userId)?.retries ?? 0;
+      const currentRetries = failedItem.retries ?? 0;
       const retryDelay = rateLimitHandler.getRetryDelay(errorType, currentRetries);
 
       if (errorType === ErrorType.RATE_LIMIT && retryDelay === null) {
@@ -145,21 +163,17 @@ async function handleMessage(message, sender) {
         await saveCooldownEnd(rateLimitHandler.getCooldownEnd());
         queue.pause();
         // Revert item back to QUEUED so it will be retried after cooldown
-        const item = queue.getItem(userId);
-        if (item) {
-          item.state = 'queued';
-          item.retries = 0;
-        }
+        failedItem.state = BlockState.QUEUED;
+        failedItem.retries = 0;
+        failedItem.nextAttemptAt = null;
         queue._notify();
         return { ok: true, cooldown: true };
       }
 
       if (retryDelay !== null) {
-        const item = queue.getItem(userId);
-        if (item) {
-          item.retries = currentRetries + 1;
-        }
-        return { ok: true, retryDelay };
+        // SW owns the retry schedule; executor just polls again after retryAfter
+        queue.scheduleRetry(userId, retryDelay);
+        return { ok: true };
       }
 
       // No more retries → mark as permanently failed
@@ -237,6 +251,7 @@ async function handleMessage(message, sender) {
 // ── Alarm handler ─────────────────────────────────────────────────────────────
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  await initPromise;
   if (alarm.name === RateLimitHandler.ALARM_NAME) {
     rateLimitHandler.clearCooldown();
     await clearCooldown();

@@ -3,6 +3,7 @@
  * We test the handleMessage logic by simulating messages.
  */
 
+import { jest } from '@jest/globals';
 import {
   setupChromeMocks,
   resetChromeMocks,
@@ -160,11 +161,15 @@ describe('Service Worker', () => {
         userId: 'user123',
         success: false,
         error: { message: 'Network error' },
-        retryCount: 0,
       });
 
       expect(response.ok).toBe(true);
-      expect(response.retryDelay).toBeDefined();
+      // 新契約:retry 由 SW 排程,item revert 到 QUEUED 帶 nextAttemptAt
+      const { items } = await sendMessage({ type: MessageType.GET_ALL_STATES });
+      const item = items.find((i) => i.userId === 'user123');
+      expect(item.state).toBe('queued');
+      expect(item.retries).toBe(1);
+      expect(item.nextAttemptAt).toBeGreaterThan(Date.now());
     });
   });
 
@@ -420,7 +425,7 @@ describe('Service Worker', () => {
   });
 
   describe('Permanent failure', () => {
-    test('marks task as failed after max retries for non-rate-limit error', async () => {
+    test('permanent error (403) fails immediately without retry', async () => {
       await sendMessage({
         type: MessageType.ENQUEUE_BLOCK,
         userId: 'user123',
@@ -428,18 +433,85 @@ describe('Service Worker', () => {
       });
       await sendMessage({ type: MessageType.GET_NEXT_TASK });
 
-      // Send failure with high retry count (exceeds max)
       const response = await sendMessage({
         type: MessageType.TASK_RESULT,
         userId: 'user123',
         success: false,
-        error: { status: 500, message: 'Server error' },
-        retryCount: 10,
+        error: { status: 403, message: 'Forbidden' },
       });
 
       expect(response.ok).toBe(true);
-      // No retryDelay means permanent failure
-      expect(response.retryDelay).toBeUndefined();
+      const { items } = await sendMessage({ type: MessageType.GET_ALL_STATES });
+      expect(items.find((i) => i.userId === 'user123').state).toBe('failed');
+    });
+  });
+
+  describe('TASK_RESULT retry scheduling', () => {
+    test('transient failure reverts item to QUEUED with retry scheduled', async () => {
+      await sendMessage({ type: MessageType.ENQUEUE_BLOCK, userId: '9', username: 'zoe' });
+      await sendMessage({ type: MessageType.GET_NEXT_TASK }); // → BLOCKING
+      await sendMessage({
+        type: MessageType.TASK_RESULT,
+        userId: '9',
+        success: false,
+        error: { status: 500, message: 'boom' },
+      });
+
+      const { items } = await sendMessage({ type: MessageType.GET_ALL_STATES });
+      const item = items.find((i) => i.userId === '9');
+      expect(item.state).toBe('queued');
+      expect(item.retries).toBe(1);
+      expect(item.nextAttemptAt).toBeGreaterThan(Date.now());
+
+      // 未到期 → 不派發,但回報 retryAfter 讓 executor 知道要等多久
+      const next = await sendMessage({ type: MessageType.GET_NEXT_TASK });
+      expect(next.task).toBeNull();
+      expect(next.retryAfter).toBeGreaterThan(0);
+    });
+
+    test('failures become FAILED after retry budget is exhausted', async () => {
+      const realNow = Date.now();
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(realNow);
+
+      await sendMessage({ type: MessageType.ENQUEUE_BLOCK, userId: '9', username: 'zoe' });
+      const fail = () =>
+        sendMessage({
+          type: MessageType.TASK_RESULT,
+          userId: '9',
+          success: false,
+          error: { status: 500, message: 'boom' },
+        });
+
+      await sendMessage({ type: MessageType.GET_NEXT_TASK });
+      await fail(); // retries 0→1, delay 3000
+      nowSpy.mockReturnValue(realNow + 4000);
+      await sendMessage({ type: MessageType.GET_NEXT_TASK });
+      await fail(); // retries 1→2, delay 5000
+      nowSpy.mockReturnValue(realNow + 10000);
+      await sendMessage({ type: MessageType.GET_NEXT_TASK });
+      await fail(); // retries=2 → getRetryDelay null → FAILED
+
+      const { items } = await sendMessage({ type: MessageType.GET_ALL_STATES });
+      expect(items.find((i) => i.userId === '9').state).toBe('failed');
+
+      nowSpy.mockRestore();
+    });
+
+    test('unblock failure reverts to BLOCKED without retry', async () => {
+      await sendMessage({ type: MessageType.ENQUEUE_BLOCK, userId: '9', username: 'zoe' });
+      await sendMessage({ type: MessageType.GET_NEXT_TASK });
+      await sendMessage({ type: MessageType.TASK_RESULT, userId: '9', success: true }); // → BLOCKED
+      await sendMessage({ type: MessageType.REQUEST_UNBLOCK, userId: '9' }); // → UNBLOCKING
+      await sendMessage({ type: MessageType.GET_NEXT_TASK }); // 派發 unblock
+      await sendMessage({
+        type: MessageType.TASK_RESULT,
+        userId: '9',
+        success: false,
+        error: { status: 500, message: 'boom' },
+      });
+
+      const { items } = await sendMessage({ type: MessageType.GET_ALL_STATES });
+      expect(items.find((i) => i.userId === '9').state).toBe('blocked');
     });
   });
 

@@ -6,3 +6,6 @@ test-results/
 playwright-report/
 CLAUDE.md
 .superpowers/
+.claude/
+.agents/
+skills-lock.json

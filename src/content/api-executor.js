@@ -74,6 +74,7 @@ export class APIExecutor {
 
   async _pollLoop() {
     console.log('[ThreadBlocker] Starting task polling...');
+    let consecutiveErrors = 0;
 
     while (this._running) {
       if (this._paused) {
@@ -81,18 +82,34 @@ export class APIExecutor {
         continue;
       }
 
-      const response = await chrome.runtime.sendMessage({ type: MessageType.GET_NEXT_TASK });
+      try {
+        const response = await chrome.runtime.sendMessage({ type: MessageType.GET_NEXT_TASK });
 
-      if (response?.task) {
-        console.log('[ThreadBlocker] Processing task:', response.task);
-        await this.processTask(response.task);
-        await this._sleep(Timing.BLOCK_INTERVAL);
-      } else if (response?.cooldownEnd) {
-        console.log('[ThreadBlocker] Queue is in cooldown');
-        break;
-      } else {
-        console.log('[ThreadBlocker] No more tasks');
-        break;
+        if (response?.task) {
+          console.log('[ThreadBlocker] Processing task:', response.task);
+          await this.processTask(response.task);
+          await this._sleep(Timing.BLOCK_INTERVAL);
+        } else if (response?.cooldownEnd) {
+          console.log('[ThreadBlocker] Queue is in cooldown');
+          break;
+        } else if (response?.retryAfter != null) {
+          // SW 有待重試項目:睡到到期再 poll(下限 250ms 防 tight loop)
+          await this._sleep(Math.max(response.retryAfter, 250));
+        } else {
+          console.log('[ThreadBlocker] No more tasks');
+          break;
+        }
+        consecutiveErrors = 0;
+      } catch (err) {
+        // SW 重啟或 extension context 失效時 sendMessage 會 reject;
+        // 短暫 backoff 後重試,連續失敗才放棄(重新整理頁面可恢復)
+        consecutiveErrors++;
+        console.warn(`[ThreadBlocker] Poll loop error (${consecutiveErrors}/3):`, err.message);
+        if (consecutiveErrors >= 3) {
+          console.error('[ThreadBlocker] Poll loop stopping after repeated errors');
+          break;
+        }
+        await this._sleep(2000);
       }
     }
   }
