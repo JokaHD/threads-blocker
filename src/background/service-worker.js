@@ -56,12 +56,16 @@ async function init() {
   }
 }
 
-init();
+const initPromise = init().catch((err) => {
+  // init 失敗時降級為空 queue 繼續服務,不可讓所有後續訊息都拿到 rejected promise
+  console.error('[ThreadBlocker] SW init failed:', err);
+});
 
 // ── Message handler ───────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  handleMessage(message, sender)
+  initPromise
+    .then(() => handleMessage(message, sender))
     .then(sendResponse)
     .catch((err) => sendResponse({ error: err.message }));
   return true; // keep channel open for async response
@@ -237,6 +241,7 @@ async function handleMessage(message, sender) {
 // ── Alarm handler ─────────────────────────────────────────────────────────────
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  await initPromise;
   if (alarm.name === RateLimitHandler.ALARM_NAME) {
     rateLimitHandler.clearCooldown();
     await clearCooldown();
