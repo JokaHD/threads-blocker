@@ -136,3 +136,32 @@ describe('polling retry wait', () => {
     jest.useRealTimers();
   });
 });
+
+describe('polling error resilience', () => {
+  it('survives a transient sendMessage failure and keeps polling', async () => {
+    jest.useFakeTimers();
+    mockRuntime.sendMessage
+      .mockRejectedValueOnce(new Error('SW restarting'))
+      .mockResolvedValueOnce({ task: null });
+
+    const polling = executor.startPolling();
+    await jest.advanceTimersByTimeAsync(2000);
+    await polling;
+
+    const polls = mockRuntime.sendMessage.mock.calls.filter(
+      (c) => c[0].type === MessageType.GET_NEXT_TASK
+    );
+    expect(polls.length).toBe(2);
+    jest.useRealTimers();
+  });
+
+  it('stops gracefully after 3 consecutive failures without throwing', async () => {
+    jest.useFakeTimers();
+    mockRuntime.sendMessage.mockRejectedValue(new Error('Extension context invalidated'));
+
+    const polling = executor.startPolling();
+    await jest.advanceTimersByTimeAsync(5000); // 兩次 2s backoff + 第三次失敗
+    await expect(polling).resolves.toBeUndefined();
+    jest.useRealTimers();
+  });
+});
