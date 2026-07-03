@@ -45,6 +45,7 @@ export class QueueManager {
       error: null,
       errorType: null,
       retries: 0,
+      nextAttemptAt: null,
       _unblockInFlight: false,
     });
     this._notify();
@@ -101,10 +102,12 @@ export class QueueManager {
       if (item.state === BlockState.BLOCKING) return null;
     }
 
-    // First, look for a QUEUED item
+    // First, look for a QUEUED item whose retry hold-off (if any) has elapsed
     for (const item of ordered) {
       if (item.state === BlockState.QUEUED) {
+        if (item.nextAttemptAt && item.nextAttemptAt > Date.now()) continue;
         item.state = BlockState.BLOCKING;
+        item.nextAttemptAt = null;
         this._notify();
         return { userId: item.userId, username: item.username, action: 'block' };
       }
@@ -179,7 +182,6 @@ export class QueueManager {
     } else {
       item.state = BlockState.FAILED;
       item.error = error;
-      item.retries = (item.retries || 0) + 1;
     }
 
     this._notify();
@@ -220,7 +222,36 @@ export class QueueManager {
     if (!item || item.state !== BlockState.FAILED) return;
     item.state = BlockState.QUEUED;
     item.error = null;
+    item.retries = 0;
+    item.nextAttemptAt = null;
     this._notify();
+  }
+
+  /**
+   * Revert a failed BLOCKING item to QUEUED with a not-before timestamp.
+   * The SW owns retry scheduling; the executor only needs to poll again later.
+   */
+  scheduleRetry(userId, delayMs) {
+    const item = this._items.get(userId);
+    if (!item) return;
+    item.state = BlockState.QUEUED;
+    item.retries = (item.retries || 0) + 1;
+    item.nextAttemptAt = Date.now() + delayMs;
+    this._notify();
+  }
+
+  /**
+   * Earliest future nextAttemptAt among QUEUED items, or null.
+   */
+  getNextRetryAt() {
+    const now = Date.now();
+    let earliest = null;
+    for (const item of this._items.values()) {
+      if (item.state === BlockState.QUEUED && item.nextAttemptAt && item.nextAttemptAt > now) {
+        if (earliest === null || item.nextAttemptAt < earliest) earliest = item.nextAttemptAt;
+      }
+    }
+    return earliest;
   }
 
   // ── Transient state recovery ────────────────────────────────────────────────

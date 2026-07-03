@@ -444,3 +444,85 @@ describe('onChange', () => {
     expect(l2).toHaveBeenCalled();
   });
 });
+
+// ── scheduleRetry / retry gating ─────────────────────────────────────────────
+
+describe('scheduleRetry', () => {
+  it('reverts BLOCKING item to QUEUED with nextAttemptAt and bumps retries', () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.getNextTask(); // → BLOCKING
+    qm.scheduleRetry('1', 3000);
+    const item = qm.getItem('1');
+    expect(item.state).toBe(BlockState.QUEUED);
+    expect(item.retries).toBe(1);
+    expect(item.nextAttemptAt).toBeGreaterThan(Date.now());
+  });
+
+  it('notifies listeners so the change is persisted', () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.getNextTask();
+    const listener = jest.fn();
+    qm.onChange(listener);
+    qm.scheduleRetry('1', 3000);
+    expect(listener).toHaveBeenCalled();
+  });
+});
+
+describe('getNextTask retry gating', () => {
+  it('does not dispatch a QUEUED item before nextAttemptAt', () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.getNextTask();
+    qm.scheduleRetry('1', 60_000);
+    expect(qm.getNextTask()).toBeNull();
+  });
+
+  it('dispatches once nextAttemptAt has passed and clears it', () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.getNextTask();
+    qm.scheduleRetry('1', -1); // 已過期
+    const task = qm.getNextTask();
+    expect(task).toEqual({ userId: '1', username: 'alice', action: 'block' });
+    expect(qm.getItem('1').nextAttemptAt).toBeNull();
+  });
+
+  it('still dispatches other eligible items while one is gated', () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.getNextTask();
+    qm.scheduleRetry('1', 60_000);
+    qm.enqueue({ userId: '2', username: 'bob' });
+    const task = qm.getNextTask();
+    expect(task.userId).toBe('2');
+  });
+});
+
+describe('getNextRetryAt', () => {
+  it('returns earliest future nextAttemptAt among QUEUED items', () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.getNextTask();
+    qm.scheduleRetry('1', 60_000);
+    const at = qm.getNextRetryAt();
+    expect(at).toBeGreaterThan(Date.now());
+    expect(at).toBeLessThanOrEqual(Date.now() + 60_000);
+  });
+
+  it('returns null when nothing is waiting for retry', () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    expect(qm.getNextRetryAt()).toBeNull();
+  });
+});
+
+describe('manual retry resets the retry budget', () => {
+  it('retry() zeroes retries and nextAttemptAt', () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.getNextTask();
+    qm.scheduleRetry('1', -1);
+    qm.getNextTask(); // 再次 BLOCKING
+    qm.onTaskComplete('1', false, 'boom'); // → FAILED
+    qm.retry('1');
+    const item = qm.getItem('1');
+    expect(item.state).toBe(BlockState.QUEUED);
+    expect(item.retries).toBe(0);
+    expect(item.nextAttemptAt).toBeNull();
+    expect(item.error).toBeNull();
+  });
+});

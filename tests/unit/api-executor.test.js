@@ -117,3 +117,22 @@ describe('processTask', () => {
     });
   });
 });
+
+describe('polling retry wait', () => {
+  it('waits retryAfter and polls again instead of stopping', async () => {
+    jest.useFakeTimers();
+    mockRuntime.sendMessage
+      .mockResolvedValueOnce({ task: null, retryAfter: 3000 })
+      .mockResolvedValueOnce({ task: null });
+
+    const polling = executor.startPolling();
+    await jest.advanceTimersByTimeAsync(3000);
+    await polling;
+
+    const polls = mockRuntime.sendMessage.mock.calls.filter(
+      (c) => c[0].type === MessageType.GET_NEXT_TASK
+    );
+    expect(polls.length).toBe(2);
+    jest.useRealTimers();
+  });
+});

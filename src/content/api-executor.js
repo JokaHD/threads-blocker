@@ -90,6 +90,9 @@ export class APIExecutor {
       } else if (response?.cooldownEnd) {
         console.log('[ThreadBlocker] Queue is in cooldown');
         break;
+      } else if (response?.retryAfter != null) {
+        // SW 有待重試項目:睡到到期再 poll(下限 250ms 防 tight loop)
+        await this._sleep(Math.max(response.retryAfter, 250));
       } else {
         console.log('[ThreadBlocker] No more tasks');
         break;
