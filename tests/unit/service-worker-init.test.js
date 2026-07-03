@@ -2,7 +2,6 @@
  * SW cold-start init race:訊息在 init() 完成前到達，不可覆蓋已持久化的 queue。
  * 注意:本檔不可呼叫 resetChromeMocks()——依賴 import 前設定的 mockImplementation。
  */
-import { jest } from '@jest/globals';
 import { setupChromeMocks, mockStorage, mockRuntime } from '../setup.js';
 import { MessageType } from '../../src/shared/messages.js';
 

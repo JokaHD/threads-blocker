@@ -283,7 +283,9 @@ describe('toJSON / loadFrom', () => {
     const qm2 = new QueueManager();
     // Bypass _resetTransientStates to test the key fix in isolation
     const origReset = QueueManager.prototype._resetTransientStates;
-    QueueManager.prototype._resetTransientStates = function () { return false; };
+    QueueManager.prototype._resetTransientStates = function () {
+      return false;
+    };
     qm2.loadFrom(json);
     QueueManager.prototype._resetTransientStates = origReset;
     // cancelResolving should find the item by pending:username key

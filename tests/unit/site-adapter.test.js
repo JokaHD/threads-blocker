@@ -79,7 +79,9 @@ describe('threadsSiteRule', () => {
     it('hides UI on non-whitelisted paths', () => {
       expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/insights')).toBe(false);
       expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/messages/abc')).toBe(false);
-      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/settings/privacy')).toBe(false);
+      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/settings/privacy')).toBe(
+        false
+      );
     });
 
     it('shows UI on search page', () => {
@@ -88,7 +90,9 @@ describe('threadsSiteRule', () => {
     });
 
     it('hides UI on media lightbox even when path is whitelisted', () => {
-      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/@user/post/ABC/media')).toBe(false);
+      expect(threadsSiteRule.isUIVisibleOnUrl('https://www.threads.com/@user/post/ABC/media')).toBe(
+        false
+      );
     });
   });
 
@@ -102,7 +106,11 @@ describe('threadsSiteRule', () => {
     });
 
     it('detects avatar link by dimensions', () => {
-      const link = { textContent: '', querySelector: () => null, getBoundingClientRect: () => ({ width: 60, height: 60 }) };
+      const link = {
+        textContent: '',
+        querySelector: () => null,
+        getBoundingClientRect: () => ({ width: 60, height: 60 }),
+      };
       expect(threadsSiteRule.isAvatarLink(link)).toBe(true);
     });
 

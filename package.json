@@ -13,7 +13,7 @@
     "test:e2e": "npx playwright test",
     "test:e2e:headed": "npx playwright test --headed",
     "test:all": "npm run test:coverage && npm run test:e2e",
-    "lint": "eslint src/ tests/",
+    "lint": "eslint src/ tests/ --max-warnings 0",
     "lint:fix": "eslint src/ tests/ --fix",
     "format": "prettier --write \"src/**/*.js\" \"tests/**/*.js\"",
     "format:check": "prettier --check \"src/**/*.js\" \"tests/**/*.js\""

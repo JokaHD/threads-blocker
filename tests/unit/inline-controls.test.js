@@ -326,7 +326,7 @@ describe('InlineControls', () => {
       expect(mockSelectionManager.recordSeen).toHaveBeenCalledWith('testuser');
     });
 
-    test('inject calls recordSeen; dedup is SelectionManager\'s responsibility', () => {
+    test("inject calls recordSeen; dedup is SelectionManager's responsibility", () => {
       inlineControls.init();
 
       const commentContainer = document.createElement('div');
