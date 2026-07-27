@@ -81,7 +81,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@jest/globals": "^30.4.1",
-    "@playwright/test": "^1.61.1",
+    "@playwright/test": "^1.62.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",
