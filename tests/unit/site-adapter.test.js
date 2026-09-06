@@ -365,6 +365,38 @@ describe('threadsSiteRule', () => {
 
       expect(threadsSiteRule.findUserListRows(document.body)).toHaveLength(1);
     });
+
+    it('skips rows the isProcessed predicate claims, before extraction', () => {
+      document.body.innerHTML = likesDialog(
+        likerRow('alice_1', 'alice_1的大頭貼照') + likerRow('bob_2', 'bob_2的大頭貼照')
+      );
+      document.querySelectorAll('.row')[0].classList.add('marked');
+
+      const rows = threadsSiteRule.findUserListRows(document.body, (row) =>
+        row.classList.contains('marked')
+      );
+      // alice_1 被 predicate 跳過;sawProcessed 讓 0x0 的 bob_2 被當成隱藏複本丟棄
+      // (真實瀏覽器中已處理過的 dialog 不該再收 0x0 rows)
+      expect(rows).toEqual([]);
+    });
+
+    it('drops zero-rect rows on rescan when processed rows exist, keeps visible ones', () => {
+      document.body.innerHTML = `
+        <div role="dialog">
+          <div class="hidden-copy">${likerRow('bob_2', 'bob_2的大頭貼照')}</div>
+          <div class="visible-copy">${likerRow('alice_1', 'alice_1的大頭貼照')}${likerRow('carol_3', 'carol_3的大頭貼照')}</div>
+        </div>`;
+      document.querySelectorAll('.visible-copy .row').forEach((el) => {
+        el.getBoundingClientRect = () => ({ width: 520, height: 67, top: 0, left: 0 });
+      });
+      // 模擬第二次 scan:可見的 alice_1 已標記
+      document.querySelector('.visible-copy .row').classList.add('marked');
+
+      const rows = threadsSiteRule.findUserListRows(document.body, (row) =>
+        row.classList.contains('marked')
+      );
+      expect(rows.map((r) => r.username)).toEqual(['carol_3']);
+    });
   });
 });
 

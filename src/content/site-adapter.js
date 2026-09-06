@@ -3,15 +3,13 @@
  * Centralizes all Threads-specific DOM knowledge.
  */
 
+import { escapeRegex } from '../shared/utils.js';
+
 const USERNAME_PATTERN = /^\/@([a-zA-Z0-9_.]+)$/;
 
 // Bare username text (no /@ prefix) — used for dialog user-list rows
 // where the username exists only as a text node.
 const USERNAME_TEXT_PATTERN = /^[a-zA-Z0-9_.]+$/;
-
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 // Whitelist of pathnames where extension UI (FAB / block mode) is shown.
 // Anything not matching is treated as an unsupported page (e.g. /insights,
@@ -124,7 +122,9 @@ export const threadsSiteRule = {
   },
 
   /**
-   * Find user rows in dialog-based user lists (likes / reposts / followers).
+   * Find user rows in dialog-based user lists. Verified on the post insights
+   * likes list (2026-09-06 debug); any dialog list with the same row shape
+   * (avatar img[alt] + anchor-less pressable content) is picked up too.
    *
    * These rows have NO <a href="/@...">: the username exists only as a text
    * node inside a data-pressable-container, plus verbatim inside the avatar
@@ -132,60 +132,72 @@ export const threadsSiteRule = {
    * against the alt with a character-boundary check, so display names and
    * locale-specific alt suffixes never produce a false username.
    *
-   * Threads keeps a hidden 0x0 duplicate of the list in the dialog; when any
-   * row has real dimensions, zero-rect rows are dropped (kept only in test
-   * environments where every rect is 0).
+   * Threads keeps a hidden 0x0 duplicate of the list in the dialog; zero-rect
+   * rows are dropped whenever a visible row exists, or when the dialog
+   * already contains processed rows (a mid-session rescan). They are kept
+   * only in rect-less test environments, where neither signal is available.
    *
    * @param {Element} root
+   * @param {(row: Element) => boolean} isProcessed - rows for which this
+   *   returns true are skipped before the (expensive) username extraction;
+   *   the scan runs on every mutation batch, so this matters.
    * @returns {Array<{username: string, container: Element, link: null}>}
    */
-  findUserListRows(root = document.body) {
+  findUserListRows(root = document.body, isProcessed = () => false) {
     const candidates = [];
+    let sawProcessed = false;
 
     for (const dialog of root.querySelectorAll('[role="dialog"], dialog')) {
       for (const pressable of dialog.querySelectorAll('[data-pressable-container]')) {
         // Rows with username anchors are handled by the regular comment flow
         if (pressable.querySelector(this.usernameSelector)) continue;
 
-        const row = this._findRowWithAvatar(pressable, dialog);
-        if (!row) continue;
+        const found = this._findRowWithAvatar(pressable, dialog);
+        if (!found) continue;
 
-        const username = this._extractUsernameFromRow(pressable, row);
+        if (isProcessed(found.row)) {
+          sawProcessed = true;
+          continue;
+        }
+
+        const username = this._extractUsernameFromRow(pressable, found.alt);
         if (!username) continue;
 
-        const rect = row.getBoundingClientRect();
+        const rect = found.row.getBoundingClientRect();
         candidates.push({
           username,
-          container: row,
-          link: null,
+          container: found.row,
           visible: rect.width > 0 && rect.height > 0,
         });
       }
     }
 
-    const anyVisible = candidates.some((c) => c.visible);
+    const dropZeroRect = candidates.some((c) => c.visible) || sawProcessed;
     const seen = new Set();
     const results = [];
     for (const c of candidates) {
-      if (anyVisible && !c.visible) continue;
+      if (dropZeroRect && !c.visible) continue;
       if (seen.has(c.username)) continue;
       seen.add(c.username);
-      results.push({ username: c.username, container: c.container, link: c.link });
+      results.push({ username: c.username, container: c.container, link: null });
     }
     return results;
   },
 
   /**
    * Walk up from a pressable content block to the row element — the first
-   * ancestor whose subtree contains an avatar img[alt] (the avatar lives in
-   * a sibling subtree of the pressable). Stops at the dialog boundary.
+   * ancestor whose subtree contains an avatar img with a non-empty alt (the
+   * avatar lives in a sibling subtree of the pressable). Stops at the dialog
+   * boundary. Returns the row together with the alt so callers don't re-query.
+   *
+   * @returns {{row: Element, alt: string}|null}
    */
   _findRowWithAvatar(pressable, dialog) {
     let el = pressable;
     for (let depth = 0; el && depth < 5; depth++) {
       if (el === dialog || el === document.body) return null;
-      const img = el.querySelector('img[alt]');
-      if (img && img.getAttribute('alt')) return el;
+      const alt = el.querySelector('img[alt]')?.getAttribute('alt');
+      if (alt) return { row: el, alt };
       el = el.parentElement;
     }
     return null;
@@ -197,17 +209,14 @@ export const threadsSiteRule = {
    * boundaries) inside the avatar alt. Longest match wins, so a display name
    * that is a substring of the username never shadows it.
    */
-  _extractUsernameFromRow(pressable, row) {
-    const alt = row.querySelector('img[alt]')?.getAttribute('alt');
-    if (!alt) return null;
-
+  _extractUsernameFromRow(pressable, alt) {
     const walker = document.createTreeWalker(pressable, NodeFilter.SHOW_TEXT);
     let best = null;
     let node;
     while ((node = walker.nextNode())) {
       const text = node.textContent.trim();
       if (!text || !USERNAME_TEXT_PATTERN.test(text)) continue;
-      const boundary = new RegExp(`(^|[^a-zA-Z0-9_.])${escapeRegExp(text)}([^a-zA-Z0-9_.]|$)`);
+      const boundary = new RegExp(`(^|[^a-zA-Z0-9_.])${escapeRegex(text)}([^a-zA-Z0-9_.]|$)`);
       if (!boundary.test(alt)) continue;
       if (!best || text.length > best.length) best = text;
     }
