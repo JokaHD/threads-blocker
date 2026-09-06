@@ -239,6 +239,133 @@ describe('threadsSiteRule', () => {
       document.body.removeChild(link);
     });
   });
+
+  // ── findUserListRows(按讚/轉發等 dialog 名單:row 沒有 <a>,username 只在文字節點) ──
+
+  describe('findUserListRows', () => {
+    // 結構照 2026-09-06 debug 實測:row = 頭像 img 區 + data-pressable-container 內容區,
+    // username 是純文字 span,頭像 alt 一定包含 username 原文
+    function likerRow(username, alt, displayName = 'Display Name') {
+      return `
+        <div class="row">
+          <div><div><img alt="${alt}"></div></div>
+          <div><div data-pressable-container>
+            <div>
+              <span><div><div><span>${username}</span></div></div></span>
+              <span><time aria-label="3分鐘前"><span>3分鐘</span></time></span>
+            </div>
+            <span><span>${displayName}</span></span>
+            <div><div role="button" tabindex="0"><div>追蹤</div></div></div>
+          </div></div>
+        </div>`;
+    }
+
+    function likesDialog(rowsHtml) {
+      return `
+        <div role="dialog">
+          <div class="list">
+            <div class="post-header">
+              <a href="/@author"><img alt="author的大頭貼照"></a>
+              <a href="/@author">author</a>
+              <span>貼文內容</span>
+            </div>
+            ${rowsHtml}
+          </div>
+        </div>`;
+    }
+
+    afterEach(() => {
+      document.body.innerHTML = '';
+    });
+
+    it('extracts liker usernames from a likes dialog', () => {
+      document.body.innerHTML = likesDialog(
+        likerRow('zy___t.t', 'zy___t.t的大頭貼照') +
+          likerRow('coldtea1127', 'coldtea1127的大頭貼照', 'ラムネビー玉コロコロ')
+      );
+
+      const rows = threadsSiteRule.findUserListRows(document.body);
+      expect(rows.map((r) => r.username)).toEqual(['zy___t.t', 'coldtea1127']);
+    });
+
+    it('returns the row element (contains both avatar img and pressable) as container', () => {
+      document.body.innerHTML = likesDialog(likerRow('alice_1', 'alice_1的大頭貼照'));
+
+      const [row] = threadsSiteRule.findUserListRows(document.body);
+      expect(row.container.querySelector('img[alt]')).not.toBeNull();
+      expect(row.container.querySelector('[data-pressable-container]')).not.toBeNull();
+      expect(row.container.className).toBe('row');
+    });
+
+    it('skips pressable rows that contain username anchors (regular comment flow)', () => {
+      document.body.innerHTML = `
+        <div role="dialog">
+          <div data-pressable-container>
+            <img alt="bob的大頭貼照">
+            <a href="/@bob">bob</a>
+          </div>
+        </div>`;
+
+      expect(threadsSiteRule.findUserListRows(document.body)).toEqual([]);
+    });
+
+    it('does not mistake a display name for the username (avatar alt boundary check)', () => {
+      // display name "cold" 是 username "coldtea1127" 的 substring,
+      // 單純 alt.includes(text) 會誤中 — 必須做字元邊界檢查
+      document.body.innerHTML = likesDialog(
+        likerRow('coldtea1127', 'coldtea1127的大頭貼照', 'cold')
+      );
+
+      const rows = threadsSiteRule.findUserListRows(document.body);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].username).toBe('coldtea1127');
+    });
+
+    it('skips rows whose texts never match the avatar alt', () => {
+      document.body.innerHTML = likesDialog(likerRow('someone_else', 'realuser的大頭貼照'));
+
+      expect(threadsSiteRule.findUserListRows(document.body)).toEqual([]);
+    });
+
+    it('returns empty array when there is no dialog', () => {
+      document.body.innerHTML = `<div>${likerRow('alice_1', 'alice_1的大頭貼照')}</div>`;
+
+      expect(threadsSiteRule.findUserListRows(document.body)).toEqual([]);
+    });
+
+    it('dedups the same username within a dialog', () => {
+      document.body.innerHTML = likesDialog(
+        likerRow('alice_1', 'alice_1的大頭貼照') + likerRow('alice_1', 'alice_1的大頭貼照')
+      );
+
+      const rows = threadsSiteRule.findUserListRows(document.body);
+      expect(rows).toHaveLength(1);
+    });
+
+    it('prefers visible rows over a hidden duplicate list (0x0 rects)', () => {
+      // Threads dialog 內有一份隱藏的名單複本(rect 全 0),必須取可見那份
+      document.body.innerHTML = `
+        <div role="dialog">
+          <div class="hidden-copy">${likerRow('alice_1', 'alice_1的大頭貼照')}</div>
+          <div class="visible-copy">${likerRow('alice_1', 'alice_1的大頭貼照')}${likerRow('bob_2', 'bob_2的大頭貼照')}</div>
+        </div>`;
+
+      // jsdom rect 預設全 0 — 手動給 visible-copy 的 rows 尺寸
+      document.querySelectorAll('.visible-copy .row').forEach((el) => {
+        el.getBoundingClientRect = () => ({ width: 520, height: 67, top: 0, left: 0 });
+      });
+
+      const rows = threadsSiteRule.findUserListRows(document.body);
+      expect(rows.map((r) => r.username).sort()).toEqual(['alice_1', 'bob_2']);
+      expect(rows.every((r) => r.container.closest('.visible-copy'))).toBe(true);
+    });
+
+    it('keeps all rows when every rect is zero (test environments)', () => {
+      document.body.innerHTML = likesDialog(likerRow('alice_1', 'alice_1的大頭貼照'));
+
+      expect(threadsSiteRule.findUserListRows(document.body)).toHaveLength(1);
+    });
+  });
 });
 
 describe('getSiteRule', () => {

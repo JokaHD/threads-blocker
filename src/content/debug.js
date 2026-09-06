@@ -64,6 +64,9 @@ export function getDebugState() {
       selected: selectedComments.length,
     },
 
+    // Dialog user-list rows (likes / reposts) — anchor-less scan entry
+    userListRows: siteRule?.findUserListRows ? siteRule.findUserListRows().length : 0,
+
     // Shadow DOM
     shadowHost: {
       exists: shadowHostExists(),
