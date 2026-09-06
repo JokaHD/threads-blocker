@@ -137,6 +137,17 @@ export const threadsSiteRule = {
    * already contains processed rows (a mid-session rescan). They are kept
    * only in rect-less test environments, where neither signal is available.
    *
+   * Selector strategy (candidates + risk):
+   * 1. `[role="dialog"]` — semantic ARIA, stable; native `dialog` element
+   *    covered as fallback in the same query.
+   * 2. `[data-pressable-container]` — Meta's own attribute, the same anchor
+   *    findContainer() trusts as priority 1; observed on every liker row.
+   * 3. `img[alt]` × username-text cross-validation — locale-independent,
+   *    since the alt always contains the username verbatim.
+   * Failure mode is graceful: any selector breaking means rows are skipped
+   * and the likes list degrades to pre-fix behavior — never a false
+   * positive, so never a wrong block.
+   *
    * @param {Element} root
    * @param {(row: Element) => boolean} isProcessed - rows for which this
    *   returns true are skipped before the (expensive) username extraction;
@@ -152,21 +163,17 @@ export const threadsSiteRule = {
         // Rows with username anchors are handled by the regular comment flow
         if (pressable.querySelector(this.usernameSelector)) continue;
 
-        const found = this._findRowWithAvatar(pressable, dialog);
-        if (!found) continue;
-
-        if (isProcessed(found.row)) {
+        const match = this._matchUserRow(pressable, dialog, isProcessed);
+        if (!match) continue;
+        if (match.processed) {
           sawProcessed = true;
           continue;
         }
 
-        const username = this._extractUsernameFromRow(pressable, found.alt);
-        if (!username) continue;
-
-        const rect = found.row.getBoundingClientRect();
+        const rect = match.row.getBoundingClientRect();
         candidates.push({
-          username,
-          container: found.row,
+          username: match.username,
+          container: match.row,
           visible: rect.width > 0 && rect.height > 0,
         });
       }
@@ -185,37 +192,58 @@ export const threadsSiteRule = {
   },
 
   /**
-   * Walk up from a pressable content block to the row element — the first
-   * ancestor whose subtree contains an avatar img with a non-empty alt (the
-   * avatar lives in a sibling subtree of the pressable). Stops at the dialog
-   * boundary. Returns the row together with the alt so callers don't re-query.
+   * Walk up from a pressable content block to its row element. A level is
+   * accepted as the row only when one of its img alts cross-validates a
+   * username-shaped text from the pressable — validation IS the row-boundary
+   * criterion, so a non-avatar img (media thumbnail) can never stop the walk
+   * early, and an ancestor spanning foreign rows can never validate (their
+   * alts belong to other users). Marked rows short-circuit as `processed`
+   * before any text extraction. Stops at the dialog boundary.
    *
-   * @returns {{row: Element, alt: string}|null}
+   * @returns {{row: Element, username: string}|{processed: true}|null}
    */
-  _findRowWithAvatar(pressable, dialog) {
+  _matchUserRow(pressable, dialog, isProcessed) {
+    let texts = null;
     let el = pressable;
     for (let depth = 0; el && depth < 5; depth++) {
       if (el === dialog || el === document.body) return null;
-      const alt = el.querySelector('img[alt]')?.getAttribute('alt');
-      if (alt) return { row: el, alt };
+      if (isProcessed(el)) return { processed: true };
+
+      for (const img of el.querySelectorAll('img[alt]')) {
+        const alt = img.getAttribute('alt');
+        if (!alt) continue;
+        texts ??= this._usernameTextCandidates(pressable);
+        const username = this._matchTextsAgainstAlt(texts, alt);
+        if (username) return { row: el, username };
+      }
       el = el.parentElement;
     }
     return null;
   },
 
   /**
-   * Extract the username from a user-list row: text nodes inside the
-   * pressable that look like a username AND appear verbatim (with character
-   * boundaries) inside the avatar alt. Longest match wins, so a display name
-   * that is a substring of the username never shadows it.
+   * Username-shaped text nodes inside the pressable. Candidates only —
+   * display names may match the shape too; the alt cross-check decides.
    */
-  _extractUsernameFromRow(pressable, alt) {
+  _usernameTextCandidates(pressable) {
     const walker = document.createTreeWalker(pressable, NodeFilter.SHOW_TEXT);
-    let best = null;
+    const texts = [];
     let node;
     while ((node = walker.nextNode())) {
       const text = node.textContent.trim();
-      if (!text || !USERNAME_TEXT_PATTERN.test(text)) continue;
+      if (text && USERNAME_TEXT_PATTERN.test(text)) texts.push(text);
+    }
+    return texts;
+  },
+
+  /**
+   * Pick the username among candidate texts: it must appear verbatim in the
+   * avatar alt with character boundaries. Longest match wins, so a display
+   * name that is a substring of the username never shadows it.
+   */
+  _matchTextsAgainstAlt(texts, alt) {
+    let best = null;
+    for (const text of texts) {
       const boundary = new RegExp(`(^|[^a-zA-Z0-9_.])${escapeRegex(text)}([^a-zA-Z0-9_.]|$)`);
       if (!boundary.test(alt)) continue;
       if (!best || text.length > best.length) best = text;

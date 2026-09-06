@@ -321,6 +321,23 @@ describe('threadsSiteRule', () => {
       expect(rows[0].username).toBe('coldtea1127');
     });
 
+    it('walks past a non-avatar img (e.g. media thumbnail) to the real avatar', () => {
+      // pressable 內有帶 alt 的媒體縮圖:比對失敗不該讓整列被跳過,
+      // 要繼續往上找到真正能驗證 username 的頭像那層
+      document.body.innerHTML = likesDialog(`
+        <div class="row">
+          <div><div><img alt="alice_1的大頭貼照"></div></div>
+          <div><div data-pressable-container>
+            <span>alice_1</span>
+            <img alt="媒體縮圖">
+            <div role="button"><div>追蹤</div></div>
+          </div></div>
+        </div>`);
+
+      const rows = threadsSiteRule.findUserListRows(document.body);
+      expect(rows.map((r) => r.username)).toEqual(['alice_1']);
+    });
+
     it('skips rows whose texts never match the avatar alt', () => {
       document.body.innerHTML = likesDialog(likerRow('someone_else', 'realuser的大頭貼照'));
 
