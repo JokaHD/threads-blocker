@@ -3,13 +3,7 @@
  * Threads API requires numeric user_id, not username.
  */
 
-// Threads usernames are validated upstream to /^[a-zA-Z0-9_.]+$/ — only `.` is
-// a regex metachar, so this handles it deterministically. Kept as a helper
-// (rather than a hard-coded pattern) so future format changes don't silently
-// re-open injection.
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+import { escapeRegex } from '../shared/utils.js';
 
 export class IDResolver {
   constructor() {

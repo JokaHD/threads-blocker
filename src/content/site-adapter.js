@@ -3,7 +3,13 @@
  * Centralizes all Threads-specific DOM knowledge.
  */
 
+import { escapeRegex } from '../shared/utils.js';
+
 const USERNAME_PATTERN = /^\/@([a-zA-Z0-9_.]+)$/;
+
+// Bare username text (no /@ prefix) — used for dialog user-list rows
+// where the username exists only as a text node.
+const USERNAME_TEXT_PATTERN = /^[a-zA-Z0-9_.]+$/;
 
 // Whitelist of pathnames where extension UI (FAB / block mode) is shown.
 // Anything not matching is treated as an unsupported page (e.g. /insights,
@@ -113,6 +119,136 @@ export const threadsSiteRule = {
 
     // Prefer dimension-based candidate, fall back to child count
     return fallbackCandidate || childCountCandidate;
+  },
+
+  /**
+   * Find user rows in dialog-based user lists. Verified on the post insights
+   * likes list (2026-09-06 debug); any dialog list with the same row shape
+   * (avatar img[alt] + anchor-less pressable content) is picked up too.
+   *
+   * These rows have NO <a href="/@...">: the username exists only as a text
+   * node inside a data-pressable-container, plus verbatim inside the avatar
+   * img alt (e.g. "user123的大頭貼照"). We cross-validate text candidates
+   * against the alt with a character-boundary check, so display names and
+   * locale-specific alt suffixes never produce a false username.
+   *
+   * Threads keeps a hidden 0x0 duplicate of the list in the dialog; zero-rect
+   * rows are dropped whenever a visible row exists, or when the dialog
+   * already contains processed rows (a mid-session rescan). They are kept
+   * only in rect-less test environments, where neither signal is available.
+   *
+   * Selector strategy (candidates + risk):
+   * 1. `[role="dialog"]` — semantic ARIA, stable; native `dialog` element
+   *    covered as fallback in the same query.
+   * 2. `[data-pressable-container]` — Meta's own attribute, the same anchor
+   *    findContainer() trusts as priority 1; observed on every liker row.
+   * 3. `img[alt]` × username-text cross-validation — locale-independent,
+   *    since the alt always contains the username verbatim.
+   * Failure mode is graceful: any selector breaking means rows are skipped
+   * and the likes list degrades to pre-fix behavior — never a false
+   * positive, so never a wrong block.
+   *
+   * @param {Element} root
+   * @param {(row: Element) => boolean} isProcessed - rows for which this
+   *   returns true are skipped before the (expensive) username extraction;
+   *   the scan runs on every mutation batch, so this matters.
+   * @returns {Array<{username: string, container: Element, link: null}>}
+   */
+  findUserListRows(root = document.body, isProcessed = () => false) {
+    const candidates = [];
+    let sawProcessed = false;
+
+    for (const dialog of root.querySelectorAll('[role="dialog"], dialog')) {
+      for (const pressable of dialog.querySelectorAll('[data-pressable-container]')) {
+        // Rows with username anchors are handled by the regular comment flow
+        if (pressable.querySelector(this.usernameSelector)) continue;
+
+        const match = this._matchUserRow(pressable, dialog, isProcessed);
+        if (!match) continue;
+        if (match.processed) {
+          sawProcessed = true;
+          continue;
+        }
+
+        const rect = match.row.getBoundingClientRect();
+        candidates.push({
+          username: match.username,
+          container: match.row,
+          visible: rect.width > 0 && rect.height > 0,
+        });
+      }
+    }
+
+    const dropZeroRect = candidates.some((c) => c.visible) || sawProcessed;
+    const seen = new Set();
+    const results = [];
+    for (const c of candidates) {
+      if (dropZeroRect && !c.visible) continue;
+      if (seen.has(c.username)) continue;
+      seen.add(c.username);
+      results.push({ username: c.username, container: c.container, link: null });
+    }
+    return results;
+  },
+
+  /**
+   * Walk up from a pressable content block to its row element. A level is
+   * accepted as the row only when one of its img alts cross-validates a
+   * username-shaped text from the pressable — validation IS the row-boundary
+   * criterion, so a non-avatar img (media thumbnail) can never stop the walk
+   * early, and an ancestor spanning foreign rows can never validate (their
+   * alts belong to other users). Marked rows short-circuit as `processed`
+   * before any text extraction. Stops at the dialog boundary.
+   *
+   * @returns {{row: Element, username: string}|{processed: true}|null}
+   */
+  _matchUserRow(pressable, dialog, isProcessed) {
+    let texts = null;
+    let el = pressable;
+    for (let depth = 0; el && depth < 5; depth++) {
+      if (el === dialog || el === document.body) return null;
+      if (isProcessed(el)) return { processed: true };
+
+      for (const img of el.querySelectorAll('img[alt]')) {
+        const alt = img.getAttribute('alt');
+        if (!alt) continue;
+        texts ??= this._usernameTextCandidates(pressable);
+        const username = this._matchTextsAgainstAlt(texts, alt);
+        if (username) return { row: el, username };
+      }
+      el = el.parentElement;
+    }
+    return null;
+  },
+
+  /**
+   * Username-shaped text nodes inside the pressable. Candidates only —
+   * display names may match the shape too; the alt cross-check decides.
+   */
+  _usernameTextCandidates(pressable) {
+    const walker = document.createTreeWalker(pressable, NodeFilter.SHOW_TEXT);
+    const texts = [];
+    let node;
+    while ((node = walker.nextNode())) {
+      const text = node.textContent.trim();
+      if (text && USERNAME_TEXT_PATTERN.test(text)) texts.push(text);
+    }
+    return texts;
+  },
+
+  /**
+   * Pick the username among candidate texts: it must appear verbatim in the
+   * avatar alt with character boundaries. Longest match wins, so a display
+   * name that is a substring of the username never shadows it.
+   */
+  _matchTextsAgainstAlt(texts, alt) {
+    let best = null;
+    for (const text of texts) {
+      const boundary = new RegExp(`(^|[^a-zA-Z0-9_.])${escapeRegex(text)}([^a-zA-Z0-9_.]|$)`);
+      if (!boundary.test(alt)) continue;
+      if (!best || text.length > best.length) best = text;
+    }
+    return best;
   },
 
   /**

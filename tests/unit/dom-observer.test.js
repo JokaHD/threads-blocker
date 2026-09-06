@@ -191,6 +191,60 @@ describe('DOMObserver', () => {
     });
   });
 
+  // ── findComments:dialog user list rows(按讚名單等,row 沒有 <a>) ──────────
+
+  describe('findComments – dialog user list rows', () => {
+    function likerRow(username, alt) {
+      return `
+        <div class="liker-row">
+          <div><div><img alt="${alt}"></div></div>
+          <div><div data-pressable-container>
+            <span>${username}</span>
+            <time aria-label="3分鐘前"><span>3分鐘</span></time>
+            <div role="button"><div>追蹤</div></div>
+          </div></div>
+        </div>`;
+    }
+
+    it('includes user list rows alongside anchor-based comments', () => {
+      document.body.innerHTML = `
+        <div class="comment"><a href="/@alice">Alice</a><p>text</p><span>x</span></div>
+        <div role="dialog">
+          ${likerRow('zy___t.t', 'zy___t.t的大頭貼照')}
+        </div>
+      `;
+
+      const comments = observer.findComments(document.body);
+      expect(comments.map((c) => c.username).sort()).toEqual(['alice', 'zy___t.t']);
+    });
+
+    it('skips user list rows whose container is already marked', () => {
+      document.body.innerHTML = `
+        <div role="dialog">
+          ${likerRow('zy___t.t', 'zy___t.t的大頭貼照')}
+        </div>
+      `;
+
+      const first = observer.findComments(document.body);
+      expect(first).toHaveLength(1);
+      observer.markProcessed(first[0].container, first[0].username);
+
+      expect(observer.findComments(document.body)).toHaveLength(0);
+    });
+
+    it('dedups a username found via both anchor flow and user list row', () => {
+      document.body.innerHTML = `
+        <div class="comment"><a href="/@zy___t.t">zy</a><p>text</p><span>x</span></div>
+        <div role="dialog">
+          ${likerRow('zy___t.t', 'zy___t.t的大頭貼照')}
+        </div>
+      `;
+
+      const comments = observer.findComments(document.body);
+      expect(comments).toHaveLength(1);
+    });
+  });
+
   // ── getMarkedComments ────────────────────────────────────────────────────
 
   describe('getMarkedComments', () => {

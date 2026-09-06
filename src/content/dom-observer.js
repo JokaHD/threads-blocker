@@ -66,6 +66,19 @@ export class DOMObserver {
       });
     }
 
+    // Second entry point: dialog user lists (e.g. the post insights likes
+    // list) whose rows carry no username anchor — see
+    // threadsSiteRule.findUserListRows. Already-marked rows are skipped
+    // inside the adapter, before the expensive extraction.
+    const listRows = this._siteRule.findUserListRows(root, (row) =>
+      row.hasAttribute(COMMENT_ID_ATTR)
+    );
+    for (const row of listRows) {
+      if (seenUsernames.has(row.username)) continue;
+      seenUsernames.add(row.username);
+      results.push(row);
+    }
+
     return results;
   }
 
