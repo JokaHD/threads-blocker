@@ -11,6 +11,10 @@ const USERNAME_PATTERN = /^\/@([a-zA-Z0-9_.]+)$/;
 // where the username exists only as a text node.
 const USERNAME_TEXT_PATTERN = /^[a-zA-Z0-9_.]+$/;
 
+// Post permalink, e.g. the timestamp link on quote rows. The username in a
+// permalink is the post owner — for a quote row, the quoter.
+const POST_PERMALINK_PATTERN = /^\/@([a-zA-Z0-9_.]+)\/post\/[^/]+$/;
+
 // Whitelist of pathnames where extension UI (FAB / block mode) is shown.
 // Anything not matching is treated as an unsupported page (e.g. /insights,
 // /messages/*, /settings/*).
@@ -126,11 +130,16 @@ export const threadsSiteRule = {
    * likes list (2026-09-06 debug); any dialog list with the same row shape
    * (avatar img[alt] + anchor-less pressable content) is picked up too.
    *
-   * These rows have NO <a href="/@...">: the username exists only as a text
-   * node inside a data-pressable-container, plus verbatim inside the avatar
-   * img alt (e.g. "user123的大頭貼照"). We cross-validate text candidates
-   * against the alt with a character-boundary check, so display names and
-   * locale-specific alt suffixes never produce a false username.
+   * These rows have NO profile <a href="/@user">: the username exists only
+   * as a text node inside a data-pressable-container, plus verbatim inside
+   * the avatar img alt (e.g. "user123的大頭貼照"). We cross-validate text
+   * candidates against the alt with a character-boundary check, so display
+   * names and locale-specific alt suffixes never produce a false username.
+   *
+   * Quote rows (引用, verified 2026-09-06 debug round 4) additionally carry
+   * a timestamp post-permalink anchor (/@quoter/post/x). The permalink owner
+   * is the quoter, and becomes the only username candidate for the same alt
+   * cross-validation — see _permalinkOverride.
    *
    * Threads keeps a hidden 0x0 duplicate of the list in the dialog; zero-rect
    * rows are dropped whenever a visible row exists, or when the dialog
@@ -160,10 +169,10 @@ export const threadsSiteRule = {
 
     for (const dialog of root.querySelectorAll('[role="dialog"], dialog')) {
       for (const pressable of dialog.querySelectorAll('[data-pressable-container]')) {
-        // Rows with username anchors are handled by the regular comment flow
-        if (pressable.querySelector(this.usernameSelector)) continue;
+        const override = this._permalinkOverride(pressable);
+        if (override === false) continue;
 
-        const match = this._matchUserRow(pressable, dialog, isProcessed);
+        const match = this._matchUserRow(pressable, dialog, isProcessed, override);
         if (!match) continue;
         if (match.processed) {
           sawProcessed = true;
@@ -192,6 +201,37 @@ export const threadsSiteRule = {
   },
 
   /**
+   * Classify the /@ anchors inside a row and decide how the row's username
+   * may be extracted (verified on the quotes list, 2026-09-06 debug):
+   *
+   * - Profile link (`/@user`) → the regular comment flow owns this row.
+   * - Post permalink (`/@user/post/x`, the quote rows' timestamp link) →
+   *   the permalink authoritatively names the row's owner: a quote post
+   *   belongs to the quoter. Its username becomes the ONLY candidate for
+   *   the alt cross-validation, so text/avatars embedded from the quoted
+   *   post can never validate a wrong user.
+   * - Anything else → unknown row shape; skip, same as the old
+   *   any-anchor-skips behavior. Rather miss a row than mis-mark it.
+   *
+   * @returns {string[]|null|false} candidate override for _matchUserRow:
+   *   an array to restrict candidates, null to use the row's own text
+   *   nodes (anchor-less likes/repost rows), false to skip the row.
+   */
+  _permalinkOverride(pressable) {
+    const owners = new Set();
+    for (const anchor of pressable.querySelectorAll(this.usernameSelector)) {
+      const href = anchor.getAttribute('href');
+      if (USERNAME_PATTERN.test(href)) return false;
+      const owner = href?.match(POST_PERMALINK_PATTERN)?.[1];
+      if (!owner) return false;
+      owners.add(owner);
+    }
+    if (owners.size === 0) return null;
+    if (owners.size > 1) return false; // two owners = ambiguous, never guess
+    return [...owners];
+  },
+
+  /**
    * Walk up from a pressable content block to its row element. A level is
    * accepted as the row only when one of its img alts cross-validates a
    * username-shaped text from the pressable — validation IS the row-boundary
@@ -200,9 +240,11 @@ export const threadsSiteRule = {
    * alts belong to other users). Marked rows short-circuit as `processed`
    * before any text extraction. Stops at the dialog boundary.
    *
+   * @param {string[]|null} overrideTexts - when given (quote rows), replaces
+   *   the row's own text-node candidates entirely — see _permalinkOverride.
    * @returns {{row: Element, username: string}|{processed: true}|null}
    */
-  _matchUserRow(pressable, dialog, isProcessed) {
+  _matchUserRow(pressable, dialog, isProcessed, overrideTexts = null) {
     let texts = null;
     let el = pressable;
     for (let depth = 0; el && depth < 5; depth++) {
@@ -212,7 +254,7 @@ export const threadsSiteRule = {
       for (const img of el.querySelectorAll('img[alt]')) {
         const alt = img.getAttribute('alt');
         if (!alt) continue;
-        texts ??= this._usernameTextCandidates(pressable);
+        texts ??= overrideTexts ?? this._usernameTextCandidates(pressable);
         const username = this._matchTextsAgainstAlt(texts, alt);
         if (username) return { row: el, username };
       }
