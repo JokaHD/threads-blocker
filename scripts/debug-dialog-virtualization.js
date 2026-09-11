@@ -139,6 +139,7 @@
       const json = JSON.stringify(out, null, 2);
       console.log(json);
       try {
+        // eslint-disable-next-line no-undef -- DevTools console command-line API
         copy(json);
         console.log('%c[tb-debug] JSON copied to clipboard.', 'color: #4caf50');
       } catch {
