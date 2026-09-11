@@ -1,6 +1,8 @@
 node_modules/
 dist/
-docs/
+# docs/ is local scratch, except ADRs which are versioned
+docs/*
+!docs/adr
 coverage/
 test-results/
 playwright-report/
