@@ -124,5 +124,17 @@ export function logDebugState() {
 export function installDebugGlobal() {
   // Store reference for internal use (content script context only)
   window.__TB_DEBUG__ = logDebugState;
+
+  // Event bridge to the page's main world. The shadow root is closed and
+  // __TB_DEBUG__ lives in the isolated world, so page-context tooling
+  // (canary / simulator test suites) has no other way to observe UI state.
+  // DOM events are shared between worlds; the detail must be a plain string
+  // because objects don't cross the world boundary in Chrome.
+  window.addEventListener('tb-debug:request', () => {
+    window.dispatchEvent(
+      new CustomEvent('tb-debug:state', { detail: JSON.stringify(getDebugState()) })
+    );
+  });
+
   console.log('[ThreadBlocker] Debug available in extension context');
 }
