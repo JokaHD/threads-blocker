@@ -113,7 +113,7 @@ async function makeGraphQLRequest(docId, variables, tokens, friendlyName) {
       'httpStatus=',
       response.status,
       'body=',
-      JSON.stringify(data),
+      JSON.stringify(data)
     );
 
     // Check for GraphQL errors
