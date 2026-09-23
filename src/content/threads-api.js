@@ -102,6 +102,20 @@ async function makeGraphQLRequest(docId, variables, tokens, friendlyName) {
 
     const data = await response.json();
 
+    // DEBUG: log every GraphQL response so we can see "HTTP 200 but not actually applied"
+    // shapes reported when large batches show blocked-in-UI but unblocked-after-refresh.
+    // Remove once the silent-failure shape is identified.
+    console.log(
+      '[TB-debug]',
+      friendlyName,
+      'userId=',
+      variables.user_id,
+      'httpStatus=',
+      response.status,
+      'body=',
+      JSON.stringify(data)
+    );
+
     // Check for GraphQL errors
     if (data.errors && data.errors.length > 0) {
       return {
