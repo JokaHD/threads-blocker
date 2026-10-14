@@ -70,6 +70,11 @@
     blockMode: document.body.classList.contains('tb-blockmode'),
     counts: {
       markedContainers: document.querySelectorAll(`[${ATTR}]`).length,
+      // Marked inside another marked comment (embedded quote / reply nesting)
+      nestedMarkedContainers: [...document.querySelectorAll(`[${ATTR}] [${ATTR}]`)].map(
+        (el) =>
+          `${el.parentElement.closest(`[${ATTR}]`).getAttribute(ATTR)} > ${el.getAttribute(ATTR)}`
+      ),
       authoredPressables: pressables.length,
       unmarkedAuthoredPressables: pressables.filter((p) => !p.el.closest(`[${ATTR}]`)).length,
       unmarkedNavigationTriggers: unmarkedTriggers.length,

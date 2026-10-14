@@ -172,6 +172,21 @@ describe('DOMObserver', () => {
       expect(byId).toEqual({ c1: 'alice', c2: 'bob' });
     });
 
+    it('does not mark an embedded post of an already-seen user inside a comment', () => {
+      // A quote comment embeds the OP's post; if the embed has its own
+      // pressable, marking it would make clicks on the quote select the OP.
+      document.body.innerHTML = `
+        <div data-pressable-container id="op-post"><a href="/@op">op</a><p>post</p><span>x</span></div>
+        <div data-pressable-container id="c1">
+          <a href="/@alice">Alice</a><p>quoting</p>
+          <div data-pressable-container id="embed"><a href="/@op">op</a><p>post</p><span>x</span></div>
+        </div>
+      `;
+      const comments = observer.findComments(document.body);
+      const byId = Object.fromEntries(comments.map((c) => [c.container.id, c.username]));
+      expect(byId).toEqual({ 'op-post': 'op', c1: 'alice' });
+    });
+
     it('returns container and link references', () => {
       document.body.innerHTML = `
         <div class="comment">

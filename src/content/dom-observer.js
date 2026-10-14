@@ -47,6 +47,7 @@ export class DOMObserver {
     const links = root.querySelectorAll(this._siteRule.usernameSelector);
     const results = [];
     const claimedContainers = new Set();
+    const seenUsernames = new Set();
 
     for (const link of links) {
       const href = link.getAttribute('href');
@@ -56,6 +57,9 @@ export class DOMObserver {
       // Skip non-comment links (avatars, navigation, compose areas)
       if (this._siteRule.shouldExcludeLink(link)) continue;
 
+      const alreadySeen = seenUsernames.has(username);
+      seenUsernames.add(username);
+
       // Find container
       const container = this._siteRule.findContainer(link);
       if (!container) continue;
@@ -63,6 +67,13 @@ export class DOMObserver {
       // Skip already processed, or claimed earlier in this scan
       if (container.hasAttribute(COMMENT_ID_ATTR)) continue;
       if (claimedContainers.has(container)) continue;
+
+      // A container nested in another comment (e.g. an embedded quoted
+      // post) keeps the old per-username dedup: marking it as an
+      // already-seen user would make clicks on the embed select that user
+      // instead of the commenter.
+      if (alreadySeen && this._isInsideComment(container, claimedContainers)) continue;
+
       claimedContainers.add(container);
 
       results.push({
@@ -86,6 +97,17 @@ export class DOMObserver {
     }
 
     return results;
+  }
+
+  /**
+   * Is `container` inside a comment that is already marked, or claimed
+   * earlier in the current scan?
+   */
+  _isInsideComment(container, claimedContainers) {
+    for (let el = container.parentElement; el; el = el.parentElement) {
+      if (claimedContainers.has(el) || el.hasAttribute(COMMENT_ID_ATTR)) return true;
+    }
+    return false;
   }
 
   /**
