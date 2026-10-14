@@ -8,19 +8,27 @@
  *   3. On tab switch: are rows batch-removed, do data-tb-comment-id markers
  *      survive, is the dialog element itself replaced?
  *   4. What signal fires on dialog close?
+ *   5. Which DOM signal identifies the active tab (role="tab" /
+ *      aria-selected / something else)? Tab detection must not assume
+ *      role="tab" exists — candidates are recorded on every click.
+ *   6. Are row elements recycled in place (same element, new user)? If so,
+ *      does the data-tb-comment-id marker go stale (marker ≠ row content)?
  *
  * Usage (on threads.com, with the extension loaded):
  *   1. Open a post's activity dialog (查看動態) and pick the 按讚 tab.
  *      Wait until rows are marked (extension scan runs automatically).
  *   2. Paste this whole file into the DevTools console (page context).
- *   3. Slowly scroll the list through at least 5–10 load batches.
+ *   3. Slowly scroll the list through at least 5–10 load batches, then
+ *      scroll back up to the top once.
  *   4. Switch to another tab (轉發/引用) and back once.
  *   5. Close the dialog.
  *   6. Run: __tbDlgDebug.report()  — JSON is logged and copied to clipboard.
  */
 (() => {
-  const MARK = '[data-tb-comment-id]';
+  const ATTR = 'data-tb-comment-id';
+  const MARK = `[${ATTR}]`;
   const PRESSABLE = '[data-pressable-container]';
+  const TAB_LABELS = ['讚', '按讚', '轉發', '引用', 'Likes', 'Reposts', 'Quotes'];
 
   const dialogs = [...document.querySelectorAll('[role="dialog"], dialog')];
   const dlg = dialogs.find((d) => d.querySelector(PRESSABLE)) || dialogs[0] || null;
@@ -35,9 +43,77 @@
     addedBatches: [], // marked-row additions per mutation tick
     removedMarkedTotal: 0,
     removalEvents: [], // {t, removedMarked, dialogStillConnected}
-    tabSwitches: [], // {t, label, before, afterSnapshots: [...]}
+    tabSwitches: [], // {t, clicked, before, afterSnapshots: [...]}
+    tabHeaderAtStart: null,
+    recycledElements: 0, // same element observed carrying a different user
+    staleMarks: [], // marker disagrees with the row's own img alt / text
     dialogRemovedAt: null,
     timeline: [], // sparse snapshots when counts change
+  };
+
+  const brief = (el) =>
+    el && {
+      tag: el.tagName.toLowerCase(),
+      role: el.getAttribute('role'),
+      ariaSelected: el.getAttribute('aria-selected'),
+      ariaCurrent: el.getAttribute('aria-current'),
+      ariaPressed: el.getAttribute('aria-pressed'),
+      tabindex: el.getAttribute('tabindex'),
+      pressable: el.hasAttribute('data-pressable-container'),
+      text: (el.textContent || '').trim().slice(0, 30),
+      // Font weight / color often carry the "selected" state when ARIA doesn't
+      fontWeight: getComputedStyle(el).fontWeight,
+      color: getComputedStyle(el).color,
+    };
+
+  // Candidate tab headers, most to least stable. Recorded so the
+  // implementation can pick a selector backed by real data.
+  const tabHeader = () => {
+    if (!dlg || !dlg.isConnected) return null;
+    const byRole = [...dlg.querySelectorAll('[role="tab"]')];
+    const byAria = [...dlg.querySelectorAll('[aria-selected]')];
+    const byText = [...dlg.querySelectorAll('div, span, a, button')].filter(
+      (el) =>
+        el.children.length <= 2 &&
+        TAB_LABELS.some((l) => (el.textContent || '').trim().startsWith(l)) &&
+        (el.textContent || '').trim().length <= 12
+    );
+    return {
+      tablistCount: dlg.querySelectorAll('[role="tablist"]').length,
+      roleTab: byRole.map(brief),
+      ariaSelected: byAria.slice(0, 10).map(brief),
+      byLabelText: byText.slice(0, 10).map(brief),
+    };
+  };
+
+  // Username a row claims to be, from its own content (avatar alt is the
+  // most reliable — see threadsSiteRule.findUserListRows).
+  const rowIdentity = (el) => {
+    const alt = el.querySelector('img[alt]')?.getAttribute('alt') || '';
+    return { alt: alt.slice(0, 60), text: (el.textContent || '').slice(0, 80) };
+  };
+
+  const elementUser = new WeakMap();
+
+  const checkMarks = () => {
+    if (!dlg || !dlg.isConnected) return;
+    for (const el of dlg.querySelectorAll(MARK)) {
+      const user = el.getAttribute(ATTR);
+      state.seenUsernames.add(user);
+
+      const prev = elementUser.get(el);
+      if (prev && prev !== user) state.recycledElements++;
+      elementUser.set(el, user);
+
+      // The marked container may be the pressable without the avatar; look
+      // one row up for the img alt.
+      const row = el.querySelector('img[alt]') ? el : el.parentElement?.parentElement || el;
+      const id = rowIdentity(row);
+      const consistent = id.alt.includes(user) || id.text.includes(user);
+      if (!consistent && state.staleMarks.length < 20) {
+        state.staleMarks.push({ t: Date.now(), marker: user, ...id });
+      }
+    }
   };
 
   const snap = () => {
@@ -51,15 +127,14 @@
         const r = e.getBoundingClientRect();
         return r.width > 0 && r.height > 0;
       }).length,
+      firstMarked: marked[0]?.getAttribute(ATTR) || null,
     };
   };
 
   const record = () => {
     const s = snap();
     if (!s) return;
-    for (const el of dlg.querySelectorAll(MARK)) {
-      state.seenUsernames.add(el.getAttribute('data-tb-comment-id'));
-    }
+    checkMarks();
     state.maxConcurrentMarked = Math.max(state.maxConcurrentMarked, s.marked);
     const last = state.timeline[state.timeline.length - 1];
     if (!last || last.pressables !== s.pressables || last.marked !== s.marked) {
@@ -70,8 +145,8 @@
 
   const countMarkedIn = (node) => {
     if (node.nodeType !== 1) return 0;
-    let n = node.matches?.(MARK) ? 1 : 0;
-    return n + node.querySelectorAll?.(MARK).length || n;
+    const self = node.matches?.(MARK) ? 1 : 0;
+    return self + (node.querySelectorAll?.(MARK).length || 0);
   };
 
   const mo = new MutationObserver((muts) => {
@@ -95,25 +170,28 @@
     }
     record();
   });
-  mo.observe(document.body, { childList: true, subtree: true });
+  // characterData: catches in-place recycling where only the text changes
+  mo.observe(document.body, { childList: true, subtree: true, characterData: true });
 
-  // Tab clicks: snapshot before, then sample 3x after to see the transition.
+  // Any click inside the dialog that is not on a marked row is a tab-switch
+  // candidate — we don't know yet whether tabs carry role="tab".
   const onClick = (e) => {
-    const tab = e.target.closest('[role="tab"]');
-    if (!tab) return;
+    if (!dlg || !dlg.contains(e.target) || e.target.closest(MARK)) return;
     const entry = {
       t: Date.now(),
-      label: tab.textContent?.trim().slice(0, 30),
-      before: snap(),
+      clicked: brief(e.target),
+      clickedRoleTabAncestor: !!e.target.closest('[role="tab"]'),
+      before: { rows: snap(), header: tabHeader() },
       afterSnapshots: [],
     };
     state.tabSwitches.push(entry);
     for (const delay of [300, 1000, 2500]) {
-      setTimeout(() => entry.afterSnapshots.push(snap()), delay);
+      setTimeout(() => entry.afterSnapshots.push({ rows: snap(), header: tabHeader() }), delay);
     }
   };
   document.addEventListener('click', onClick, true);
 
+  state.tabHeaderAtStart = tabHeader();
   record();
 
   window.__tbDlgDebug = {
@@ -132,6 +210,9 @@
             ? state.addedBatches.sort((a, b) => a - b)[Math.floor(state.addedBatches.length / 2)]
             : null,
           dialogRemovedOnClose: state.dialogRemovedAt !== null,
+          tabsHaveRoleTab: (state.tabHeaderAtStart?.roleTab.length || 0) > 0,
+          rowsRecycledInPlace: state.recycledElements > 0,
+          staleMarkersFound: state.staleMarks.length > 0,
         },
         suggestedNextStep:
           'Paste this JSON back into the Claude session for Tab Session implementation.',
@@ -148,8 +229,9 @@
       return out;
     },
   };
+
   console.log(
-    `%c[tb-debug] Probe armed (dialogFound=${!!dlg}). Scroll, switch tab, close dialog, then run __tbDlgDebug.report()`,
-    'color: #2196f3'
+    `[tb-debug] armed. dialog=${!!dlg}, roleTab=${state.tabHeaderAtStart?.roleTab.length ?? 0}. ` +
+      'Scroll, switch tab, close dialog, then run __tbDlgDebug.report()'
   );
 })();
