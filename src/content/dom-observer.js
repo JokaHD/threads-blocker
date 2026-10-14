@@ -29,7 +29,15 @@ export class DOMObserver {
 
   /**
    * Find comments in the DOM.
-   * For each unique username (text link, not avatar), finds the container.
+   *
+   * Dedup is per CONTAINER, not per username: a user with several comments
+   * must have every one of them marked. An unmarked comment is not
+   * intercepted in block mode, so clicking it navigates to the permalink
+   * and the route change wipes the whole selection.
+   *
+   * Links are visited in document order, so a comment's author link claims
+   * the container before any @mention inside the comment body can.
+   *
    * @param {Element} root - Root element to search within
    * @returns {Array<{username: string, container: Element, link: Element}>}
    */
@@ -38,7 +46,7 @@ export class DOMObserver {
 
     const links = root.querySelectorAll(this._siteRule.usernameSelector);
     const results = [];
-    const seenUsernames = new Set();
+    const claimedContainers = new Set();
 
     for (const link of links) {
       const href = link.getAttribute('href');
@@ -48,16 +56,14 @@ export class DOMObserver {
       // Skip non-comment links (avatars, navigation, compose areas)
       if (this._siteRule.shouldExcludeLink(link)) continue;
 
-      // Skip duplicates
-      if (seenUsernames.has(username)) continue;
-      seenUsernames.add(username);
-
       // Find container
       const container = this._siteRule.findContainer(link);
       if (!container) continue;
 
-      // Skip already processed
+      // Skip already processed, or claimed earlier in this scan
       if (container.hasAttribute(COMMENT_ID_ATTR)) continue;
+      if (claimedContainers.has(container)) continue;
+      claimedContainers.add(container);
 
       results.push({
         username,
@@ -74,8 +80,8 @@ export class DOMObserver {
       row.hasAttribute(COMMENT_ID_ATTR)
     );
     for (const row of listRows) {
-      if (seenUsernames.has(row.username)) continue;
-      seenUsernames.add(row.username);
+      if (claimedContainers.has(row.container)) continue;
+      claimedContainers.add(row.container);
       results.push(row);
     }
 

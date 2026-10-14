@@ -80,6 +80,31 @@ export const threadsSiteRule = {
   },
 
   /**
+   * Elements Threads turns into in-app navigation when clicked: user /
+   * permalink anchors, and pressable containers (whole-comment click opens
+   * the post). Block mode swallows clicks on these when they sit outside a
+   * marked comment — navigating would exit block mode and drop the
+   * selection. Candidates, most to least stable:
+   *   1. a[href^="/@"]                — URL contract, same as usernameSelector
+   *   2. [data-pressable-container]   — Meta's own attribute (findContainer p1)
+   *   3. [role="link"]                — ARIA fallback for JS-only navigation
+   */
+  navigationTriggerSelector: 'a[href^="/@"], [data-pressable-container], [role="link"]',
+
+  /**
+   * Should a block-mode click on `target` be swallowed so it cannot navigate?
+   * Intentional navigation (sidebar / nav bar) and dialog tab switches stay
+   * clickable.
+   */
+  isBlockModeNavigationTrigger(target) {
+    const trigger = target.closest?.(this.navigationTriggerSelector);
+    if (!trigger) return false;
+    if (this.isNavigationLink(trigger)) return false;
+    if (trigger.closest('[role="tablist"], [role="tab"]')) return false;
+    return true;
+  },
+
+  /**
    * Extract username from href.
    * Returns null if not a valid username link.
    */

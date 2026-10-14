@@ -112,6 +112,66 @@ describe('DOMObserver', () => {
       expect(comments).toHaveLength(0);
     });
 
+    it('marks every comment of a user who commented more than once', () => {
+      document.body.innerHTML = `
+        <div class="feed">
+          <div class="comment" id="c1"><a href="/@alice">Alice</a><p>first</p><span>x</span></div>
+          <div class="comment" id="c2"><a href="/@alice">Alice</a><p>second</p><span>x</span></div>
+        </div>
+      `;
+      const comments = observer.findComments(document.body);
+      expect(comments.map((c) => c.container.id).sort()).toEqual(['c1', 'c2']);
+      expect(comments.every((c) => c.username === 'alice')).toBe(true);
+    });
+
+    it('still finds a later comment by the same user once the first is marked', () => {
+      document.body.innerHTML = `
+        <div class="feed">
+          <div class="comment" id="c1"><a href="/@alice">Alice</a><p>first</p><span>x</span></div>
+        </div>
+      `;
+      const [first] = observer.findComments(document.body);
+      observer.markProcessed(first.container, first.username);
+
+      // Second comment by the same user loads later (virtual scroll / reply)
+      document
+        .querySelector('.feed')
+        .insertAdjacentHTML(
+          'beforeend',
+          `<div class="comment" id="c2"><a href="/@alice">Alice</a><p>second</p><span>x</span></div>`
+        );
+
+      const comments = observer.findComments(document.body);
+      expect(comments.map((c) => c.container.id)).toEqual(['c2']);
+    });
+
+    it('attributes a comment to its author, not to an @mention in its body', () => {
+      document.body.innerHTML = `
+        <div class="comment" id="c1">
+          <a href="/@alice">Alice</a>
+          <p>hey <a href="/@bob">@bob</a></p>
+          <span>x</span>
+        </div>
+      `;
+      const comments = observer.findComments(document.body);
+      expect(comments).toHaveLength(1);
+      expect(comments[0].username).toBe('alice');
+    });
+
+    it('a mention does not stop the mentioned user’s own comment from being marked', () => {
+      document.body.innerHTML = `
+        <div class="feed">
+          <div class="comment" id="c1">
+            <a href="/@alice">Alice</a><p>hey <a href="/@bob">@bob</a></p><span>x</span>
+          </div>
+          <div class="comment" id="c2"><a href="/@bob">Bob</a><p>reply</p><span>x</span></div>
+        </div>
+      `;
+      const comments = observer.findComments(document.body);
+      const byId = Object.fromEntries(comments.map((c) => [c.container.id, c.username]));
+      expect(byId).toEqual({ c1: 'alice', c2: 'bob' });
+    });
+
     it('returns container and link references', () => {
       document.body.innerHTML = `
         <div class="comment">
@@ -232,7 +292,7 @@ describe('DOMObserver', () => {
       expect(observer.findComments(document.body)).toHaveLength(0);
     });
 
-    it('dedups a username found via both anchor flow and user list row', () => {
+    it('marks both the comment and the user list row of the same username', () => {
       document.body.innerHTML = `
         <div class="comment"><a href="/@zy___t.t">zy</a><p>text</p><span>x</span></div>
         <div role="dialog">
@@ -240,8 +300,12 @@ describe('DOMObserver', () => {
         </div>
       `;
 
+      // Two distinct containers — each must be clickable in block mode,
+      // otherwise the unmarked one navigates away and drops the selection.
       const comments = observer.findComments(document.body);
-      expect(comments).toHaveLength(1);
+      expect(comments).toHaveLength(2);
+      expect(new Set(comments.map((c) => c.container)).size).toBe(2);
+      expect(comments.every((c) => c.username === 'zy___t.t')).toBe(true);
     });
   });
 

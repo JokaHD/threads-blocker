@@ -268,6 +268,65 @@ describe('InlineControls', () => {
     });
   });
 
+  // An unmarked comment (heuristic miss) would otherwise navigate to its
+  // permalink, and the route change wipes the entire selection.
+  describe('navigation guard in block mode', () => {
+    let host;
+
+    beforeEach(() => {
+      host = document.createElement('div');
+      host.innerHTML = `
+        <div data-pressable-container id="unmarked-pressable"><span id="inner">text</span></div>
+        <a href="/@someone/post/abc" id="permalink">2h</a>
+        <nav><a href="/@me" id="nav-link">me</a></nav>
+        <div role="tablist"><div role="tab" data-pressable-container id="tab">讚</div></div>
+        <a href="/search" id="other-link">search</a>
+      `;
+      document.body.appendChild(host);
+    });
+
+    afterEach(() => {
+      host.remove();
+    });
+
+    function click(id) {
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+      document.getElementById(id).dispatchEvent(event);
+      return event;
+    }
+
+    test('swallows clicks on an unmarked pressable container', () => {
+      inlineControls.init();
+      inlineControls.setMultiSelectMode(true);
+
+      expect(click('inner').defaultPrevented).toBe(true);
+      expect(mockSelectionManager.toggle).not.toHaveBeenCalled();
+    });
+
+    test('swallows clicks on an unmarked /@ link', () => {
+      inlineControls.init();
+      inlineControls.setMultiSelectMode(true);
+
+      expect(click('permalink').defaultPrevented).toBe(true);
+    });
+
+    test('lets sidebar navigation, tabs and non-user links through', () => {
+      inlineControls.init();
+      inlineControls.setMultiSelectMode(true);
+
+      expect(click('nav-link').defaultPrevented).toBe(false);
+      expect(click('tab').defaultPrevented).toBe(false);
+      expect(click('other-link').defaultPrevented).toBe(false);
+    });
+
+    test('does not guard outside block mode', () => {
+      inlineControls.init();
+
+      expect(click('inner').defaultPrevented).toBe(false);
+      expect(click('permalink').defaultPrevented).toBe(false);
+    });
+  });
+
   describe('comment hover', () => {
     let comment;
 
