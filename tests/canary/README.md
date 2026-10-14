@@ -36,6 +36,9 @@ npm run canary:login
 - **三階段 project**（`playwright.canary.config.js`）：`infra` → `credential` →
   `contract`（public / authed）。前一階段失敗時後面自動跳過，所以「第一個失敗的
   階段」就是結論分類，drift 不會被環境問題或過期憑證污染。
+- **Canary build**：`npm run canary` 以 `TB_BUILD=canary` 另外 build 到 `.canary/dist/`，
+  多了一條 page-world debug bridge 讓 extension smoke 能讀 closed shadow root 的狀態。
+  平常載入 Chrome 的 `dist/` 不含 bridge（避免任何頁面 script 偵測 extension 或讀到選取名單）。
 - **報告（`reporter.js`）**：終端輸出中文報告，並寫 `.canary/last-run.json`
   供未來自動化（nightly CI、自動開 issue）使用。
 

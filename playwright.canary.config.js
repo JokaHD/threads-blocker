@@ -1,5 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
+// Extension fixture loads the canary build (debug bridge enabled), not dist/
+process.env.TB_EXTENSION_PATH = '.canary/dist';
+
 /**
  * Canary config — real-site drift detection (npm run canary).
  * Separate from playwright.config.js (functional e2e): different testDir,

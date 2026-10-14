@@ -4,7 +4,9 @@ import path from 'path';
 export const test = base.extend({
   // eslint-disable-next-line no-empty-pattern
   context: async ({}, use) => {
-    const extensionPath = path.resolve('dist');
+    // Canary runs load the bridge-enabled build (see esbuild.config.js)
+    // eslint-disable-next-line no-undef -- Node runtime (Playwright fixture)
+    const extensionPath = path.resolve(process.env.TB_EXTENSION_PATH || 'dist');
 
     const context = await chromium.launchPersistentContext('', {
       headless: false,

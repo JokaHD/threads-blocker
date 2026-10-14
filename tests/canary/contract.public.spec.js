@@ -81,6 +81,10 @@ test.describe('contract: 路由存活', () => {
       )
       .toBe(true);
 
-    expect.soft(s.pathSupported, '/search path 不再匹配 SUPPORTED_PATH_PATTERNS').toBe(true);
+    // A logged-out /login redirect is accepted above; /login itself is not
+    // a supported page, so the pattern check only applies on /search.
+    if (pathname.startsWith('/search')) {
+      expect.soft(s.pathSupported, '/search path 不再匹配 SUPPORTED_PATH_PATTERNS').toBe(true);
+    }
   });
 });

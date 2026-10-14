@@ -10,6 +10,7 @@ import path from 'node:path';
 
 export const CANARY_DIR = '.canary';
 export const PROBE_BUNDLE = path.join(CANARY_DIR, 'probe.bundle.js');
+export const EXTENSION_DIR = path.join(CANARY_DIR, 'dist');
 
 export default async function globalSetup() {
   fs.mkdirSync(CANARY_DIR, { recursive: true });
@@ -22,9 +23,12 @@ export default async function globalSetup() {
     logLevel: 'silent',
   });
 
-  // The extension smoke spec loads dist/ into a persistent context; fail
-  // early with a clear message instead of a confusing launch error.
-  if (!fs.existsSync('dist/manifest.json')) {
-    throw new Error('dist/manifest.json 不存在 — 先跑 npm run build（npm run canary 會自動做）');
+  // The extension smoke spec loads the canary build (bridge enabled) into a
+  // persistent context; fail early with a clear message instead of a
+  // confusing launch error.
+  if (!fs.existsSync(path.join(EXTENSION_DIR, 'manifest.json'))) {
+    throw new Error(
+      `${EXTENSION_DIR}/manifest.json 不存在 — 先跑 TB_BUILD=canary npm run build（npm run canary 會自動做）`
+    );
   }
 }

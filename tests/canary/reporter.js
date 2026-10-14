@@ -98,8 +98,11 @@ export default class CanaryReporter {
 
 function computeVerdict(stages) {
   if (stages.infra.failed > 0) return 'INFRA';
-  if (stages.credential.failed > 0) return 'CREDENTIAL_EXPIRED';
+  // contract-public only depends on infra, so its failures are real drift
+  // even when the session expired (contract-authed is skipped then, never
+  // failed) — an expired session must not mask them.
   if (stages.contract.failed > 0) return 'DRIFT';
+  if (stages.credential.failed > 0) return 'CREDENTIAL_EXPIRED';
   // 只跑部分 project（--project 篩選）時不給綠燈結論
   if (stages.contract.passed === 0) return 'INCOMPLETE';
   return 'OK';

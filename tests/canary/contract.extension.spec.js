@@ -1,6 +1,7 @@
 /**
- * CONTRACT stage (extension smoke) — the shipped extension, loaded from
- * dist/, must still boot on the real threads.com page. This is the
+ * CONTRACT stage (extension smoke) — the extension, loaded from the canary
+ * build in .canary/dist (same code as dist/ plus the debug bridge), must
+ * still boot on the real threads.com page. This is the
  * end-to-end confirmation that the page-level contract items compose:
  * content script boot → site rule match → shadow host mount → FAB render →
  * dom-observer marking comments.
@@ -8,6 +9,7 @@
  * The shadow root is `mode: 'closed'`, so page-context querySelector can
  * never see the UI — state is read through the tb-debug event bridge that
  * debug.js installs in the content script world (DOM events cross worlds).
+ * The bridge only exists in canary builds (TB_BUILD=canary).
  *
  * GraphQL is route-mocked so the smoke never fires real mutations.
  */
@@ -63,7 +65,14 @@ test('extension 在真站仍可掛載 Shadow DOM UI 並標記留言', async ({
   const state = await askDebugBridge(page);
   expect.soft(state.siteRule, 'site rule 未匹配').toBe('threads');
   expect.soft(state.shadowHost.hasRoot, 'shadow root 不存在').toBe(true);
-  expect
-    .soft(state.comments.marked, 'dom-observer 在真站 feed 上標記到 0 則留言 — 偵測管線失效')
+
+  // Marking runs after the feed renders (MutationObserver + debounce),
+  // which can be well after the FAB is up — poll instead of reading once.
+  await expect
+    .configure({ soft: true })
+    .poll(async () => (await askDebugBridge(page)).comments.marked, {
+      timeout: 15000,
+      message: 'dom-observer 在真站 feed 上標記到 0 則留言 — 偵測管線失效',
+    })
     .toBeGreaterThan(0);
 });
