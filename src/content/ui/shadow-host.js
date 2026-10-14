@@ -254,6 +254,53 @@ function getExtensionStyles() {
       margin-top: 4px;
     }
 
+    /* Select all (activity dialog Sub-List only) */
+    .tb-card-selectall-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tb-card-selectall {
+      display: none;
+      flex: 1;
+      padding: 10px 16px;
+      margin-bottom: 12px;
+      background: none;
+      color: var(--tb-text);
+      border: 1px solid var(--tb-border);
+      border-radius: var(--tb-radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--tb-transition);
+    }
+
+    .tb-card-selectall.tb-card-selectall-visible {
+      display: block;
+    }
+
+    .tb-card-selectall:hover:not(:disabled) {
+      border-color: var(--tb-text-muted);
+    }
+
+    .tb-card-selectall:disabled {
+      color: var(--tb-text-muted);
+      cursor: default;
+    }
+
+    .tb-card-selectall-info {
+      display: none;
+      margin-bottom: 12px;
+      color: var(--tb-text-muted);
+      font-size: 16px;
+      cursor: help;
+    }
+
+    .tb-card-selectall-visible + .tb-card-selectall-info {
+      display: inline;
+    }
+
     /* Actions (shown when count > 0) */
     .tb-card-actions {
       display: none;

@@ -41,6 +41,8 @@ export const Timing = {
 // Selection limits
 export const Limits = {
   MAX_SCROLL_RECORD: 500,
+  // Block with this many accounts or more asks for confirmation first
+  BLOCK_CONFIRM_THRESHOLD: 20,
 };
 
 // Threads API configuration

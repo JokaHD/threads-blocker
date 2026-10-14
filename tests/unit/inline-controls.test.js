@@ -4,6 +4,7 @@
 
 import { InlineControls } from '../../src/content/ui/inline-controls.js';
 import { COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
+import { threadsSiteRule } from '../../src/content/site-adapter.js';
 
 describe('InlineControls', () => {
   let inlineControls;
@@ -483,6 +484,155 @@ describe('InlineControls', () => {
       expect(mockSelectionManager.toggle).not.toHaveBeenCalled();
 
       comment.remove();
+    });
+  });
+
+  describe('select all (activity dialog)', () => {
+    let candidatesSpy;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      candidatesSpy = jest.spyOn(threadsSiteRule, 'getSelectAllCandidates');
+      mockSelectionManager.selectMany = jest.fn();
+    });
+
+    afterEach(() => {
+      candidatesSpy.mockRestore();
+      jest.useRealTimers();
+    });
+
+    const button = () => container.querySelector('.tb-card-selectall');
+
+    test('is hidden when no Sub-List is active', () => {
+      candidatesSpy.mockReturnValue(null);
+      inlineControls.init();
+      inlineControls.setMultiSelectMode(true);
+
+      expect(button().classList.contains('tb-card-selectall-visible')).toBe(false);
+    });
+
+    test('shows the loaded count for the Active Sub-List', () => {
+      candidatesSpy.mockReturnValue(['a', 'b', 'c']);
+      inlineControls.init();
+      inlineControls.setMultiSelectMode(true);
+
+      expect(button().classList.contains('tb-card-selectall-visible')).toBe(true);
+      expect(button().textContent).toBe('Select all (3 loaded)');
+    });
+
+    test('selects the snapshot taken at click time', () => {
+      candidatesSpy.mockReturnValue(['a', 'b']);
+      inlineControls.init();
+      inlineControls.setMultiSelectMode(true);
+
+      candidatesSpy.mockReturnValue(['a', 'b', 'c']);
+      button().click();
+
+      expect(mockSelectionManager.selectMany).toHaveBeenCalledWith(['a', 'b', 'c']);
+    });
+
+    test('is disabled once every candidate is selected', () => {
+      candidatesSpy.mockReturnValue(['a', 'b']);
+      mockSelectionManager.isSelected.mockReturnValue(true);
+      inlineControls.init();
+      inlineControls.setMultiSelectMode(true);
+
+      expect(button().disabled).toBe(true);
+      expect(button().textContent).toBe('All 2 selected');
+    });
+
+    test('refreshes after a DOM scan', () => {
+      candidatesSpy.mockReturnValue(null);
+      inlineControls.init();
+      inlineControls.setMultiSelectMode(true);
+
+      candidatesSpy.mockReturnValue(['a']);
+      window.dispatchEvent(new CustomEvent('tb-dom-scan'));
+
+      expect(button().classList.contains('tb-card-selectall-visible')).toBe(true);
+    });
+
+    test('refreshes shortly after a click (Sub-List switch may not mutate the tree)', () => {
+      candidatesSpy.mockReturnValue(null);
+      inlineControls.init();
+      inlineControls.setMultiSelectMode(true);
+
+      candidatesSpy.mockReturnValue(['a']);
+      document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      jest.advanceTimersByTime(400);
+
+      expect(button().classList.contains('tb-card-selectall-visible')).toBe(true);
+    });
+
+    test('is hidden outside block mode', () => {
+      candidatesSpy.mockReturnValue(['a']);
+      inlineControls.init();
+
+      window.dispatchEvent(new CustomEvent('tb-dom-scan'));
+
+      expect(button().classList.contains('tb-card-selectall-visible')).toBe(false);
+    });
+  });
+
+  describe('block confirmation threshold', () => {
+    beforeEach(() => {
+      global.chrome = { runtime: { sendMessage: jest.fn(() => Promise.resolve()) } };
+      mockIdResolver.resolve.mockResolvedValue({ userId: '1', transient: false });
+    });
+
+    afterEach(() => {
+      delete global.chrome;
+    });
+
+    function enterWithSelection(n) {
+      const users = Array.from({ length: n }, (_, i) => `u${i}`);
+      mockSelectionManager.getSelected.mockReturnValue(users);
+      mockSelectionManager.count.mockReturnValue(n);
+      inlineControls.init();
+      inlineControls.setMultiSelectMode(true);
+    }
+
+    test('blocks immediately below the threshold', () => {
+      enterWithSelection(19);
+      container.querySelector('.tb-card-block-btn').click();
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+      expect(
+        container.querySelector('.tb-confirm-backdrop').classList.contains('tb-confirm-visible')
+      ).toBe(false);
+    });
+
+    test('asks for confirmation at 20 or more, and blocks on confirm', () => {
+      enterWithSelection(20);
+      container.querySelector('.tb-card-block-btn').click();
+
+      const backdrop = container.querySelector('.tb-confirm-backdrop');
+      expect(backdrop.classList.contains('tb-confirm-visible')).toBe(true);
+      expect(container.querySelector('.tb-confirm-title').textContent).toContain('20');
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+
+      container.querySelector('.tb-confirm-btn-confirm').click();
+      expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    });
+
+    test('cancel keeps the selection and block mode', () => {
+      enterWithSelection(20);
+      container.querySelector('.tb-card-block-btn').click();
+      container.querySelector('.tb-confirm-btn-cancel').click();
+
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+      expect(mockSelectionManager.clearSelection).not.toHaveBeenCalled();
+      expect(inlineControls.multiSelectMode).toBe(true);
+    });
+
+    test('exit confirmation still uses the exit wording', () => {
+      enterWithSelection(3);
+      const exitLink = [...container.querySelectorAll('.tb-card-link')].find((b) =>
+        b.textContent.includes('Exit')
+      );
+      exitLink.click();
+
+      expect(container.querySelector('.tb-confirm-title').textContent).toBe('確定要離開？');
     });
   });
 
