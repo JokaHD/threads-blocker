@@ -5,10 +5,17 @@
  */
 
 import { MessageType } from '../../shared/messages.js';
+import { Limits } from '../../shared/constants.js';
 import { Icons } from './icons.js';
 import { getUIContainer, getStackContainer } from './shadow-host.js';
 import { COMMENT_ID_ATTR } from '../dom-observer.js';
 import { threadsSiteRule } from '../site-adapter.js';
+
+const EXIT_CONFIRM = {
+  title: '確定要離開？',
+  message: '你有已選取的項目尚未處理，離開後選取將被清除。',
+  confirmLabel: '離開',
+};
 
 export class InlineControls {
   constructor(selectionManager, idResolver, container = null) {
@@ -24,6 +31,9 @@ export class InlineControls {
     this._hoverHandler = null;
     this._lastHovered = null;
     this._confirmDialog = null;
+    this._selectAllBtn = null;
+    this._selectAllTimer = null;
+    this._domScanHandler = null;
   }
 
   init() {
@@ -49,6 +59,11 @@ export class InlineControls {
     // Document-level click handler (always active, checks block mode)
     this._clickHandler = (e) => {
       if (!this._blockMode) return;
+
+      // Entering / leaving a Sub-List may only toggle visibility, which the
+      // childList observer behind tb-dom-scan doesn't see — re-check after
+      // the host page has reacted to the click.
+      this._scheduleSelectAllRefresh();
 
       const comment = e.target.closest(`[${COMMENT_ID_ATTR}]`);
       if (!comment) {
@@ -108,7 +123,12 @@ export class InlineControls {
     this._selection.onChange(() => {
       this._updateCard();
       this._updateHighlights();
+      this._refreshSelectAll();
     });
+
+    // dom-observer finished a scan: dialog rows may have appeared / gone
+    this._domScanHandler = () => this._refreshSelectAll();
+    window.addEventListener('tb-dom-scan', this._domScanHandler);
 
     // Create confirmation dialog (in UI container, not stack)
     this._createConfirmDialog(uiContainer);
@@ -167,6 +187,25 @@ export class InlineControls {
     countArea.appendChild(countNum);
     countArea.appendChild(countLabel);
 
+    // Select all (activity dialog Sub-List only, see docs/adr/0001)
+    const selectAllRow = document.createElement('div');
+    selectAllRow.className = 'tb-card-selectall-row';
+
+    const selectAllBtn = document.createElement('button');
+    selectAllBtn.className = 'tb-card-selectall';
+    selectAllBtn.addEventListener('click', () => this._handleSelectAll());
+
+    const selectAllInfo = document.createElement('span');
+    selectAllInfo.className = 'tb-card-selectall-info';
+    selectAllInfo.textContent = 'ⓘ';
+    selectAllInfo.title =
+      '按讚／轉發不等於認同，封鎖前請先確認名單。\n' +
+      '只涵蓋目前已載入的帳號（網頁版每份名單約只載入前 200 人）。';
+    selectAllInfo.setAttribute('aria-label', selectAllInfo.title);
+
+    selectAllRow.appendChild(selectAllBtn);
+    selectAllRow.appendChild(selectAllInfo);
+
     // Actions area (Block button + links)
     const actions = document.createElement('div');
     actions.className = 'tb-card-actions';
@@ -202,6 +241,7 @@ export class InlineControls {
     exitOnly.addEventListener('click', () => this._exitBlockMode());
 
     card.appendChild(countArea);
+    card.appendChild(selectAllRow);
     card.appendChild(actions);
     card.appendChild(exitOnly);
 
@@ -211,6 +251,41 @@ export class InlineControls {
     this._cardCountNum = countNum;
     this._cardActions = actions;
     this._cardExitOnly = exitOnly;
+    this._selectAllBtn = selectAllBtn;
+  }
+
+  /**
+   * Show "Select all (N loaded)" while an activity-dialog Sub-List is on
+   * screen in block mode; hide it otherwise.
+   */
+  _refreshSelectAll() {
+    if (!this._selectAllBtn) return;
+    const candidates = this._blockMode
+      ? threadsSiteRule.getSelectAllCandidates(COMMENT_ID_ATTR)
+      : null;
+    const visible = !!candidates && candidates.length > 0;
+    this._selectAllBtn.classList.toggle('tb-card-selectall-visible', visible);
+    if (!visible) return;
+
+    const allSelected = candidates.every((u) => this._selection.isSelected(u));
+    this._selectAllBtn.disabled = allSelected;
+    this._selectAllBtn.textContent = allSelected
+      ? `All ${candidates.length} selected`
+      : `Select all (${candidates.length} loaded)`;
+  }
+
+  _scheduleSelectAllRefresh() {
+    clearTimeout(this._selectAllTimer);
+    this._selectAllTimer = setTimeout(() => this._refreshSelectAll(), 350);
+  }
+
+  /**
+   * One-shot snapshot: whatever the Active Sub-List shows at click time.
+   */
+  _handleSelectAll() {
+    const candidates = threadsSiteRule.getSelectAllCandidates(COMMENT_ID_ATTR);
+    if (!candidates || candidates.length === 0) return;
+    this._selection.selectMany(candidates);
   }
 
   _updateCard() {
@@ -241,6 +316,23 @@ export class InlineControls {
    * Handle block all selected users.
    */
   _handleBlockAll() {
+    const selected = this._selection.getSelected();
+    if (selected.length === 0) return;
+
+    // Large batches (typically from select-all) get a second look first
+    if (selected.length >= Limits.BLOCK_CONFIRM_THRESHOLD) {
+      this._showConfirmDialog({
+        title: `確定要封鎖 ${selected.length} 個帳號？`,
+        message: '封鎖會在背景依序執行。請確認名單中沒有誤選的人。',
+        confirmLabel: '封鎖',
+        onConfirm: () => this._blockSelected(),
+      });
+      return;
+    }
+    this._blockSelected();
+  }
+
+  _blockSelected() {
     const selected = this._selection.getSelected();
     if (selected.length === 0) return;
 
@@ -318,11 +410,11 @@ export class InlineControls {
     const title = document.createElement('div');
     title.className = 'tb-confirm-title';
     title.id = 'tb-confirm-title';
-    title.textContent = '確定要離開？';
+    title.textContent = EXIT_CONFIRM.title;
 
     const message = document.createElement('div');
     message.className = 'tb-confirm-message';
-    message.textContent = '你有已選取的項目尚未處理，離開後選取將被清除。';
+    message.textContent = EXIT_CONFIRM.message;
 
     const actions = document.createElement('div');
     actions.className = 'tb-confirm-actions';
@@ -334,10 +426,11 @@ export class InlineControls {
 
     const confirmBtn = document.createElement('button');
     confirmBtn.className = 'tb-confirm-btn tb-confirm-btn-confirm';
-    confirmBtn.textContent = '離開';
+    confirmBtn.textContent = EXIT_CONFIRM.confirmLabel;
     confirmBtn.addEventListener('click', () => {
+      const onConfirm = this._confirmAction;
       this._hideConfirmDialog();
-      this._exitBlockMode();
+      onConfirm?.();
     });
 
     actions.appendChild(cancelBtn);
@@ -363,10 +456,21 @@ export class InlineControls {
 
     container.appendChild(backdrop);
     this._confirmDialog = backdrop;
+    this._confirmTitle = title;
+    this._confirmMessage = message;
+    this._confirmBtn = confirmBtn;
   }
 
-  _showConfirmDialog() {
+  /**
+   * @param {{title: string, message: string, confirmLabel: string,
+   *   onConfirm: function}} [options] - defaults to the exit confirmation
+   */
+  _showConfirmDialog(options = { ...EXIT_CONFIRM, onConfirm: () => this._exitBlockMode() }) {
     if (!this._confirmDialog) return;
+    this._confirmTitle.textContent = options.title;
+    this._confirmMessage.textContent = options.message;
+    this._confirmBtn.textContent = options.confirmLabel;
+    this._confirmAction = options.onConfirm;
     this._confirmDialog.classList.add('tb-confirm-visible');
     // Focus confirm button for keyboard users
     const confirmBtn = this._confirmDialog.querySelector('.tb-confirm-btn-confirm');
@@ -426,6 +530,7 @@ export class InlineControls {
 
     // Add body class - this triggers CSS that disables pointer-events on links
     document.body.classList.add('tb-blockmode');
+    this._refreshSelectAll();
   }
 
   _exitBlockMode() {
@@ -448,7 +553,9 @@ export class InlineControls {
     });
 
     this._lastHovered = null;
+    clearTimeout(this._selectAllTimer);
     this._selection.clearSelection();
+    this._refreshSelectAll();
   }
 
   _updateHighlights() {
@@ -469,6 +576,9 @@ export class InlineControls {
     }
     if (this._hoverHandler) {
       document.removeEventListener('mouseover', this._hoverHandler, true);
+    }
+    if (this._domScanHandler) {
+      window.removeEventListener('tb-dom-scan', this._domScanHandler);
     }
     if (this._fab) {
       this._fab.remove();

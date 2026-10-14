@@ -72,6 +72,27 @@ describe('clearSelection', () => {
 
 // ── count ─────────────────────────────────────────────────────────────────────
 
+describe('selectMany', () => {
+  it('adds every username, keeping existing selections', () => {
+    sm.toggle('alice');
+    sm.selectMany(['bob', 'carol']);
+    expect(sm.getSelected().sort()).toEqual(['alice', 'bob', 'carol']);
+  });
+
+  it('never deselects an already-selected username', () => {
+    sm.toggle('alice');
+    sm.selectMany(['alice']);
+    expect(sm.isSelected('alice')).toBe(true);
+  });
+
+  it('notifies listeners once', () => {
+    const listener = jest.fn();
+    sm.onChange(listener);
+    sm.selectMany(['bob', 'carol']);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('count', () => {
   it('returns correct number of selected usernames', () => {
     expect(sm.count()).toBe(0);

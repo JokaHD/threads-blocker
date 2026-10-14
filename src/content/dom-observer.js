@@ -182,6 +182,8 @@ export class DOMObserver {
     if (comments.length > 0 && this._onNewComments) {
       this._onNewComments(comments);
     }
+    // Lets UI that depends on page state (e.g. select-all) re-check it
+    window.dispatchEvent(new CustomEvent('tb-dom-scan'));
   }
 
   /**

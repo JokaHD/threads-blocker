@@ -533,3 +533,76 @@ describe('getSiteRule', () => {
     expect(threadsSiteRule.match.test('https://threads.net/')).toBe(false);
   });
 });
+
+// Structure per 2026-10-14 real-site probe: the activity dialog is an
+// overview (「按讚內容／轉發／引用內容 N ›」role=button entries + a
+// recent-activity preview) that drills down into one Sub-List at a time.
+// Hidden Sub-Lists / the hidden overview stay mounted with a zero rect.
+describe('threadsSiteRule.getSelectAllCandidates', () => {
+  const MARK = 'data-tb-comment-id';
+
+  function setVisible(el, visible) {
+    el.getBoundingClientRect = () =>
+      visible ? { width: 424, height: 66, top: 0, left: 0 } : { width: 0, height: 0 };
+  }
+
+  function row(u) {
+    return `<div data-pressable-container ${MARK}="${u}">${u} 追蹤</div>`;
+  }
+
+  function buildDialog({ overviewVisible, likes = [], reposts = [] }) {
+    document.body.innerHTML = `
+      <div role="dialog">
+        <div class="post-header" ${MARK}="me"><a href="/@me">me</a><span>暴雨</span></div>
+        <div class="overview">
+          <div role="button">按讚內容5,321繼續</div>
+          <div role="button">轉發轉發288繼續</div>
+          <div role="button">引用內容引用內容38繼續</div>
+          ${row('preview1')}
+        </div>
+        <div class="likes">${likes.map(row).join('')}</div>
+        <div class="reposts">${reposts.map(row).join('')}</div>
+      </div>`;
+    const dlg = document.querySelector('[role="dialog"]');
+    setVisible(dlg.querySelector('.post-header'), true);
+    dlg.querySelectorAll('.overview > *').forEach((el) => setVisible(el, overviewVisible));
+    // Likes was visited earlier: still mounted, hidden
+    dlg.querySelectorAll('.likes > *').forEach((el) => setVisible(el, false));
+    dlg.querySelectorAll('.reposts > *').forEach((el) => setVisible(el, !overviewVisible));
+  }
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('returns null when no dialog is open', () => {
+    document.body.innerHTML = row('alice');
+    expect(threadsSiteRule.getSelectAllCandidates(MARK)).toBeNull();
+  });
+
+  it('returns null on the overview screen (mixed recent activity)', () => {
+    buildDialog({ overviewVisible: true, likes: ['alice'] });
+    expect(threadsSiteRule.getSelectAllCandidates(MARK)).toBeNull();
+  });
+
+  it('returns only the visible Sub-List rows, not hidden mounted ones', () => {
+    buildDialog({ overviewVisible: false, likes: ['alice', 'bob'], reposts: ['carol', 'dave'] });
+    expect(threadsSiteRule.getSelectAllCandidates(MARK)).toEqual(['carol', 'dave']);
+  });
+
+  it('excludes the post author (the viewer) shown in the dialog header', () => {
+    buildDialog({ overviewVisible: false, reposts: ['carol', 'me'] });
+    expect(threadsSiteRule.getSelectAllCandidates(MARK)).toEqual(['carol']);
+  });
+
+  it('dedups usernames', () => {
+    buildDialog({ overviewVisible: false, reposts: ['carol', 'carol'] });
+    expect(threadsSiteRule.getSelectAllCandidates(MARK)).toEqual(['carol']);
+  });
+
+  it('returns null for a dialog that is not the activity dialog', () => {
+    document.body.innerHTML = `<div role="dialog">${row('alice')}</div>`;
+    setVisible(document.querySelector('[data-pressable-container]'), true);
+    expect(threadsSiteRule.getSelectAllCandidates(MARK)).toBeNull();
+  });
+});

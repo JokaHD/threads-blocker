@@ -31,6 +31,17 @@ const SUPPORTED_PATH_PATTERNS = [
   /^\/search(\/.*)?$/, // search page (with sub-tabs)
 ];
 
+// Overview entry labels of the post-activity dialog (zh-TW, verified
+// 2026-10-14). Entry text is "<label><count>繼續" (repost/quote repeat the
+// label). Other locales are unverified: the dialog then simply isn't
+// recognized and select-all stays hidden.
+const ACTIVITY_OVERVIEW_LABELS = ['按讚內容', '轉發', '引用內容'];
+
+const isRendered = (el) => {
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+};
+
 // Media lightbox view — UI is hidden even though path is under /@*
 const MEDIA_VIEW_PATTERN = /\/post\/[^/]+\/media/;
 
@@ -226,6 +237,67 @@ export const threadsSiteRule = {
       results.push({ username: c.username, container: c.container, link: null });
     }
     return results;
+  },
+
+  /**
+   * Usernames select-all may pick in the post-activity dialog right now, or
+   * null when select-all does not apply (no activity dialog, or the
+   * overview screen with its mixed recent-activity preview is showing).
+   *
+   * Real-site facts (2026-10-14 probe, see docs/adr/0001):
+   * - The dialog is an overview with 「按讚內容 / 轉發 / 引用內容 N ›」
+   *   role=button entries, drilling down into one Sub-List at a time.
+   * - Sub-Lists and the overview stay mounted while hidden (zero rect), so
+   *   the Active Sub-List is decided by visibility, never DOM presence.
+   * - The post header (author = the viewer, since only your own posts have
+   *   this dialog) is a marked but non-pressable element; list rows are
+   *   marked pressables. The author is excluded — never block yourself.
+   *
+   * Fail-safe: if the overview entries can't be recognized, the dialog is
+   * not treated as an activity dialog and select-all stays hidden.
+   *
+   * @param {string} markAttr - attribute dom-observer stamps on rows
+   * @returns {string[]|null}
+   */
+  getSelectAllCandidates(markAttr) {
+    const dialog = this._findActivityDialog();
+    if (!dialog) return null;
+
+    const entries = this._activityOverviewEntries(dialog);
+    if (entries.some(isRendered)) return null;
+
+    const authors = new Set();
+    const usernames = new Set();
+    for (const el of dialog.querySelectorAll(`[${markAttr}]`)) {
+      const username = el.getAttribute(markAttr);
+      if (!el.hasAttribute('data-pressable-container')) {
+        authors.add(username);
+      } else if (isRendered(el)) {
+        usernames.add(username);
+      }
+    }
+    for (const author of authors) usernames.delete(author);
+    return [...usernames];
+  },
+
+  /**
+   * The post-activity dialog: a dialog carrying the overview entries.
+   * Candidates: [role="dialog"] (verified), <dialog>, [aria-modal="true"].
+   */
+  _findActivityDialog() {
+    for (const dialog of document.querySelectorAll(
+      '[role="dialog"], dialog, [aria-modal="true"]'
+    )) {
+      if (this._activityOverviewEntries(dialog).length > 0) return dialog;
+    }
+    return null;
+  },
+
+  _activityOverviewEntries(dialog) {
+    return [...dialog.querySelectorAll('[role="button"]')].filter((el) => {
+      const text = el.textContent?.trim() || '';
+      return ACTIVITY_OVERVIEW_LABELS.some((label) => text.startsWith(label));
+    });
   },
 
   /**

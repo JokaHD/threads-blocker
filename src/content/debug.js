@@ -67,6 +67,10 @@ export function getDebugState() {
     // Dialog user-list rows (e.g. likes list) — anchor-less scan entry
     userListRows: siteRule?.findUserListRows().length ?? 0,
 
+    // Select-all candidates in the activity dialog's Active Sub-List;
+    // null = not applicable (no activity dialog, or overview showing)
+    selectAllCandidates: siteRule?.getSelectAllCandidates('data-tb-comment-id')?.length ?? null,
+
     // Shadow DOM
     shadowHost: {
       exists: shadowHostExists(),

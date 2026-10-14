@@ -58,6 +58,14 @@ export class SelectionManager {
   }
 
   /**
+   * Add usernames to the selection (select-all). Never deselects.
+   */
+  selectMany(usernames) {
+    for (const username of usernames) this._selected.add(username);
+    this._notify();
+  }
+
+  /**
    * Handle a checkbox click.
    * - If shift is held and an anchor exists: range-select from anchor to username.
    * - Otherwise: add username to selection, set anchor, clear seenList.
