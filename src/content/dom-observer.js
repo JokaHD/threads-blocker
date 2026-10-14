@@ -60,6 +60,12 @@ export class DOMObserver {
       const alreadySeen = seenUsernames.has(username);
       seenUsernames.add(username);
 
+      // Fast path: an already-seen username inside an already-marked
+      // comment can only resolve to that comment or a nested one — both
+      // skipped below. Skip before findContainer's layout reads; this is
+      // most links on every re-scan tick.
+      if (alreadySeen && link.closest(`[${COMMENT_ID_ATTR}]`)) continue;
+
       // Find container
       const container = this._siteRule.findContainer(link);
       if (!container) continue;
@@ -104,8 +110,9 @@ export class DOMObserver {
    * earlier in the current scan?
    */
   _isInsideComment(container, claimedContainers) {
-    for (let el = container.parentElement; el; el = el.parentElement) {
-      if (claimedContainers.has(el) || el.hasAttribute(COMMENT_ID_ATTR)) return true;
+    if (container.parentElement?.closest(`[${COMMENT_ID_ATTR}]`)) return true;
+    for (const claimed of claimedContainers) {
+      if (claimed.contains(container)) return true;
     }
     return false;
   }
