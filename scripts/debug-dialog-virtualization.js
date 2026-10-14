@@ -14,13 +14,19 @@
  *   6. Are row elements recycled in place (same element, new user)? If so,
  *      does the data-tb-comment-id marker go stale (marker ≠ row content)?
  *
+ *   7. (round 2) Does the reposts / quotes sub-list lazy-load on scroll
+ *      (unlike likes, which loaded ~200 rows at once)?
+ *   8. (round 2) Which marked elements are visible on the overview screen
+ *      (post preview? liker avatar previews?) — select-all must exclude
+ *      anything that is not a list row. See visibleMarkedDetail.
+ *
  * Usage (on threads.com, with the extension loaded):
- *   1. Open a post's activity dialog (查看動態) and pick the 按讚 tab.
- *      Wait until rows are marked (extension scan runs automatically).
+ *   1. Open a post's activity dialog (查看動態) — the overview with
+ *      「按讚內容 / 轉發 / 引用內容 ›」. Stay on the overview.
  *   2. Paste this whole file into the DevTools console (page context).
- *   3. Slowly scroll the list through at least 5–10 load batches, then
- *      scroll back up to the top once.
- *   4. Switch to another tab (轉發/引用) and back once.
+ *   3. Click 轉發 ›, wait 3 s, then slowly scroll to the very bottom,
+ *      pausing until each new batch appears.
+ *   4. Click the back arrow, wait 3 s.
  *   5. Close the dialog.
  *   6. Run: __tbDlgDebug.report()  — JSON is logged and copied to clipboard.
  */
@@ -116,6 +122,24 @@
     }
   };
 
+  // What a visible marked element is: a list row (avatar + username +
+  // follow button, ~full dialog width) or something else (post preview,
+  // avatar strip on the overview screen).
+  const describeMarked = (el) => {
+    const r = el.getBoundingClientRect();
+    return {
+      user: el.getAttribute(ATTR),
+      w: Math.round(r.width),
+      h: Math.round(r.height),
+      top: Math.round(r.top - dlg.getBoundingClientRect().top),
+      pressable: el.hasAttribute('data-pressable-container'),
+      imgs: el.querySelectorAll('img').length,
+      hasButton: !!el.querySelector('[role="button"]'),
+      insideButton: !!el.parentElement?.closest('[role="button"]'),
+      text: (el.textContent || '').trim().slice(0, 50),
+    };
+  };
+
   const snap = () => {
     if (!dlg || !dlg.isConnected) return null;
     const marked = [...dlg.querySelectorAll(MARK)];
@@ -128,6 +152,13 @@
         return r.width > 0 && r.height > 0;
       }).length,
       firstMarked: marked[0]?.getAttribute(ATTR) || null,
+      visibleMarkedDetail: marked
+        .filter((e) => {
+          const r = e.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        })
+        .slice(0, 20)
+        .map(describeMarked),
     };
   };
 
