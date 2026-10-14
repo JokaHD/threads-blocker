@@ -15,6 +15,7 @@
  */
 
 import fs from 'node:fs';
+import { CANARY_DIR, LAST_RUN_PATH } from './paths.js';
 
 const STAGE_BY_PROJECT = {
   infra: 'infra',
@@ -84,9 +85,9 @@ export default class CanaryReporter {
     lines.push('');
     console.log(lines.join('\n'));
 
-    fs.mkdirSync('.canary', { recursive: true });
+    fs.mkdirSync(CANARY_DIR, { recursive: true });
     fs.writeFileSync(
-      '.canary/last-run.json',
+      LAST_RUN_PATH,
       JSON.stringify({ at: new Date().toISOString(), verdict, stages }, null, 2)
     );
   }

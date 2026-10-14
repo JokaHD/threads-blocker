@@ -5,9 +5,9 @@
  */
 
 import fs from 'node:fs';
+import { STATE_PATH, PROBE_BUNDLE } from '../paths.js';
 
-export const STATE_PATH = '.canary/state.json';
-export const PROBE_BUNDLE = '.canary/probe.bundle.js';
+export { STATE_PATH };
 
 export function hasCredentials() {
   return fs.existsSync(STATE_PATH);

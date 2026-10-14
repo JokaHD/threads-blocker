@@ -10,8 +10,8 @@
 
 import { chromium } from '@playwright/test';
 import fs from 'node:fs';
+import { CANARY_DIR, STATE_PATH } from './paths.js';
 
-const STATE_PATH = '.canary/state.json';
 const POLL_MS = 2000;
 const TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -41,7 +41,7 @@ if (!loggedIn) {
 
 // 登入剛完成時 server 可能還在補發 cookie，稍等再存
 await new Promise((r) => setTimeout(r, 3000));
-fs.mkdirSync('.canary', { recursive: true });
+fs.mkdirSync(CANARY_DIR, { recursive: true });
 await context.storageState({ path: STATE_PATH });
 await browser.close();
 

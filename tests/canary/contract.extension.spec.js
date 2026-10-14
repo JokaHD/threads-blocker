@@ -55,14 +55,14 @@ test('extension 在真站仍可掛載 Shadow DOM UI 並標記留言', async ({
   ).toBeTruthy();
 
   // UI 初始化與留言標記在 host 掛載後非同步發生 — poll bridge 直到就緒
+  let state;
   await expect
-    .poll(async () => (await askDebugBridge(page)).ui.fab, {
+    .poll(async () => (state = await askDebugBridge(page)).ui.fab, {
       timeout: 15000,
       message: 'FAB 未渲染（透過 tb-debug bridge 觀測）— UI 初始化對真站失效',
     })
     .toBe(true);
 
-  const state = await askDebugBridge(page);
   expect.soft(state.siteRule, 'site rule 未匹配').toBe('threads');
   expect.soft(state.shadowHost.hasRoot, 'shadow root 不存在').toBe(true);
 

@@ -7,10 +7,7 @@
 import { build } from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
-
-export const CANARY_DIR = '.canary';
-export const PROBE_BUNDLE = path.join(CANARY_DIR, 'probe.bundle.js');
-export const EXTENSION_DIR = path.join(CANARY_DIR, 'dist');
+import { CANARY_DIR, PROBE_BUNDLE, EXTENSION_DIR } from './paths.js';
 
 export default async function globalSetup() {
   fs.mkdirSync(CANARY_DIR, { recursive: true });
