@@ -29,7 +29,15 @@ export class DOMObserver {
 
   /**
    * Find comments in the DOM.
-   * For each unique username (text link, not avatar), finds the container.
+   *
+   * Dedup is per CONTAINER, not per username: a user with several comments
+   * must have every one of them marked. An unmarked comment is not
+   * intercepted in block mode, so clicking it navigates to the permalink
+   * and the route change wipes the whole selection.
+   *
+   * Links are visited in document order, so a comment's author link claims
+   * the container before any @mention inside the comment body can.
+   *
    * @param {Element} root - Root element to search within
    * @returns {Array<{username: string, container: Element, link: Element}>}
    */
@@ -38,6 +46,7 @@ export class DOMObserver {
 
     const links = root.querySelectorAll(this._siteRule.usernameSelector);
     const results = [];
+    const claimedContainers = new Set();
     const seenUsernames = new Set();
 
     for (const link of links) {
@@ -48,16 +57,30 @@ export class DOMObserver {
       // Skip non-comment links (avatars, navigation, compose areas)
       if (this._siteRule.shouldExcludeLink(link)) continue;
 
-      // Skip duplicates
-      if (seenUsernames.has(username)) continue;
+      const alreadySeen = seenUsernames.has(username);
       seenUsernames.add(username);
+
+      // Fast path: an already-seen username inside an already-marked
+      // comment can only resolve to that comment or a nested one — both
+      // skipped below. Skip before findContainer's layout reads; this is
+      // most links on every re-scan tick.
+      if (alreadySeen && link.closest(`[${COMMENT_ID_ATTR}]`)) continue;
 
       // Find container
       const container = this._siteRule.findContainer(link);
       if (!container) continue;
 
-      // Skip already processed
+      // Skip already processed, or claimed earlier in this scan
       if (container.hasAttribute(COMMENT_ID_ATTR)) continue;
+      if (claimedContainers.has(container)) continue;
+
+      // A container nested in another comment (e.g. an embedded quoted
+      // post) keeps the old per-username dedup: marking it as an
+      // already-seen user would make clicks on the embed select that user
+      // instead of the commenter.
+      if (alreadySeen && this._isInsideComment(container, claimedContainers)) continue;
+
+      claimedContainers.add(container);
 
       results.push({
         username,
@@ -74,12 +97,24 @@ export class DOMObserver {
       row.hasAttribute(COMMENT_ID_ATTR)
     );
     for (const row of listRows) {
-      if (seenUsernames.has(row.username)) continue;
-      seenUsernames.add(row.username);
+      if (claimedContainers.has(row.container)) continue;
+      claimedContainers.add(row.container);
       results.push(row);
     }
 
     return results;
+  }
+
+  /**
+   * Is `container` inside a comment that is already marked, or claimed
+   * earlier in the current scan?
+   */
+  _isInsideComment(container, claimedContainers) {
+    if (container.parentElement?.closest(`[${COMMENT_ID_ATTR}]`)) return true;
+    for (const claimed of claimedContainers) {
+      if (claimed.contains(container)) return true;
+    }
+    return false;
   }
 
   /**

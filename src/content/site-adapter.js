@@ -7,6 +7,9 @@ import { escapeRegex } from '../shared/utils.js';
 
 const USERNAME_PATTERN = /^\/@([a-zA-Z0-9_.]+)$/;
 
+// Any link into a user's space (profile, post permalink).
+const USERNAME_SELECTOR = 'a[href^="/@"]';
+
 // Bare username text (no /@ prefix) — used for dialog user-list rows
 // where the username exists only as a text node.
 const USERNAME_TEXT_PATTERN = /^[a-zA-Z0-9_.]+$/;
@@ -36,7 +39,7 @@ export const threadsSiteRule = {
   match: /^https:\/\/www\.threads\.com\//,
 
   // Username link selector
-  usernameSelector: 'a[href^="/@"]',
+  usernameSelector: USERNAME_SELECTOR,
   usernamePattern: USERNAME_PATTERN,
 
   /**
@@ -77,6 +80,31 @@ export const threadsSiteRule = {
    */
   shouldExcludeLink(link) {
     return this.isAvatarLink(link) || this.isNavigationLink(link) || this.isComposeAreaLink(link);
+  },
+
+  /**
+   * Elements Threads turns into in-app navigation when clicked: user /
+   * permalink anchors, and pressable containers (whole-comment click opens
+   * the post). Block mode swallows clicks on these when they sit outside a
+   * marked comment — navigating would exit block mode and drop the
+   * selection. Candidates, most to least stable:
+   *   1. USERNAME_SELECTOR            — URL contract (a[href^="/@"])
+   *   2. [data-pressable-container]   — Meta's own attribute (findContainer p1)
+   *   3. [role="link"]                — ARIA fallback for JS-only navigation
+   */
+  navigationTriggerSelector: `${USERNAME_SELECTOR}, [data-pressable-container], [role="link"]`,
+
+  /**
+   * Should a block-mode click on `target` be swallowed so it cannot navigate?
+   * Intentional navigation (sidebar / nav bar) and dialog tab switches stay
+   * clickable.
+   */
+  isBlockModeNavigationTrigger(target) {
+    const trigger = target.closest?.(this.navigationTriggerSelector);
+    if (!trigger) return false;
+    if (this.isNavigationLink(trigger)) return false;
+    if (trigger.closest('[role="tablist"], [role="tab"]')) return false;
+    return true;
   },
 
   /**

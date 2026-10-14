@@ -51,7 +51,16 @@ export class InlineControls {
       if (!this._blockMode) return;
 
       const comment = e.target.closest(`[${COMMENT_ID_ATTR}]`);
-      if (!comment) return;
+      if (!comment) {
+        // Unmarked comment (heuristic miss): don't let it navigate away —
+        // the route change would exit block mode and drop the selection.
+        if (threadsSiteRule.isBlockModeNavigationTrigger(e.target)) {
+          e.preventDefault();
+          e.stopPropagation();
+          console.debug('[ThreadBlocker] Block mode: swallowed navigation click on', e.target);
+        }
+        return;
+      }
 
       e.preventDefault();
       e.stopPropagation();
