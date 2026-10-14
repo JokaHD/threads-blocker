@@ -2,9 +2,12 @@ import { test as base, chromium } from '@playwright/test';
 import path from 'path';
 
 export const test = base.extend({
-  // eslint-disable-next-line no-empty-pattern
-  context: async ({}, use) => {
-    const extensionPath = path.resolve('dist');
+  // Build directory to load; projects override via `use: { extensionDir }`
+  // (the canary loads its bridge-enabled build from .canary/dist).
+  extensionDir: ['dist', { option: true }],
+
+  context: async ({ extensionDir }, use) => {
+    const extensionPath = path.resolve(extensionDir);
 
     const context = await chromium.launchPersistentContext('', {
       headless: false,

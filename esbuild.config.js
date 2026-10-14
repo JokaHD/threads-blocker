@@ -3,15 +3,23 @@ import { cpSync, mkdirSync } from 'fs';
 
 const isWatch = process.argv.includes('--watch');
 
+// Canary build (TB_BUILD=canary): enables the page-world debug bridge in
+// debug.js and writes to .canary/dist so the dist/ you load in Chrome never
+// ships the bridge.
+const isCanary = process.env.TB_BUILD === 'canary';
+const outDir = isCanary ? '.canary/dist' : 'dist';
+const define = { __TB_DEBUG_BRIDGE__: JSON.stringify(isCanary) };
+
 // Ensure dist directories exist
-mkdirSync('dist/icons', { recursive: true });
+mkdirSync(`${outDir}/icons`, { recursive: true });
 
 // Bundle content script (IIFE — Chrome doesn't support ES modules in content scripts)
 const contentBuild = {
   entryPoints: ['src/content/content.js'],
   bundle: true,
-  outfile: 'dist/content.js',
+  outfile: `${outDir}/content.js`,
   format: 'iife',
+  define,
   target: 'chrome120',
 };
 
@@ -19,15 +27,16 @@ const contentBuild = {
 const swBuild = {
   entryPoints: ['src/background/service-worker.js'],
   bundle: true,
-  outfile: 'dist/service-worker.js',
+  outfile: `${outDir}/service-worker.js`,
   format: 'esm',
+  define,
   target: 'chrome120',
 };
 
 // Copy static assets into dist/
-cpSync('styles/content.css', 'dist/content.css');
-cpSync('manifest.json', 'dist/manifest.json');
-cpSync('icons', 'dist/icons', { recursive: true });
+cpSync('styles/content.css', `${outDir}/content.css`);
+cpSync('manifest.json', `${outDir}/manifest.json`);
+cpSync('icons', `${outDir}/icons`, { recursive: true });
 
 if (isWatch) {
   const ctx1 = await esbuild.context(contentBuild);
