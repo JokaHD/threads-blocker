@@ -6,6 +6,7 @@
   "description": "Chrome Extension to batch-block accounts on Threads",
   "scripts": {
     "build": "node esbuild.config.js",
+    "build:release": "TB_BUILD=release node esbuild.config.js",
     "watch": "node esbuild.config.js --watch",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",

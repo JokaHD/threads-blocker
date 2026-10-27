@@ -53,7 +53,8 @@ jobs:
           "
           echo "manifest.json version set to $VERSION"
 
-      - run: npm run build
+      # build:release strips the dev-only [TB-dev] failure logs
+      - run: npm run build:release
 
       # 打包 dist/ 為 zip
       - name: Package extension
