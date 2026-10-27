@@ -24,6 +24,9 @@ export class InlineControls {
     this._hoverHandler = null;
     this._lastHovered = null;
     this._confirmDialog = null;
+    // Queue pause mirrored from the SW's queueNotify broadcast (content.js)
+    this._queuePaused = false;
+    this._resumeWaiters = [];
   }
 
   init() {
@@ -312,28 +315,22 @@ export class InlineControls {
    * resolving: each resolve fetches a profile page, which shouldn't keep
    * hitting threads.com while the user — or Meta — wants the queue to stop.
    * Checked between users, so the one in flight still finishes.
-   *
-   * Waits on the queueNotify broadcast (resume and cooldown end both write
-   * it) instead of polling, so a long pause doesn't keep the SW awake.
    */
-  async _waitWhileQueuePaused() {
-    let onChanged;
-    const resumed = new Promise((resolve) => {
-      onChanged = (changes, area) => {
-        const status = changes.queueNotify?.newValue?.status;
-        if (area === 'local' && status && !status.paused) resolve();
-      };
-    });
-    // Listen before asking, so a resume landing in between isn't missed
-    chrome.storage.onChanged.addListener(onChanged);
-    try {
-      const res = await chrome.runtime.sendMessage({ type: MessageType.GET_QUEUE_STATUS });
-      if (res?.status?.paused === true) await resumed;
-    } catch {
-      // SW unreachable — don't let that strand the selection in RESOLVING
-    } finally {
-      chrome.storage.onChanged.removeListener(onChanged);
-    }
+  _waitWhileQueuePaused() {
+    if (!this._queuePaused) return Promise.resolve();
+    return new Promise((resolve) => this._resumeWaiters.push(resolve));
+  }
+
+  /**
+   * Fed by content.js from every queueNotify broadcast (resume and cooldown
+   * end both send one), so waiting costs no SW round trip or extra listener.
+   */
+  setQueuePaused(paused) {
+    this._queuePaused = paused === true;
+    if (this._queuePaused) return;
+    const waiters = this._resumeWaiters;
+    this._resumeWaiters = [];
+    for (const resolve of waiters) resolve();
   }
 
   _createConfirmDialog(container) {

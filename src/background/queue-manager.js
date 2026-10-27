@@ -217,13 +217,18 @@ export class QueueManager {
 
   // ── Retry ─────────────────────────────────────────────────────────────────
 
-  retry(userId) {
-    const item = this._items.get(userId);
-    if (!item || item.state !== BlockState.FAILED) return;
+  // Manual retry: back to QUEUED with a fresh retry budget
+  _requeueItem(item) {
     item.state = BlockState.QUEUED;
     item.error = null;
     item.retries = 0;
     item.nextAttemptAt = null;
+  }
+
+  retry(userId) {
+    const item = this._items.get(userId);
+    if (!item || item.state !== BlockState.FAILED) return;
+    this._requeueItem(item);
     this._notify();
   }
 
@@ -235,10 +240,7 @@ export class QueueManager {
     let count = 0;
     for (const item of this._items.values()) {
       if (item.state !== BlockState.FAILED) continue;
-      item.state = BlockState.QUEUED;
-      item.error = null;
-      item.retries = 0;
-      item.nextAttemptAt = null;
+      this._requeueItem(item);
       count++;
     }
     if (count > 0) this._notify();

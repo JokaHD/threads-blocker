@@ -64,6 +64,7 @@ function handleStorageChange(changes, area) {
   if (!items || !status) return;
 
   panel.update(items, status);
+  inlineControls.setQueuePaused(status.paused);
 
   if (status.queued > 0 || status.unblocking > 0) {
     apiExecutor.startPolling();
@@ -116,8 +117,10 @@ if (document.readyState === 'loading') {
   try {
     const response = await chrome.runtime.sendMessage({ type: MessageType.GET_ALL_STATES });
     const statusResponse = await chrome.runtime.sendMessage({ type: MessageType.GET_QUEUE_STATUS });
+    const items = response?.items || [];
     if (statusResponse?.status) {
-      panel.update(response?.items || [], statusResponse.status);
+      panel.update(items, statusResponse.status);
+      inlineControls.setQueuePaused(statusResponse.status.paused);
       if (statusResponse.status.queued > 0 || statusResponse.status.unblocking > 0) {
         apiExecutor.startPolling();
       }
@@ -125,9 +128,7 @@ if (document.readyState === 'loading') {
     // Pick up users left RESOLVING by a tab that was reloaded or closed
     // mid-resolve. If that tab is in fact still resolving them, the second
     // UPDATE_RESOLVED_USER is a harmless no-op.
-    const pending = (response?.items || [])
-      .filter((i) => i.state === BlockState.RESOLVING)
-      .map((i) => i.username);
+    const pending = items.filter((i) => i.state === BlockState.RESOLVING).map((i) => i.username);
     if (pending.length > 0) inlineControls.resolveUsers(pending);
   } catch (e) {
     console.warn('[ThreadBlocker] Failed to fetch initial states:', e);
