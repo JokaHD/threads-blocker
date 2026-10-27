@@ -122,6 +122,12 @@ async function makeGraphQLRequest(docId, variables, tokens, friendlyName) {
 
     // Check for successful response
     // The exact response structure may vary, but we check for no errors
+    // eslint-disable-next-line no-undef -- build-time constant from esbuild define
+    if (typeof __TB_DEV_LOG__ !== 'undefined' && __TB_DEV_LOG__) {
+      // console.debug: hidden unless DevTools shows "Verbose". Lets a "200 but
+      // not applied" body be compared against a genuine success.
+      console.debug('[TB-dev] request ok', friendlyName, 'userId=', variables.user_id, data);
+    }
     return { success: true, data };
   } catch (err) {
     // eslint-disable-next-line no-undef -- build-time constant from esbuild define

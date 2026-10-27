@@ -163,9 +163,22 @@ describe('dev failure log (__TB_DEV_LOG__)', () => {
       );
     });
 
-    it('does not log on success', async () => {
+    it('does not warn on success, but debug-logs the body', async () => {
+      const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
+      const json = { data: { block: { friendship_status: { blocking: true } } } };
+      setFetchResponse({ ok: true, json });
+
       await blockUser('12345', tokens);
+
       expect(warnSpy).not.toHaveBeenCalled();
+      expect(debugSpy).toHaveBeenCalledWith(
+        '[TB-dev] request ok',
+        'useTHUserBlockMutation',
+        'userId=',
+        '12345',
+        json
+      );
+      debugSpy.mockRestore();
     });
   });
 });
