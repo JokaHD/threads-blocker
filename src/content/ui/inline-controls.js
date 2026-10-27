@@ -273,6 +273,8 @@ export class InlineControls {
    */
   async _resolveUsersAsync(usernames) {
     for (const username of usernames) {
+      await this._waitWhileQueuePaused();
+
       let result = { userId: null, transient: true };
       for (let attempt = 0; attempt < 5; attempt++) {
         result = await this._idResolver.resolve(username);
@@ -302,6 +304,27 @@ export class InlineControls {
           userId: result.userId,
         })
         .catch((e) => console.warn('[ThreadBlocker] Update resolved user failed:', e.message));
+    }
+  }
+
+  /**
+   * Pause (and rate-limit cooldown, which pauses the queue) also holds back
+   * resolving: each resolve fetches a profile page, which shouldn't keep
+   * hitting threads.com while the user — or Meta — wants the queue to stop.
+   * Checked between users, so the one in flight still finishes.
+   */
+  async _waitWhileQueuePaused() {
+    for (;;) {
+      let paused;
+      try {
+        const res = await chrome.runtime.sendMessage({ type: MessageType.GET_QUEUE_STATUS });
+        paused = res?.status?.paused === true;
+      } catch {
+        // SW unreachable — don't let that strand the selection in RESOLVING
+        return;
+      }
+      if (!paused) return;
+      await new Promise((r) => setTimeout(r, 1000));
     }
   }
 

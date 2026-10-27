@@ -4,6 +4,7 @@
 
 import { InlineControls } from '../../src/content/ui/inline-controls.js';
 import { COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
+import { MessageType } from '../../src/shared/messages.js';
 
 describe('InlineControls', () => {
   let inlineControls;
@@ -528,6 +529,72 @@ describe('InlineControls', () => {
 
       expect(inlineControls.multiSelectMode).toBe(false);
       expect(mockSelectionManager.clearSelection).toHaveBeenCalled();
+    });
+  });
+
+  describe('resolving respects queue pause', () => {
+    let paused;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      paused = false;
+      global.chrome = {
+        runtime: {
+          sendMessage: jest.fn(async (msg) =>
+            msg.type === MessageType.GET_QUEUE_STATUS ? { status: { paused } } : { ok: true }
+          ),
+        },
+      };
+      mockIdResolver.resolve.mockImplementation(async (u) => ({ userId: `id-${u}` }));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+      delete global.chrome;
+    });
+
+    it('waits while paused and resumes resolving after unpause', async () => {
+      paused = true;
+      const done = inlineControls._resolveUsersAsync(['alice', 'bob']);
+
+      await jest.advanceTimersByTimeAsync(3000);
+      expect(mockIdResolver.resolve).not.toHaveBeenCalled();
+
+      paused = false;
+      await jest.advanceTimersByTimeAsync(1000);
+      await done;
+
+      expect(mockIdResolver.resolve.mock.calls.map(([u]) => u)).toEqual(['alice', 'bob']);
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: MessageType.UPDATE_RESOLVED_USER,
+        username: 'bob',
+        userId: 'id-bob',
+      });
+    });
+
+    it('stops between users when paused mid-batch', async () => {
+      mockIdResolver.resolve.mockImplementation(async (u) => {
+        paused = true; // user hits Pause while alice is resolving
+        return { userId: `id-${u}` };
+      });
+      const done = inlineControls._resolveUsersAsync(['alice', 'bob']);
+
+      await jest.advanceTimersByTimeAsync(3000);
+      expect(mockIdResolver.resolve.mock.calls.map(([u]) => u)).toEqual(['alice']);
+
+      paused = false;
+      await jest.advanceTimersByTimeAsync(1000);
+      await done;
+      expect(mockIdResolver.resolve.mock.calls.map(([u]) => u)).toEqual(['alice', 'bob']);
+    });
+
+    it('keeps resolving if the service worker cannot be reached', async () => {
+      chrome.runtime.sendMessage.mockImplementation(async (msg) => {
+        if (msg.type === MessageType.GET_QUEUE_STATUS) throw new Error('SW gone');
+        return { ok: true };
+      });
+      await inlineControls._resolveUsersAsync(['alice']);
+      expect(mockIdResolver.resolve).toHaveBeenCalledWith('alice');
     });
   });
 });
