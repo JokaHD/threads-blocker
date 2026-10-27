@@ -10,6 +10,7 @@ export const MessageType = {
   CANCEL_QUEUED: 'cancelQueued',
   REQUEST_UNBLOCK: 'requestUnblock',
   RETRY_FAILED: 'retryFailed',
+  RETRY_ALL_FAILED: 'retryAllFailed',
   PAUSE_QUEUE: 'pauseQueue',
   RESUME_QUEUE: 'resumeQueue',
   GET_ALL_STATES: 'getAllStates',

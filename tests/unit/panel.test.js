@@ -148,6 +148,36 @@ describe('Panel', () => {
       });
     });
 
+    test('hides retry-all button when nothing has failed', () => {
+      panel.init();
+      panel.update([{ userId: '1', username: 'user1', state: BlockState.QUEUED }], {});
+
+      const btn = container.querySelector('.tb-panel-retry-all-btn');
+      expect(btn).not.toBeNull();
+      expect(btn.style.display).toBe('none');
+    });
+
+    test('shows retry-all button with failed count and sends retry-all message', () => {
+      panel.init();
+      panel.update(
+        [
+          { userId: '1', username: 'user1', state: BlockState.FAILED },
+          { userId: '2', username: 'user2', state: BlockState.FAILED },
+          { userId: '3', username: 'user3', state: BlockState.BLOCKED },
+        ],
+        {}
+      );
+
+      const btn = container.querySelector('.tb-panel-retry-all-btn');
+      expect(btn.style.display).toBe('');
+      expect(btn.textContent).toBe('Retry Failed (2)');
+
+      btn.click();
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: MessageType.RETRY_ALL_FAILED,
+      });
+    });
+
     test('does nothing if not initialized', () => {
       // Don't call init
       panel.update([{ userId: '1', username: 'user1', state: BlockState.QUEUED }], {});
@@ -223,7 +253,7 @@ describe('Panel', () => {
       panel.init();
 
       const clearCompletedBtn = container.querySelector(
-        '.tb-panel-action-btn:not(.tb-panel-action-btn--danger)'
+        '.tb-panel-action-btn[title="Clear completed items"]'
       );
       clearCompletedBtn.click();
 

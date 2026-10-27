@@ -228,6 +228,24 @@ export class QueueManager {
   }
 
   /**
+   * Requeue every FAILED item in one go (one notify, so the panel redraws once).
+   * @returns {number} how many items were requeued
+   */
+  retryAllFailed() {
+    let count = 0;
+    for (const item of this._items.values()) {
+      if (item.state !== BlockState.FAILED) continue;
+      item.state = BlockState.QUEUED;
+      item.error = null;
+      item.retries = 0;
+      item.nextAttemptAt = null;
+      count++;
+    }
+    if (count > 0) this._notify();
+    return count;
+  }
+
+  /**
    * Revert a failed BLOCKING item to QUEUED with a not-before timestamp.
    * The SW owns retry scheduling; the executor only needs to poll again later.
    */

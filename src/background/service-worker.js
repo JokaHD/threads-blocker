@@ -201,6 +201,12 @@ async function handleMessage(message, sender) {
       return { ok: true };
     }
 
+    case MessageType.RETRY_ALL_FAILED: {
+      // Paused / in cooldown → items just wait as QUEUED until the queue resumes
+      const count = queue.retryAllFailed();
+      return { ok: true, count };
+    }
+
     case MessageType.PAUSE_QUEUE: {
       queue.pause();
       return { ok: true };
