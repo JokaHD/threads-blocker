@@ -258,7 +258,7 @@ export class InlineControls {
     this._selection.clearSelection();
     this._exitBlockMode();
 
-    this._resolveUsersAsync(selected);
+    this.resolveUsers(selected);
   }
 
   /**
@@ -267,11 +267,11 @@ export class InlineControls {
    * Transient failures (network offline / 5xx / 429) retry with exponential
    * backoff. Permanent failures (404 / pattern not found) fall through and
    * the item is deleted via `UPDATE_RESOLVED_USER: null`. If retries are
-   * exhausted while still transient, the item is left in RESOLVING so the
-   * user can retry manually via the panel — beats silently losing the
-   * selection during a brief offline blip.
+   * exhausted while still transient, the item is left in RESOLVING: the
+   * next page load picks it up again (content.js), or the user cancels it
+   * in the panel — beats silently losing the selection during an offline blip.
    */
-  async _resolveUsersAsync(usernames) {
+  async resolveUsers(usernames) {
     for (const username of usernames) {
       await this._waitWhileQueuePaused();
 
@@ -312,19 +312,27 @@ export class InlineControls {
    * resolving: each resolve fetches a profile page, which shouldn't keep
    * hitting threads.com while the user — or Meta — wants the queue to stop.
    * Checked between users, so the one in flight still finishes.
+   *
+   * Waits on the queueNotify broadcast (resume and cooldown end both write
+   * it) instead of polling, so a long pause doesn't keep the SW awake.
    */
   async _waitWhileQueuePaused() {
-    for (;;) {
-      let paused;
-      try {
-        const res = await chrome.runtime.sendMessage({ type: MessageType.GET_QUEUE_STATUS });
-        paused = res?.status?.paused === true;
-      } catch {
-        // SW unreachable — don't let that strand the selection in RESOLVING
-        return;
-      }
-      if (!paused) return;
-      await new Promise((r) => setTimeout(r, 1000));
+    let onChanged;
+    const resumed = new Promise((resolve) => {
+      onChanged = (changes, area) => {
+        const status = changes.queueNotify?.newValue?.status;
+        if (area === 'local' && status && !status.paused) resolve();
+      };
+    });
+    // Listen before asking, so a resume landing in between isn't missed
+    chrome.storage.onChanged.addListener(onChanged);
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MessageType.GET_QUEUE_STATUS });
+      if (res?.status?.paused === true) await resumed;
+    } catch {
+      // SW unreachable — don't let that strand the selection in RESOLVING
+    } finally {
+      chrome.storage.onChanged.removeListener(onChanged);
     }
   }
 

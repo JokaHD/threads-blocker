@@ -17,6 +17,7 @@ import { getShadowRoot } from './ui/shadow-host.js';
 import { InlineControls } from './ui/inline-controls.js';
 import { Panel } from './ui/panel.js';
 import { MessageType } from '../shared/messages.js';
+import { BlockState } from '../shared/constants.js';
 import { installDebugGlobal } from './debug.js';
 import { blockUser, unblockUser } from './threads-api.js';
 
@@ -121,6 +122,13 @@ if (document.readyState === 'loading') {
         apiExecutor.startPolling();
       }
     }
+    // Pick up users left RESOLVING by a tab that was reloaded or closed
+    // mid-resolve. If that tab is in fact still resolving them, the second
+    // UPDATE_RESOLVED_USER is a harmless no-op.
+    const pending = (response?.items || [])
+      .filter((i) => i.state === BlockState.RESOLVING)
+      .map((i) => i.username);
+    if (pending.length > 0) inlineControls.resolveUsers(pending);
   } catch (e) {
     console.warn('[ThreadBlocker] Failed to fetch initial states:', e);
   }

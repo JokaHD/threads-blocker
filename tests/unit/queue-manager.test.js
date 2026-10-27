@@ -326,27 +326,23 @@ describe('toJSON / loadFrom', () => {
     expect(qm2.getItem('1').state).toBe(BlockState.QUEUED);
   });
 
-  it('removes RESOLVING items on load', () => {
+  it('keeps RESOLVING items on load so a later resolve still lands', () => {
     qm.enqueue({ userId: null, username: 'alice' });
     qm.enqueue({ userId: '2', username: 'bob' });
     const json = qm.toJSON();
     const qm2 = new QueueManager();
     qm2.loadFrom(json);
-    expect(qm2.getAll().length).toBe(1);
-    expect(qm2.getAll()[0].username).toBe('bob');
+    expect(qm2.getAll().map((i) => i.state)).toEqual([BlockState.RESOLVING, BlockState.QUEUED]);
+
+    qm2.updateResolvedUser('alice', '1');
+    expect(qm2.getItem('1').state).toBe(BlockState.QUEUED);
   });
 
-  it('re-keys RESOLVING items correctly so cancelResolving works before reset', () => {
+  it('re-keys RESOLVING items correctly so cancelResolving works after load', () => {
     qm.enqueue({ userId: null, username: 'alice' });
     const json = qm.toJSON();
     const qm2 = new QueueManager();
-    // Bypass _resetTransientStates to test the key fix in isolation
-    const origReset = QueueManager.prototype._resetTransientStates;
-    QueueManager.prototype._resetTransientStates = function () {
-      return false;
-    };
     qm2.loadFrom(json);
-    QueueManager.prototype._resetTransientStates = origReset;
     // cancelResolving should find the item by pending:username key
     qm2.cancelResolving('alice');
     expect(qm2.getAll().length).toBe(0);
@@ -367,12 +363,11 @@ describe('toJSON / loadFrom', () => {
 // ── resetOrphanedTasks ──────────────────────────────────────────────────────
 
 describe('resetOrphanedTasks', () => {
-  it('removes RESOLVING items', () => {
+  it('keeps RESOLVING items (another tab may still be resolving them)', () => {
     qm.enqueue({ userId: null, username: 'alice' });
     qm.enqueue({ userId: '2', username: 'bob' });
     qm.resetOrphanedTasks();
-    expect(qm.getAll().length).toBe(1);
-    expect(qm.getAll()[0].username).toBe('bob');
+    expect(qm.getAll().map((i) => i.username)).toEqual(['alice', 'bob']);
   });
 
   it('reverts BLOCKING → QUEUED', () => {

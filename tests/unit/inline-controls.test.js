@@ -534,37 +534,59 @@ describe('InlineControls', () => {
 
   describe('resolving respects queue pause', () => {
     let paused;
+    let storageListeners;
+
+    // What the SW does on resume / cooldown end: broadcast status via queueNotify
+    function broadcastStatus(status) {
+      for (const l of [...storageListeners]) {
+        l({ queueNotify: { newValue: { items: [], status } } }, 'local');
+      }
+    }
+
+    // Let pending promise chains (sendMessage → resolve → sendMessage …) settle
+    const flush = () => new Promise((r) => setTimeout(r, 0));
 
     beforeEach(() => {
-      jest.useFakeTimers();
       paused = false;
+      storageListeners = new Set();
       global.chrome = {
         runtime: {
           sendMessage: jest.fn(async (msg) =>
             msg.type === MessageType.GET_QUEUE_STATUS ? { status: { paused } } : { ok: true }
           ),
         },
+        storage: {
+          onChanged: {
+            addListener: jest.fn((l) => storageListeners.add(l)),
+            removeListener: jest.fn((l) => storageListeners.delete(l)),
+          },
+        },
       };
       mockIdResolver.resolve.mockImplementation(async (u) => ({ userId: `id-${u}` }));
     });
 
     afterEach(() => {
-      jest.useRealTimers();
       delete global.chrome;
     });
 
     it('waits while paused and resumes resolving after unpause', async () => {
       paused = true;
-      const done = inlineControls._resolveUsersAsync(['alice', 'bob']);
+      const done = inlineControls.resolveUsers(['alice', 'bob']);
 
-      await jest.advanceTimersByTimeAsync(3000);
+      await flush();
+      expect(mockIdResolver.resolve).not.toHaveBeenCalled();
+
+      // An unrelated queue update while still paused must not release the wait
+      broadcastStatus({ paused: true });
+      await flush();
       expect(mockIdResolver.resolve).not.toHaveBeenCalled();
 
       paused = false;
-      await jest.advanceTimersByTimeAsync(1000);
+      broadcastStatus({ paused: false });
       await done;
 
       expect(mockIdResolver.resolve.mock.calls.map(([u]) => u)).toEqual(['alice', 'bob']);
+      expect(storageListeners.size).toBe(0);
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: MessageType.UPDATE_RESOLVED_USER,
         username: 'bob',
@@ -577,13 +599,13 @@ describe('InlineControls', () => {
         paused = true; // user hits Pause while alice is resolving
         return { userId: `id-${u}` };
       });
-      const done = inlineControls._resolveUsersAsync(['alice', 'bob']);
+      const done = inlineControls.resolveUsers(['alice', 'bob']);
 
-      await jest.advanceTimersByTimeAsync(3000);
+      await flush();
       expect(mockIdResolver.resolve.mock.calls.map(([u]) => u)).toEqual(['alice']);
 
       paused = false;
-      await jest.advanceTimersByTimeAsync(1000);
+      broadcastStatus({ paused: false });
       await done;
       expect(mockIdResolver.resolve.mock.calls.map(([u]) => u)).toEqual(['alice', 'bob']);
     });
@@ -593,7 +615,7 @@ describe('InlineControls', () => {
         if (msg.type === MessageType.GET_QUEUE_STATUS) throw new Error('SW gone');
         return { ok: true };
       });
-      await inlineControls._resolveUsersAsync(['alice']);
+      await inlineControls.resolveUsers(['alice']);
       expect(mockIdResolver.resolve).toHaveBeenCalledWith('alice');
     });
   });
