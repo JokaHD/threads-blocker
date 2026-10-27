@@ -93,6 +93,11 @@ async function makeGraphQLRequest(docId, variables, tokens, friendlyName) {
     });
 
     if (!response.ok) {
+      // eslint-disable-next-line no-undef -- build-time constant from esbuild define
+      if (typeof __TB_DEV_LOG__ !== 'undefined' && __TB_DEV_LOG__) {
+        const raw = await response.text().catch(() => '(unreadable)');
+        logFailure(friendlyName, variables.user_id, { httpStatus: response.status, body: raw });
+      }
       return {
         success: false,
         error: `HTTP ${response.status}`,
@@ -104,6 +109,10 @@ async function makeGraphQLRequest(docId, variables, tokens, friendlyName) {
 
     // Check for GraphQL errors
     if (data.errors && data.errors.length > 0) {
+      // eslint-disable-next-line no-undef -- build-time constant from esbuild define
+      if (typeof __TB_DEV_LOG__ !== 'undefined' && __TB_DEV_LOG__) {
+        logFailure(friendlyName, variables.user_id, { httpStatus: response.status, body: data });
+      }
       return {
         success: false,
         error: data.errors[0].message || 'GraphQL error',
@@ -113,11 +122,32 @@ async function makeGraphQLRequest(docId, variables, tokens, friendlyName) {
 
     // Check for successful response
     // The exact response structure may vary, but we check for no errors
+    // eslint-disable-next-line no-undef -- build-time constant from esbuild define
+    if (typeof __TB_DEV_LOG__ !== 'undefined' && __TB_DEV_LOG__) {
+      // console.debug: hidden unless DevTools shows "Verbose". Lets a "200 but
+      // not applied" body be compared against a genuine success.
+      console.debug('[TB-dev] request ok', friendlyName, 'userId=', variables.user_id, data);
+    }
     return { success: true, data };
   } catch (err) {
+    // eslint-disable-next-line no-undef -- build-time constant from esbuild define
+    if (typeof __TB_DEV_LOG__ !== 'undefined' && __TB_DEV_LOG__) {
+      logFailure(friendlyName, variables.user_id, { networkError: err.message });
+    }
     return {
       success: false,
       error: err.message || 'Network error',
     };
   }
+}
+
+/**
+ * Dev-build failure log: the raw response Meta sends back when a block fails
+ * (e.g. when it throttles), so the error classifier can learn its shape.
+ * Every call site is guarded by __TB_DEV_LOG__ (esbuild.config.js), which is
+ * false in the release build — esbuild then drops the calls and this function
+ * with them, so none of it ships.
+ */
+function logFailure(friendlyName, userId, detail) {
+  console.warn('[TB-dev] request failed', friendlyName, 'userId=', userId, detail);
 }

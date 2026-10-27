@@ -4,6 +4,7 @@
 
 import { InlineControls } from '../../src/content/ui/inline-controls.js';
 import { COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
+import { MessageType } from '../../src/shared/messages.js';
 
 describe('InlineControls', () => {
   let inlineControls;
@@ -528,6 +529,66 @@ describe('InlineControls', () => {
 
       expect(inlineControls.multiSelectMode).toBe(false);
       expect(mockSelectionManager.clearSelection).toHaveBeenCalled();
+    });
+  });
+
+  describe('resolving respects queue pause', () => {
+    // Let pending promise chains (resolve → sendMessage …) settle
+    const flush = () => new Promise((r) => setTimeout(r, 0));
+
+    beforeEach(() => {
+      global.chrome = {
+        runtime: { sendMessage: jest.fn(async () => ({ ok: true })) },
+      };
+      mockIdResolver.resolve.mockImplementation(async (u) => ({ userId: `id-${u}` }));
+    });
+
+    afterEach(() => {
+      delete global.chrome;
+    });
+
+    it('waits while paused and resumes resolving after unpause', async () => {
+      inlineControls.setQueuePaused(true);
+      const done = inlineControls.resolveUsers(['alice', 'bob']);
+
+      await flush();
+      expect(mockIdResolver.resolve).not.toHaveBeenCalled();
+
+      // A queue update that is still paused must not release the wait
+      inlineControls.setQueuePaused(true);
+      await flush();
+      expect(mockIdResolver.resolve).not.toHaveBeenCalled();
+
+      inlineControls.setQueuePaused(false);
+      await done;
+
+      expect(mockIdResolver.resolve.mock.calls.map(([u]) => u)).toEqual(['alice', 'bob']);
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: MessageType.UPDATE_RESOLVED_USER,
+        username: 'bob',
+        userId: 'id-bob',
+      });
+    });
+
+    it('stops between users when paused mid-batch', async () => {
+      mockIdResolver.resolve.mockImplementation(async (u) => {
+        inlineControls.setQueuePaused(true); // user hits Pause while alice is resolving
+        return { userId: `id-${u}` };
+      });
+      const done = inlineControls.resolveUsers(['alice', 'bob']);
+
+      await flush();
+      expect(mockIdResolver.resolve.mock.calls.map(([u]) => u)).toEqual(['alice']);
+
+      mockIdResolver.resolve.mockImplementation(async (u) => ({ userId: `id-${u}` }));
+      inlineControls.setQueuePaused(false);
+      await done;
+      expect(mockIdResolver.resolve.mock.calls.map(([u]) => u)).toEqual(['alice', 'bob']);
+    });
+
+    it('resolves straight through when the queue is not paused', async () => {
+      await inlineControls.resolveUsers(['alice']);
+      expect(mockIdResolver.resolve).toHaveBeenCalledWith('alice');
     });
   });
 });

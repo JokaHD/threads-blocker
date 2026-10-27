@@ -24,6 +24,9 @@ export class InlineControls {
     this._hoverHandler = null;
     this._lastHovered = null;
     this._confirmDialog = null;
+    // Queue pause mirrored from the SW's queueNotify broadcast (content.js)
+    this._queuePaused = false;
+    this._resumeWaiters = [];
   }
 
   init() {
@@ -258,7 +261,7 @@ export class InlineControls {
     this._selection.clearSelection();
     this._exitBlockMode();
 
-    this._resolveUsersAsync(selected);
+    this.resolveUsers(selected);
   }
 
   /**
@@ -267,12 +270,14 @@ export class InlineControls {
    * Transient failures (network offline / 5xx / 429) retry with exponential
    * backoff. Permanent failures (404 / pattern not found) fall through and
    * the item is deleted via `UPDATE_RESOLVED_USER: null`. If retries are
-   * exhausted while still transient, the item is left in RESOLVING so the
-   * user can retry manually via the panel — beats silently losing the
-   * selection during a brief offline blip.
+   * exhausted while still transient, the item is left in RESOLVING: the
+   * next page load picks it up again (content.js), or the user cancels it
+   * in the panel — beats silently losing the selection during an offline blip.
    */
-  async _resolveUsersAsync(usernames) {
+  async resolveUsers(usernames) {
     for (const username of usernames) {
+      await this._waitWhileQueuePaused();
+
       let result = { userId: null, transient: true };
       for (let attempt = 0; attempt < 5; attempt++) {
         result = await this._idResolver.resolve(username);
@@ -303,6 +308,29 @@ export class InlineControls {
         })
         .catch((e) => console.warn('[ThreadBlocker] Update resolved user failed:', e.message));
     }
+  }
+
+  /**
+   * Pause (and rate-limit cooldown, which pauses the queue) also holds back
+   * resolving: each resolve fetches a profile page, which shouldn't keep
+   * hitting threads.com while the user — or Meta — wants the queue to stop.
+   * Checked between users, so the one in flight still finishes.
+   */
+  _waitWhileQueuePaused() {
+    if (!this._queuePaused) return Promise.resolve();
+    return new Promise((resolve) => this._resumeWaiters.push(resolve));
+  }
+
+  /**
+   * Fed by content.js from every queueNotify broadcast (resume and cooldown
+   * end both send one), so waiting costs no SW round trip or extra listener.
+   */
+  setQueuePaused(paused) {
+    this._queuePaused = paused === true;
+    if (this._queuePaused) return;
+    const waiters = this._resumeWaiters;
+    this._resumeWaiters = [];
+    for (const resolve of waiters) resolve();
   }
 
   _createConfirmDialog(container) {

@@ -545,6 +545,11 @@ function getExtensionStyles() {
       height: 12px;
     }
 
+    .tb-panel-retry-all-btn {
+      color: var(--tb-warning);
+      border-color: var(--tb-warning);
+    }
+
     .tb-panel-action-btn--danger:hover {
       background: rgba(220, 38, 38, 0.2);
       border-color: var(--tb-danger);

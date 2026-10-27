@@ -217,14 +217,34 @@ export class QueueManager {
 
   // ── Retry ─────────────────────────────────────────────────────────────────
 
-  retry(userId) {
-    const item = this._items.get(userId);
-    if (!item || item.state !== BlockState.FAILED) return;
+  // Manual retry: back to QUEUED with a fresh retry budget
+  _requeueItem(item) {
     item.state = BlockState.QUEUED;
     item.error = null;
     item.retries = 0;
     item.nextAttemptAt = null;
+  }
+
+  retry(userId) {
+    const item = this._items.get(userId);
+    if (!item || item.state !== BlockState.FAILED) return;
+    this._requeueItem(item);
     this._notify();
+  }
+
+  /**
+   * Requeue every FAILED item in one go (one notify, so the panel redraws once).
+   * @returns {number} how many items were requeued
+   */
+  retryAllFailed() {
+    let count = 0;
+    for (const item of this._items.values()) {
+      if (item.state !== BlockState.FAILED) continue;
+      this._requeueItem(item);
+      count++;
+    }
+    if (count > 0) this._notify();
+    return count;
   }
 
   /**
@@ -256,13 +276,15 @@ export class QueueManager {
 
   // ── Transient state recovery ────────────────────────────────────────────────
 
+  // RESOLVING items are left alone: their resolve loop lives in a content
+  // script, which may still be running (e.g. held by a pause) when another
+  // tab registers or the SW restarts. Dropping them made that tab's later
+  // UPDATE_RESOLVED_USER a silent no-op. A truly orphaned one is picked up
+  // again on the next page load (content.js) or cancelled from the panel.
   _resetTransientStates() {
     let changed = false;
-    for (const [key, item] of this._items) {
-      if (item.state === BlockState.RESOLVING) {
-        this._items.delete(key);
-        changed = true;
-      } else if (item.state === BlockState.BLOCKING) {
+    for (const item of this._items.values()) {
+      if (item.state === BlockState.BLOCKING) {
         item.state = BlockState.QUEUED;
         changed = true;
       } else if (item.state === BlockState.UNBLOCKING) {

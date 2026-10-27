@@ -214,6 +214,65 @@ describe('retry', () => {
   });
 });
 
+// ── retryAllFailed ───────────────────────────────────────────────────────────
+
+describe('retryAllFailed', () => {
+  function failItem(userId, username) {
+    qm.enqueue({ userId, username });
+    qm.getNextTask();
+    qm.onTaskComplete(userId, false, { type: 'transient', message: 'err' });
+  }
+
+  it('requeues every FAILED item and resets its retry state', () => {
+    failItem('1', 'alice');
+    failItem('2', 'bob');
+    qm.getItem('2').retries = 2;
+    qm.getItem('2').nextAttemptAt = Date.now() + 10000;
+
+    expect(qm.retryAllFailed()).toBe(2);
+
+    for (const id of ['1', '2']) {
+      const item = qm.getItem(id);
+      expect(item.state).toBe(BlockState.QUEUED);
+      expect(item.error).toBeNull();
+      expect(item.retries).toBe(0);
+      expect(item.nextAttemptAt).toBeNull();
+    }
+  });
+
+  it('leaves non-FAILED items untouched', () => {
+    failItem('1', 'alice');
+    qm.enqueue({ userId: '2', username: 'bob' });
+    qm.getNextTask(); // bob → BLOCKING
+    qm.onTaskComplete('2', true); // bob → BLOCKED
+    qm.enqueue({ userId: '3', username: 'carol' });
+
+    qm.retryAllFailed();
+
+    expect(qm.getItem('2').state).toBe(BlockState.BLOCKED);
+    expect(qm.getItem('3').state).toBe(BlockState.QUEUED);
+  });
+
+  it('notifies once and keeps panel order', () => {
+    failItem('1', 'alice');
+    failItem('2', 'bob');
+    const listener = jest.fn();
+    qm.onChange(listener);
+
+    qm.retryAllFailed();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(qm.getAll().map((i) => i.userId)).toEqual(['1', '2']);
+  });
+
+  it('does not notify when there is nothing to retry', () => {
+    const listener = jest.fn();
+    qm.onChange(listener);
+    expect(qm.retryAllFailed()).toBe(0);
+    expect(listener).not.toHaveBeenCalled();
+  });
+});
+
 // ── pause/resume/isPaused ────────────────────────────────────────────────────
 
 describe('pause/resume/isPaused', () => {
@@ -267,27 +326,23 @@ describe('toJSON / loadFrom', () => {
     expect(qm2.getItem('1').state).toBe(BlockState.QUEUED);
   });
 
-  it('removes RESOLVING items on load', () => {
+  it('keeps RESOLVING items on load so a later resolve still lands', () => {
     qm.enqueue({ userId: null, username: 'alice' });
     qm.enqueue({ userId: '2', username: 'bob' });
     const json = qm.toJSON();
     const qm2 = new QueueManager();
     qm2.loadFrom(json);
-    expect(qm2.getAll().length).toBe(1);
-    expect(qm2.getAll()[0].username).toBe('bob');
+    expect(qm2.getAll().map((i) => i.state)).toEqual([BlockState.RESOLVING, BlockState.QUEUED]);
+
+    qm2.updateResolvedUser('alice', '1');
+    expect(qm2.getItem('1').state).toBe(BlockState.QUEUED);
   });
 
-  it('re-keys RESOLVING items correctly so cancelResolving works before reset', () => {
+  it('re-keys RESOLVING items correctly so cancelResolving works after load', () => {
     qm.enqueue({ userId: null, username: 'alice' });
     const json = qm.toJSON();
     const qm2 = new QueueManager();
-    // Bypass _resetTransientStates to test the key fix in isolation
-    const origReset = QueueManager.prototype._resetTransientStates;
-    QueueManager.prototype._resetTransientStates = function () {
-      return false;
-    };
     qm2.loadFrom(json);
-    QueueManager.prototype._resetTransientStates = origReset;
     // cancelResolving should find the item by pending:username key
     qm2.cancelResolving('alice');
     expect(qm2.getAll().length).toBe(0);
@@ -308,12 +363,11 @@ describe('toJSON / loadFrom', () => {
 // ── resetOrphanedTasks ──────────────────────────────────────────────────────
 
 describe('resetOrphanedTasks', () => {
-  it('removes RESOLVING items', () => {
+  it('keeps RESOLVING items (another tab may still be resolving them)', () => {
     qm.enqueue({ userId: null, username: 'alice' });
     qm.enqueue({ userId: '2', username: 'bob' });
     qm.resetOrphanedTasks();
-    expect(qm.getAll().length).toBe(1);
-    expect(qm.getAll()[0].username).toBe('bob');
+    expect(qm.getAll().map((i) => i.username)).toEqual(['alice', 'bob']);
   });
 
   it('reverts BLOCKING → QUEUED', () => {

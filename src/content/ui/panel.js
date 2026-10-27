@@ -29,6 +29,7 @@ export class Panel {
     this._cooldownBtn = null;
     this._cooldownTimeSpan = null;
     this._retryNowBtn = null;
+    this._retryAllBtn = null;
   }
 
   /**
@@ -93,6 +94,16 @@ export class Panel {
     const footer = document.createElement('div');
     footer.className = 'tb-panel-footer';
 
+    const retryAllBtn = document.createElement('button');
+    retryAllBtn.className = 'tb-panel-action-btn tb-panel-retry-all-btn';
+    retryAllBtn.title = 'Retry all failed items';
+    retryAllBtn.style.display = 'none';
+    retryAllBtn.addEventListener('click', () => {
+      chrome.runtime
+        .sendMessage({ type: MessageType.RETRY_ALL_FAILED })
+        .catch((e) => console.warn('[ThreadBlocker] Retry all failed failed:', e.message));
+    });
+
     const clearCompletedBtn = document.createElement('button');
     clearCompletedBtn.className = 'tb-panel-action-btn';
     clearCompletedBtn.innerHTML = `${Icons.check}<span>Clear Done</span>`;
@@ -113,6 +124,7 @@ export class Panel {
         .catch((e) => console.warn('[ThreadBlocker] Clear queue failed:', e.message));
     });
 
+    footer.appendChild(retryAllBtn);
     footer.appendChild(clearCompletedBtn);
     footer.appendChild(clearAllBtn);
 
@@ -138,6 +150,7 @@ export class Panel {
     this._progressFill = progressFill;
     this._body = body;
     this._pauseBtn = pauseBtn;
+    this._retryAllBtn = retryAllBtn;
     this._cooldownArea = cooldownArea;
 
     // Start minimized
@@ -185,6 +198,11 @@ export class Panel {
 
     // Pause button
     this._updatePauseBtn();
+
+    // Retry-all button: only while something has failed
+    const failed = items.filter((i) => i.state === BlockState.FAILED).length;
+    this._retryAllBtn.style.display = failed > 0 ? '' : 'none';
+    this._retryAllBtn.innerHTML = `${Icons.refreshCw}<span>Retry Failed (${failed})</span>`;
 
     // Item list
     this._body.innerHTML = '';

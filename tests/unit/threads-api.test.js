@@ -11,6 +11,7 @@ function setFetchResponse(response) {
     ok: response.ok ?? true,
     status: response.status ?? 200,
     json: async () => response.json ?? {},
+    text: async () => response.text ?? '',
   };
 }
 
@@ -98,5 +99,86 @@ describe('unblockUser', () => {
     const result = await unblockUser('12345', tokens);
 
     expect(result.success).toBe(true);
+  });
+});
+
+describe('dev failure log (__TB_DEV_LOG__)', () => {
+  const tokens = { csrftoken: 'csrf123', fb_dtsg: 'dtsg456', lsd: 'lsd789' };
+  let warnSpy;
+
+  beforeEach(() => {
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    delete globalThis.__TB_DEV_LOG__;
+  });
+
+  it('stays silent when the flag is not defined (release build)', async () => {
+    setFetchResponse({ ok: false, status: 400, text: 'nope' });
+    await blockUser('12345', tokens);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  describe('when enabled', () => {
+    beforeEach(() => {
+      globalThis.__TB_DEV_LOG__ = true;
+    });
+
+    it('logs status and raw body on HTTP error', async () => {
+      setFetchResponse({ ok: false, status: 400, text: '{"message":"feedback_required"}' });
+      await blockUser('12345', tokens);
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[TB-dev] request failed',
+        'useTHUserBlockMutation',
+        'userId=',
+        '12345',
+        { httpStatus: 400, body: '{"message":"feedback_required"}' }
+      );
+    });
+
+    it('logs the full response body on GraphQL error', async () => {
+      const json = { errors: [{ message: 'Please wait a few minutes' }] };
+      setFetchResponse({ ok: true, json });
+      await blockUser('12345', tokens);
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[TB-dev] request failed',
+        'useTHUserBlockMutation',
+        'userId=',
+        '12345',
+        { httpStatus: 200, body: json }
+      );
+    });
+
+    it('logs the error on network failure', async () => {
+      global.fetch.mockImplementationOnce(() => Promise.reject(new Error('offline')));
+      await blockUser('12345', tokens);
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[TB-dev] request failed',
+        'useTHUserBlockMutation',
+        'userId=',
+        '12345',
+        { networkError: 'offline' }
+      );
+    });
+
+    it('does not warn on success, but debug-logs the body', async () => {
+      const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
+      const json = { data: { block: { friendship_status: { blocking: true } } } };
+      setFetchResponse({ ok: true, json });
+
+      await blockUser('12345', tokens);
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(debugSpy).toHaveBeenCalledWith(
+        '[TB-dev] request ok',
+        'useTHUserBlockMutation',
+        'userId=',
+        '12345',
+        json
+      );
+      debugSpy.mockRestore();
+    });
   });
 });

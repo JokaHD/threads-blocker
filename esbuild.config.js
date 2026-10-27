@@ -7,8 +7,17 @@ const isWatch = process.argv.includes('--watch');
 // debug.js and writes to .canary/dist so the dist/ you load in Chrome never
 // ships the bridge.
 const isCanary = process.env.TB_BUILD === 'canary';
+// Release build (TB_BUILD=release, used by the release workflow): strips the
+// [TB-dev] failure logs that every other build keeps.
+const isRelease = process.env.TB_BUILD === 'release';
 const outDir = isCanary ? '.canary/dist' : 'dist';
-const define = { __TB_DEBUG_BRIDGE__: JSON.stringify(isCanary) };
+const define = {
+  __TB_DEBUG_BRIDGE__: JSON.stringify(isCanary),
+  __TB_DEV_LOG__: JSON.stringify(!isRelease),
+};
+// Without syntax minification esbuild keeps `if (false) { … }` blocks, so the
+// flags above would only disable that code, not remove it from the shipped zip.
+const minifySyntax = isRelease;
 
 // Ensure dist directories exist
 mkdirSync(`${outDir}/icons`, { recursive: true });
@@ -20,6 +29,7 @@ const contentBuild = {
   outfile: `${outDir}/content.js`,
   format: 'iife',
   define,
+  minifySyntax,
   target: 'chrome120',
 };
 
@@ -30,6 +40,7 @@ const swBuild = {
   outfile: `${outDir}/service-worker.js`,
   format: 'esm',
   define,
+  minifySyntax,
   target: 'chrome120',
 };
 

@@ -324,6 +324,31 @@ describe('Service Worker', () => {
     });
   });
 
+  describe('RETRY_ALL_FAILED', () => {
+    test('requeues every failed item', async () => {
+      for (const userId of ['u1', 'u2']) {
+        await sendMessage({ type: MessageType.ENQUEUE_BLOCK, userId, username: userId });
+        await sendMessage({ type: MessageType.GET_NEXT_TASK });
+        await sendMessage({
+          type: MessageType.TASK_RESULT,
+          userId,
+          success: false,
+          error: { status: 403, message: 'HTTP 403' },
+        });
+      }
+
+      const before = await sendMessage({ type: MessageType.GET_QUEUE_STATUS });
+      expect(before.status.failed).toBe(2);
+
+      const response = await sendMessage({ type: MessageType.RETRY_ALL_FAILED });
+      expect(response).toEqual({ ok: true, count: 2 });
+
+      const after = await sendMessage({ type: MessageType.GET_QUEUE_STATUS });
+      expect(after.status.failed).toBeUndefined();
+      expect(after.status.queued).toBe(2);
+    });
+  });
+
   describe('Rate limit scenarios', () => {
     test('returns cooldownEnd when in cooldown', async () => {
       // Enqueue and get task
