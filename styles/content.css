@@ -16,8 +16,18 @@ body.tb-blockmode [data-tb-comment-id] {
 body.tb-blockmode [data-tb-comment-id] a,
 body.tb-blockmode [data-tb-comment-id] button,
 body.tb-blockmode [data-tb-comment-id] [role="button"],
+body.tb-blockmode [data-tb-comment-id] [role="link"],
 body.tb-blockmode [data-tb-comment-id] [data-pressable-container] {
   pointer-events: none !important;
+}
+
+/* ...except a marked post nested in another one (quoted post B inside quote
+   post A): it is a pressable too, but must stay hit-testable so a click on
+   it reaches B instead of falling through to A. Its own interactive
+   descendants are still disabled by the rule above. Must stay after it:
+   equal specificity, so source order decides. */
+body.tb-blockmode [data-tb-comment-id] [data-tb-comment-id] {
+  pointer-events: auto !important;
 }
 
 /* ============================================================
@@ -60,4 +70,33 @@ body.tb-blockmode [data-tb-comment-id] [data-pressable-container] {
   font-weight: 700;
   pointer-events: none;
   z-index: 10000;
+}
+
+/* ============================================================
+   Nested posts (quote post A embedding quoted post B)
+   A and B are separate targets. The red tint is what reads as "this
+   area is selected", so an outer post never tints its nested posts:
+   - only A selected: outline + ✓ around A, B untinted with a neutral
+     dashed frame → B is visibly excluded
+   - only B selected: just B is red
+   - both selected:   two separate frames (A outline only, B tinted),
+     never one merged red block
+   ============================================================ */
+
+[data-tb-comment-id].tb-hover:has([data-tb-comment-id]),
+[data-tb-comment-id].tb-selected:has([data-tb-comment-id]) {
+  background: transparent !important;
+}
+
+[data-tb-comment-id]:is(.tb-hover, .tb-selected)
+  [data-tb-comment-id]:not(.tb-hover):not(.tb-selected) {
+  outline: 2px dashed rgba(160, 160, 160, 0.7) !important;
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
+/* Inset the nested frame a bit further so it never touches A's frame,
+   even if B's box runs flush with A's edge */
+[data-tb-comment-id] [data-tb-comment-id]:is(.tb-hover, .tb-selected) {
+  outline-offset: -4px;
 }
