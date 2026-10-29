@@ -79,6 +79,19 @@ describe('InlineControls', () => {
       expect(document.body.classList.contains('tb-blockmode')).toBe(false);
     });
 
+    test('exposes the page background behind posts as --tb-host-bg while in block mode', () => {
+      container.style.backgroundColor = 'rgb(16, 16, 16)';
+      container.innerHTML = `<div ${COMMENT_ID_ATTR}="alice"></div>`;
+      inlineControls.init();
+      const rootStyle = document.documentElement.style;
+
+      container.querySelector('.tb-fab').click(); // Enter
+      expect(rootStyle.getPropertyValue('--tb-host-bg')).toBe('rgb(16, 16, 16)');
+
+      container.querySelector('.tb-card-exit-only').click(); // Exit
+      expect(rootStyle.getPropertyValue('--tb-host-bg')).toBe('');
+    });
+
     test('clears selection when exiting block mode', () => {
       inlineControls.init();
 

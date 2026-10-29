@@ -74,29 +74,36 @@ body.tb-blockmode [data-tb-comment-id] [data-tb-comment-id] {
 
 /* ============================================================
    Nested posts (quote post A embedding quoted post B)
-   A and B are separate targets. The red tint is what reads as "this
-   area is selected", so an outer post never tints its nested posts:
-   - only A selected: outline + ✓ around A, B untinted with a neutral
-     dashed frame → B is visibly excluded
-   - only B selected: just B is red
-   - both selected:   two separate frames (A outline only, B tinted),
-     never one merged red block
+   A and B are separate targets, so A's red tint must cover A minus B.
+   CSS can't subtract a region from a background, so B paints itself with
+   the page background (--tb-host-bg, sampled at runtime by
+   InlineControls._syncHostBackground) plus a 4px ring of it, cutting
+   itself and a thin margin out of A's tint:
+   - only A selected: tint = A − (B + ring), B gets a neutral dashed frame
+   - only B selected: just B is red (base rules, A untouched)
+   - both selected:   two red areas split by the ring, never one block
+   Without --tb-host-bg the fallback is transparent: B shows A's tint
+   through, i.e. the pre-cutout look — degraded, never broken.
    ============================================================ */
 
-[data-tb-comment-id].tb-hover:has([data-tb-comment-id]),
-[data-tb-comment-id].tb-selected:has([data-tb-comment-id]) {
-  background: transparent !important;
+[data-tb-comment-id]:is(.tb-hover, .tb-selected) [data-tb-comment-id] {
+  background: var(--tb-host-bg, transparent) !important;
+  box-shadow: 0 0 0 4px var(--tb-host-bg, transparent) !important;
 }
 
 [data-tb-comment-id]:is(.tb-hover, .tb-selected)
   [data-tb-comment-id]:not(.tb-hover):not(.tb-selected) {
   outline: 2px dashed rgba(160, 160, 160, 0.7) !important;
   outline-offset: -2px;
-  border-radius: 8px;
 }
 
-/* Inset the nested frame a bit further so it never touches A's frame,
-   even if B's box runs flush with A's edge */
-[data-tb-comment-id] [data-tb-comment-id]:is(.tb-hover, .tb-selected) {
-  outline-offset: -4px;
+/* B's own tint, layered over the cutout so A's tint doesn't double it */
+[data-tb-comment-id]:is(.tb-hover, .tb-selected) [data-tb-comment-id].tb-hover {
+  background: linear-gradient(rgba(220, 38, 38, 0.08), rgba(220, 38, 38, 0.08))
+    var(--tb-host-bg, transparent) !important;
+}
+
+[data-tb-comment-id]:is(.tb-hover, .tb-selected) [data-tb-comment-id].tb-selected {
+  background: linear-gradient(rgba(220, 38, 38, 0.15), rgba(220, 38, 38, 0.15))
+    var(--tb-host-bg, transparent) !important;
 }

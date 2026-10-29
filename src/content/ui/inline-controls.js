@@ -454,6 +454,19 @@ export class InlineControls {
 
     // Add body class - this triggers CSS that disables pointer-events on links
     document.body.classList.add('tb-blockmode');
+    this._syncHostBackground();
+  }
+
+  /**
+   * Expose the page background behind posts as --tb-host-bg; content.css
+   * paints nested posts (quoted post B inside quote post A) with it, so a
+   * selected A's tint covers A minus B. Sampled from the first marked post,
+   * which has no marked ancestor and so no tint of ours above it.
+   */
+  _syncHostBackground() {
+    const sample = document.querySelector(`[${COMMENT_ID_ATTR}]`);
+    const bg = threadsSiteRule.getHostBackground(sample);
+    if (bg) document.documentElement.style.setProperty('--tb-host-bg', bg);
   }
 
   _exitBlockMode() {
@@ -469,6 +482,7 @@ export class InlineControls {
 
     // Remove body class
     document.body.classList.remove('tb-blockmode');
+    document.documentElement.style.removeProperty('--tb-host-bg');
 
     // Remove all visual states
     document.querySelectorAll(`[${COMMENT_ID_ATTR}]`).forEach((el) => {
@@ -480,6 +494,9 @@ export class InlineControls {
   }
 
   _updateHighlights() {
+    // Re-sample on every selection change: the theme may have flipped, or
+    // the first sample may have run before any post was marked
+    if (this._blockMode) this._syncHostBackground();
     document.querySelectorAll(`[${COMMENT_ID_ATTR}]`).forEach((el) => {
       const username = el.getAttribute(COMMENT_ID_ATTR);
       const isSelected = this._selection.isSelected(username);

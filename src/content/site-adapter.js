@@ -381,6 +381,23 @@ export const threadsSiteRule = {
   },
 
   /**
+   * The opaque background color behind `el` — the first ancestor (from its
+   * parent up) whose computed background is not transparent, falling back
+   * to body. Read at runtime, never hardcoded: block mode paints a nested
+   * post with it to cut the post out of its outer post's selection tint.
+   *
+   * @param {Element|null} el
+   * @returns {string|null} a CSS color, or null if nothing opaque was found
+   */
+  getHostBackground(el) {
+    for (let node = el?.parentElement ?? document.body; node; node = node.parentElement) {
+      const bg = getComputedStyle(node).backgroundColor;
+      if (bg && bg !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(bg)) return bg;
+    }
+    return null;
+  },
+
+  /**
    * Detect current theme.
    */
   getTheme() {
