@@ -154,6 +154,24 @@ export const threadsSiteRule = {
   },
 
   /**
+   * Is `container`, found nested inside another marked post, an embedded
+   * post of its own (a quoted post B inside quote post A) rather than a
+   * fragment of the outer post's body (e.g. the block around an @mention)?
+   * Only embeds become separate block-mode targets; a fragment must never
+   * be marked, or clicking the outer post's text would select the mention.
+   *
+   * Candidates, most to least stable:
+   *   1. [data-pressable-container] — Meta's own attribute (findContainer p1);
+   *      the quoted card navigates to B on click, so it is pressable
+   *   2. [role="link"]              — ARIA fallback for a JS-only clickable card
+   * A heuristic (child-count / width) container matches neither: rather
+   * leave B unselectable than mis-mark a body fragment.
+   */
+  isEmbeddedPost(container) {
+    return container.matches('[data-pressable-container], [role="link"]');
+  },
+
+  /**
    * Find user rows in dialog-based user lists. Verified on the post insights
    * likes list (2026-09-06 debug); any dialog list with the same row shape
    * (avatar img[alt] + anchor-less pressable content) is picked up too.
@@ -360,6 +378,23 @@ export const threadsSiteRule = {
   isUIVisibleOnUrl(url = location.href) {
     const pathname = new URL(url, location.origin).pathname;
     return this.isSupportedPath(pathname) && !this.isMediaPath(pathname);
+  },
+
+  /**
+   * The opaque background color behind `el` — the first ancestor (from its
+   * parent up) whose computed background is not transparent, falling back
+   * to body. Read at runtime, never hardcoded: block mode paints a nested
+   * post with it to cut the post out of its outer post's selection tint.
+   *
+   * @param {Element|null} el
+   * @returns {string|null} a CSS color, or null if nothing opaque was found
+   */
+  getHostBackground(el) {
+    for (let node = el?.parentElement ?? document.body; node; node = node.parentElement) {
+      const bg = getComputedStyle(node).backgroundColor;
+      if (bg && bg !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(bg)) return bg;
+    }
+    return null;
   },
 
   /**

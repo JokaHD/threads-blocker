@@ -60,11 +60,18 @@ export class DOMObserver {
       const alreadySeen = seenUsernames.has(username);
       seenUsernames.add(username);
 
-      // Fast path: an already-seen username inside an already-marked
-      // comment can only resolve to that comment or a nested one — both
-      // skipped below. Skip before findContainer's layout reads; this is
-      // most links on every re-scan tick.
-      if (alreadySeen && link.closest(`[${COMMENT_ID_ATTR}]`)) continue;
+      // Fast path: a link inside a comment already marked for the SAME user
+      // resolves to that comment, or to a nested embed whose click would
+      // select the same user anyway. Skip before findContainer's layout
+      // reads; this is most links on every re-scan tick. A link inside
+      // another user's comment can't take it: it may be a quoted post
+      // rendered after the outer comment was marked.
+      if (
+        alreadySeen &&
+        link.closest(`[${COMMENT_ID_ATTR}]`)?.getAttribute(COMMENT_ID_ATTR) === username
+      ) {
+        continue;
+      }
 
       // Find container
       const container = this._siteRule.findContainer(link);
@@ -74,11 +81,18 @@ export class DOMObserver {
       if (container.hasAttribute(COMMENT_ID_ATTR)) continue;
       if (claimedContainers.has(container)) continue;
 
-      // A container nested in another comment (e.g. an embedded quoted
-      // post) keeps the old per-username dedup: marking it as an
-      // already-seen user would make clicks on the embed select that user
-      // instead of the commenter.
-      if (alreadySeen && this._isInsideComment(container, claimedContainers)) continue;
+      // A container nested in another comment is a separate target only
+      // when it is an embedded post (quoted post B inside quote post A):
+      // clicking B selects B's author, clicking the rest of A selects A's —
+      // even when B's author was already seen elsewhere (e.g. a reply
+      // quoting the OP). Any other nested container is a fragment of the
+      // outer post's body and stays unmarked.
+      if (
+        this._isInsideComment(container, claimedContainers) &&
+        !this._siteRule.isEmbeddedPost(container)
+      ) {
+        continue;
+      }
 
       claimedContainers.add(container);
 

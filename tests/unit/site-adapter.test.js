@@ -242,6 +242,50 @@ describe('threadsSiteRule', () => {
 
   // ── findUserListRows(按讚/轉發等 dialog 名單:row 沒有 <a>,username 只在文字節點) ──
 
+  describe('isEmbeddedPost', () => {
+    it('accepts a pressable or role=link card', () => {
+      document.body.innerHTML = `
+        <div data-pressable-container id="p"></div>
+        <div role="link" id="l"></div>
+      `;
+      expect(threadsSiteRule.isEmbeddedPost(document.getElementById('p'))).toBe(true);
+      expect(threadsSiteRule.isEmbeddedPost(document.getElementById('l'))).toBe(true);
+    });
+
+    it('rejects a heuristic (plain div) container', () => {
+      document.body.innerHTML = `<div id="d"><span></span><span></span><span></span></div>`;
+      expect(threadsSiteRule.isEmbeddedPost(document.getElementById('d'))).toBe(false);
+    });
+  });
+
+  describe('getHostBackground', () => {
+    afterEach(() => {
+      document.body.style.backgroundColor = '';
+    });
+
+    it('returns the first opaque ancestor background, skipping transparent ones', () => {
+      document.body.innerHTML = `
+        <div style="background-color: rgb(24, 24, 24)">
+          <div style="background-color: rgba(0, 0, 0, 0)"><div id="post"></div></div>
+        </div>
+      `;
+      const post = document.getElementById('post');
+      expect(threadsSiteRule.getHostBackground(post)).toBe('rgb(24, 24, 24)');
+    });
+
+    it('ignores the element’s own background', () => {
+      document.body.style.backgroundColor = 'rgb(10, 10, 10)';
+      document.body.innerHTML = `<div id="post" style="background-color: red"></div>`;
+      const post = document.getElementById('post');
+      expect(threadsSiteRule.getHostBackground(post)).toBe('rgb(10, 10, 10)');
+    });
+
+    it('returns null when nothing is opaque', () => {
+      document.body.innerHTML = `<div id="post"></div>`;
+      expect(threadsSiteRule.getHostBackground(document.getElementById('post'))).toBeNull();
+    });
+  });
+
   describe('findUserListRows', () => {
     // 結構照 2026-09-06 debug 實測:row = 頭像 img 區 + data-pressable-container 內容區,
     // username 是純文字 span,頭像 alt 一定包含 username 原文

@@ -172,9 +172,21 @@ describe('DOMObserver', () => {
       expect(byId).toEqual({ c1: 'alice', c2: 'bob' });
     });
 
-    it('does not mark an embedded post of an already-seen user inside a comment', () => {
-      // A quote comment embeds the OP's post; if the embed has its own
-      // pressable, marking it would make clicks on the quote select the OP.
+    // ── 引用貼文:A 內嵌 B,點 B 選 B 的作者,點 A 其餘區域選 A ──
+
+    it('marks a quoted post embedded in a quote post with its own author', () => {
+      document.body.innerHTML = `
+        <div data-pressable-container id="a">
+          <a href="/@alice">Alice</a><p>quoting</p>
+          <div data-pressable-container id="b"><a href="/@bob">bob</a><p>post</p><span>x</span></div>
+        </div>
+      `;
+      const comments = observer.findComments(document.body);
+      const byId = Object.fromEntries(comments.map((c) => [c.container.id, c.username]));
+      expect(byId).toEqual({ a: 'alice', b: 'bob' });
+    });
+
+    it('marks an embedded post even when its author was already seen (reply quoting the OP)', () => {
       document.body.innerHTML = `
         <div data-pressable-container id="op-post"><a href="/@op">op</a><p>post</p><span>x</span></div>
         <div data-pressable-container id="c1">
@@ -184,7 +196,38 @@ describe('DOMObserver', () => {
       `;
       const comments = observer.findComments(document.body);
       const byId = Object.fromEntries(comments.map((c) => [c.container.id, c.username]));
-      expect(byId).toEqual({ 'op-post': 'op', c1: 'alice' });
+      expect(byId).toEqual({ 'op-post': 'op', c1: 'alice', embed: 'op' });
+    });
+
+    it('marks a quoted post rendered after the outer post was already marked', () => {
+      document.body.innerHTML = `
+        <div data-pressable-container id="op-post"><a href="/@op">op</a><p>post</p><span>x</span></div>
+        <div data-pressable-container id="c1"><a href="/@alice">Alice</a><p>quoting</p></div>
+      `;
+      for (const c of observer.findComments(document.body)) {
+        observer.markProcessed(c.container, c.username);
+      }
+      document
+        .getElementById('c1')
+        .insertAdjacentHTML(
+          'beforeend',
+          `<div data-pressable-container id="embed"><a href="/@op">op</a><p>post</p><span>x</span></div>`
+        );
+
+      const comments = observer.findComments(document.body);
+      expect(comments.map((c) => [c.container.id, c.username])).toEqual([['embed', 'op']]);
+    });
+
+    it('does not mark a non-embed fragment of a comment body (e.g. around an @mention)', () => {
+      document.body.innerHTML = `
+        <div class="comment" id="c1">
+          <a href="/@alice">Alice</a>
+          <div class="body" id="frag"><span>hey</span><a href="/@bob">@bob</a><span>!</span></div>
+          <span>x</span>
+        </div>
+      `;
+      const comments = observer.findComments(document.body);
+      expect(comments.map((c) => [c.container.id, c.username])).toEqual([['c1', 'alice']]);
     });
 
     it('returns container and link references', () => {
