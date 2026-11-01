@@ -1,12 +1,24 @@
-import { BlockState, QueueFlag } from '../shared/constants.js';
+import { BlockState, QueueFlag, Timing } from '../shared/constants.js';
 
 export class QueueManager {
-  constructor() {
+  /**
+   * @param {{dispatchIntervalMs?: number}} [opts] - minimum gap between one
+   *   task settling and the next being dispatched. Enforced here rather than
+   *   per executor so several threads.com tabs polling at once can't shorten it.
+   */
+  constructor({ dispatchIntervalMs = 0 } = {}) {
     /** @type {Map<string, object>} */
     this._items = new Map();
     this._paused = false;
     this._listeners = [];
     this._seqCounter = 0;
+    this._dispatchIntervalMs = dispatchIntervalMs;
+    this._lastSettledAt = -Infinity;
+    /**
+     * The one task in flight across all tabs, or null.
+     * @type {{userId: string, ownerTabId: number|null, dispatchedAt: number}|null}
+     */
+    this._lease = null;
   }
 
   // Items are rendered and dispatched in `seq` order, not Map insertion order,
@@ -46,7 +58,6 @@ export class QueueManager {
       errorType: null,
       retries: 0,
       nextAttemptAt: null,
-      _unblockInFlight: false,
     });
     this._notify();
   }
@@ -92,15 +103,40 @@ export class QueueManager {
 
   // ── Task dispatching ──────────────────────────────────────────────────────
 
-  getNextTask() {
+  /** The in-flight task finished: free the slot and start the dispatch interval. */
+  _settle() {
+    this._lease = null;
+    this._lastSettledAt = Date.now();
+  }
+
+  _isLeaseStale() {
+    return Date.now() - this._lease.dispatchedAt > Timing.ORPHANED_TASK_TIMEOUT;
+  }
+
+  /** Revert the leased item to its pre-dispatch state and free the slot. */
+  _releaseLease() {
+    const item = this._items.get(this._lease.userId);
+    this._lease = null;
+    if (item?.state === BlockState.BLOCKING) item.state = BlockState.QUEUED;
+    else if (item?.state === BlockState.UNBLOCKING) item.state = BlockState.BLOCKED;
+    this._notify();
+  }
+
+  /**
+   * @param {number|null} [ownerTabId] - tab whose executor will run the task;
+   *   lets resetOrphanedTasks tell its own reload apart from another tab's.
+   */
+  getNextTask(ownerTabId = null) {
     if (this._paused) return null;
 
-    const ordered = this._orderedItems();
+    // Owner tab closed or navigated away mid-request: free the slot
+    if (this._lease && this._isLeaseStale()) this._releaseLease();
 
-    // Only one active task at a time: check for in-progress BLOCKING
-    for (const item of ordered) {
-      if (item.state === BlockState.BLOCKING) return null;
-    }
+    // One task in flight at a time across all tabs, spaced by the interval
+    if (this._lease) return null;
+    if (Date.now() < this._lastSettledAt + this._dispatchIntervalMs) return null;
+
+    const ordered = this._orderedItems();
 
     // First, look for a QUEUED item whose retry hold-off (if any) has elapsed
     for (const item of ordered) {
@@ -108,21 +144,39 @@ export class QueueManager {
         if (item.nextAttemptAt && item.nextAttemptAt > Date.now()) continue;
         item.state = BlockState.BLOCKING;
         item.nextAttemptAt = null;
+        this._claim(item, ownerTabId);
         this._notify();
         return { userId: item.userId, username: item.username, action: 'block' };
       }
     }
 
-    // Then, look for an UNBLOCKING item not already in-flight
+    // Then, look for an UNBLOCKING item
     for (const item of ordered) {
-      if (item.state === BlockState.UNBLOCKING && !item._unblockInFlight) {
-        item._unblockInFlight = true;
+      if (item.state === BlockState.UNBLOCKING) {
+        this._claim(item, ownerTabId);
         this._notify();
         return { userId: item.userId, username: item.username, action: 'unblock' };
       }
     }
 
     return null;
+  }
+
+  _claim(item, ownerTabId) {
+    this._lease = { userId: item.userId, ownerTabId, dispatchedAt: Date.now() };
+  }
+
+  /**
+   * Whether a TASK_RESULT from `tabId` is for the current lease. A late result
+   * from a tab whose stale task was re-dispatched elsewhere is not.
+   */
+  acceptsResult(userId, tabId) {
+    const lease = this._lease;
+    return (
+      lease !== null &&
+      lease.userId === userId &&
+      (lease.ownerTabId == null || lease.ownerTabId === tabId)
+    );
   }
 
   // ── Cancellation ──────────────────────────────────────────────────────────
@@ -166,6 +220,7 @@ export class QueueManager {
   onTaskComplete(userId, success, error = null) {
     const item = this._items.get(userId);
     if (!item) return false;
+    this._settle();
 
     const hasPendingCancel = item.flags.includes(QueueFlag.PENDING_CANCEL);
 
@@ -202,6 +257,7 @@ export class QueueManager {
   onUnblockComplete(userId, success) {
     const item = this._items.get(userId);
     if (!item) return;
+    this._settle();
 
     if (success) {
       // UNBLOCKING → IDLE: remove entirely
@@ -209,7 +265,6 @@ export class QueueManager {
     } else {
       // UNBLOCKING → BLOCKED: revert
       item.state = BlockState.BLOCKED;
-      item._unblockInFlight = false;
     }
 
     this._notify();
@@ -254,6 +309,7 @@ export class QueueManager {
   scheduleRetry(userId, delayMs) {
     const item = this._items.get(userId);
     if (!item) return;
+    this._settle();
     item.state = BlockState.QUEUED;
     item.retries = (item.retries || 0) + 1;
     item.nextAttemptAt = Date.now() + delayMs;
@@ -261,15 +317,25 @@ export class QueueManager {
   }
 
   /**
-   * Earliest future nextAttemptAt among QUEUED items, or null.
+   * Earliest future time a waiting task becomes dispatchable (its retry
+   * hold-off or the dispatch interval, whichever is later), or when an
+   * in-flight task goes stale and frees the slot, or null.
    */
   getNextRetryAt() {
     const now = Date.now();
+    const intervalEnd = this._lastSettledAt + this._dispatchIntervalMs;
     let earliest = null;
     for (const item of this._items.values()) {
-      if (item.state === BlockState.QUEUED && item.nextAttemptAt && item.nextAttemptAt > now) {
-        if (earliest === null || item.nextAttemptAt < earliest) earliest = item.nextAttemptAt;
-      }
+      let at;
+      if (item.userId === this._lease?.userId) {
+        // Keep waiting tabs polling so a closed owner tab's task is reclaimed
+        at = this._lease.dispatchedAt + Timing.ORPHANED_TASK_TIMEOUT;
+      } else if (item.state === BlockState.QUEUED) {
+        at = Math.max(item.nextAttemptAt ?? 0, intervalEnd);
+      } else if (item.state === BlockState.UNBLOCKING) {
+        at = intervalEnd;
+      } else continue;
+      if (at > now && (earliest === null || at < earliest)) earliest = at;
     }
     return earliest;
   }
@@ -282,22 +348,32 @@ export class QueueManager {
   // UPDATE_RESOLVED_USER a silent no-op. A truly orphaned one is picked up
   // again on the next page load (content.js) or cancelled from the panel.
   _resetTransientStates() {
-    let changed = false;
     for (const item of this._items.values()) {
-      if (item.state === BlockState.BLOCKING) {
-        item.state = BlockState.QUEUED;
-        changed = true;
-      } else if (item.state === BlockState.UNBLOCKING) {
-        item.state = BlockState.BLOCKED;
-        item._unblockInFlight = false;
-        changed = true;
-      }
+      if (item.state === BlockState.BLOCKING) item.state = BlockState.QUEUED;
+      else if (item.state === BlockState.UNBLOCKING) item.state = BlockState.BLOCKED;
     }
-    return changed;
   }
 
-  resetOrphanedTasks() {
-    if (this._resetTransientStates()) this._notify();
+  /**
+   * A tab (re)registered: release the in-flight task if that tab owned it —
+   * its reload killed the request — or it has no known or live owner. Another
+   * tab's in-flight request is left alone, so opening a second tab can't
+   * dispatch it twice.
+   */
+  resetOrphanedTasks(tabId = null) {
+    const lease = this._lease;
+    if (lease && (lease.ownerTabId == null || lease.ownerTabId === tabId || this._isLeaseStale())) {
+      this._releaseLease();
+    }
+  }
+
+  /** Cooldown hit: put the in-flight task back in line with a fresh retry budget. */
+  requeueForCooldown(userId) {
+    const item = this._items.get(userId);
+    if (!item) return;
+    this._settle();
+    this._requeueItem(item);
+    this._notify();
   }
 
   // ── Pause / Resume ────────────────────────────────────────────────────────
@@ -344,7 +420,6 @@ export class QueueManager {
       const item = { ...items[idx] };
       if (typeof item.seq !== 'number') item.seq = idx;
       if (item.seq > maxSeq) maxSeq = item.seq;
-      item._unblockInFlight = false;
       const key = item.userId ?? `pending:${item.username}`;
       this._items.set(key, item);
     }
@@ -372,6 +447,8 @@ export class QueueManager {
 
   clearAll() {
     this._items.clear();
+    this._lease = null;
+    this._lastSettledAt = -Infinity;
     this._notify();
   }
 }

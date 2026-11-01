@@ -13,6 +13,7 @@ import {
 } from '../setup.js';
 import { RateLimitHandler } from '../../src/background/rate-limit-handler.js';
 import { MessageType } from '../../src/shared/messages.js';
+import { Timing } from '../../src/shared/constants.js';
 
 // Setup mocks before importing service-worker
 setupChromeMocks();
@@ -52,6 +53,17 @@ describe('Service Worker', () => {
     });
   }
 
+  // Dispatch the next task the way the executor does: after any retry
+  // hold-off and the dispatch interval have passed
+  async function dispatchNext() {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 10000);
+    try {
+      return await sendMessage({ type: MessageType.GET_NEXT_TASK });
+    } finally {
+      nowSpy.mockRestore();
+    }
+  }
+
   describe('REGISTER_EXECUTOR', () => {
     test('registers executor tab', async () => {
       const response = await sendMessage(
@@ -61,7 +73,7 @@ describe('Service Worker', () => {
         { tab: { id: 42 }, url: 'https://www.threads.com/' }
       );
 
-      expect(response).toEqual({ ok: true, executorTabId: 42 });
+      expect(response).toEqual({ ok: true });
     });
 
     test('handles missing tab', async () => {
@@ -72,7 +84,7 @@ describe('Service Worker', () => {
         { url: 'https://www.threads.com/' }
       );
 
-      expect(response).toEqual({ ok: true, executorTabId: null });
+      expect(response).toEqual({ ok: true });
     });
   });
 
@@ -124,6 +136,58 @@ describe('Service Worker', () => {
 
       expect(response.task).not.toBeNull();
       expect(response.task.userId).toBe('user123');
+    });
+  });
+
+  describe('multiple tabs', () => {
+    const tab = (id) => ({ tab: { id }, url: 'https://www.threads.com/' });
+
+    test('spaces dispatches across tabs by BLOCK_INTERVAL', async () => {
+      await sendMessage({
+        type: MessageType.ENQUEUE_BLOCK_BATCH,
+        entries: [
+          { userId: '1', username: 'a' },
+          { userId: '2', username: 'b' },
+        ],
+      });
+      await sendMessage({ type: MessageType.GET_NEXT_TASK }, tab(1));
+      await sendMessage({ type: MessageType.TASK_RESULT, userId: '1', success: true }, tab(1));
+
+      // Another tab polls right after: must wait out the interval
+      const next = await sendMessage({ type: MessageType.GET_NEXT_TASK }, tab(2));
+      expect(next.task).toBeNull();
+      expect(next.retryAfter).toBeGreaterThan(1000);
+    });
+
+    test("a second tab registering doesn't requeue the first tab's in-flight task", async () => {
+      await sendMessage({ type: MessageType.ENQUEUE_BLOCK, userId: '1', username: 'a' });
+      await sendMessage({ type: MessageType.GET_NEXT_TASK }, tab(1));
+
+      await sendMessage({ type: MessageType.REGISTER_EXECUTOR }, tab(2));
+
+      const { items } = await sendMessage({ type: MessageType.GET_ALL_STATES });
+      expect(items[0].state).toBe('blocking');
+      const next = await sendMessage({ type: MessageType.GET_NEXT_TASK }, tab(2));
+      expect(next.task).toBeNull();
+    });
+  });
+
+  describe('stale task re-dispatched to another tab', () => {
+    const tab = (id) => ({ tab: { id }, url: 'https://www.threads.com/' });
+
+    test("ignores the original tab's late result", async () => {
+      await sendMessage({ type: MessageType.ENQUEUE_BLOCK, userId: '1', username: 'a' });
+      await sendMessage({ type: MessageType.GET_NEXT_TASK }, tab(1));
+      const nowSpy = jest
+        .spyOn(Date, 'now')
+        .mockReturnValue(Date.now() + Timing.ORPHANED_TASK_TIMEOUT + 1);
+      const next = await sendMessage({ type: MessageType.GET_NEXT_TASK }, tab(2));
+      nowSpy.mockRestore();
+      expect(next.task?.userId).toBe('1');
+
+      await sendMessage({ type: MessageType.TASK_RESULT, userId: '1', success: true }, tab(1));
+      const { items } = await sendMessage({ type: MessageType.GET_ALL_STATES });
+      expect(items[0].state).toBe('blocking');
     });
   });
 
@@ -328,7 +392,7 @@ describe('Service Worker', () => {
     test('requeues every failed item', async () => {
       for (const userId of ['u1', 'u2']) {
         await sendMessage({ type: MessageType.ENQUEUE_BLOCK, userId, username: userId });
-        await sendMessage({ type: MessageType.GET_NEXT_TASK });
+        await dispatchNext();
         await sendMessage({
           type: MessageType.TASK_RESULT,
           userId,
@@ -361,6 +425,7 @@ describe('Service Worker', () => {
 
       // Simulate multiple rate limit failures to trigger cooldown
       for (let i = 0; i < 5; i++) {
+        await dispatchNext();
         await sendMessage({
           type: MessageType.TASK_RESULT,
           userId: 'user123',
@@ -389,6 +454,7 @@ describe('Service Worker', () => {
       await sendMessage({ type: MessageType.GET_NEXT_TASK });
 
       for (let i = 0; i < 5; i++) {
+        await dispatchNext();
         await sendMessage({
           type: MessageType.TASK_RESULT,
           userId: 'user123',
@@ -434,8 +500,10 @@ describe('Service Worker', () => {
         userId: 'user123',
       });
 
-      // Get the unblock task
+      // Get the unblock task once the dispatch interval has passed
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 2000);
       const taskResponse = await sendMessage({ type: MessageType.GET_NEXT_TASK });
+      nowSpy.mockRestore();
       expect(taskResponse.task).not.toBeNull();
 
       // Complete the unblock
@@ -527,7 +595,7 @@ describe('Service Worker', () => {
       await sendMessage({ type: MessageType.GET_NEXT_TASK });
       await sendMessage({ type: MessageType.TASK_RESULT, userId: '9', success: true }); // → BLOCKED
       await sendMessage({ type: MessageType.REQUEST_UNBLOCK, userId: '9' }); // → UNBLOCKING
-      await sendMessage({ type: MessageType.GET_NEXT_TASK }); // 派發 unblock
+      await dispatchNext(); // 派發 unblock
       await sendMessage({
         type: MessageType.TASK_RESULT,
         userId: '9',
@@ -551,6 +619,7 @@ describe('Service Worker', () => {
       await sendMessage({ type: MessageType.GET_NEXT_TASK });
 
       for (let i = 0; i < 5; i++) {
+        await dispatchNext();
         await sendMessage({
           type: MessageType.TASK_RESULT,
           userId: 'user123',

@@ -8,15 +8,12 @@ import {
   clearCooldown,
 } from './persistence.js';
 import { MessageType } from '../shared/messages.js';
-import { ErrorType, BlockState } from '../shared/constants.js';
+import { ErrorType, BlockState, Timing } from '../shared/constants.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-const queue = new QueueManager();
+const queue = new QueueManager({ dispatchIntervalMs: Timing.BLOCK_INTERVAL });
 const rateLimitHandler = new RateLimitHandler();
-
-/** Tab ID of the content script currently acting as executor */
-let executorTabId = null;
 
 // ── Queue persistence & notification ─────────────────────────────────────────
 
@@ -89,12 +86,12 @@ async function handleMessage(message, sender) {
   }
 
   const { type } = message;
+  const tabId = sender.tab?.id ?? null;
 
   switch (type) {
     case MessageType.REGISTER_EXECUTOR: {
-      executorTabId = sender.tab?.id ?? null;
-      queue.resetOrphanedTasks();
-      return { ok: true, executorTabId };
+      queue.resetOrphanedTasks(tabId);
+      return { ok: true };
     }
 
     case MessageType.ENQUEUE_BLOCK: {
@@ -119,7 +116,7 @@ async function handleMessage(message, sender) {
       if (rateLimitHandler.isInCooldown()) {
         return { task: null, cooldownEnd: rateLimitHandler.getCooldownEnd() };
       }
-      const task = queue.getNextTask();
+      const task = queue.getNextTask(tabId);
       if (task) return { task };
       const nextRetryAt = queue.getNextRetryAt();
       if (nextRetryAt !== null) {
@@ -131,10 +128,14 @@ async function handleMessage(message, sender) {
     case MessageType.TASK_RESULT: {
       const { userId, success, error: errPayload } = message;
 
+      // Only the in-flight task's owner reports on it: a late result from a tab
+      // whose stale task was re-dispatched to another tab doesn't count
+      if (!queue.acceptsResult(userId, tabId)) return { ok: true };
+      const item = queue.getItem(userId);
+      if (!item) return { ok: true };
+
       if (success) {
-        const item = queue.getItem(userId);
-        const wasUnblocking = item?.state === 'unblocking';
-        if (wasUnblocking) {
+        if (item.state === BlockState.UNBLOCKING) {
           queue.onUnblockComplete(userId, true);
         } else {
           queue.onTaskComplete(userId, true);
@@ -143,17 +144,14 @@ async function handleMessage(message, sender) {
       }
 
       // Failure path
-      const failedItem = queue.getItem(userId);
-      if (!failedItem) return { ok: true };
-
-      if (failedItem.state === BlockState.UNBLOCKING) {
+      if (item.state === BlockState.UNBLOCKING) {
         // Unblock failures don't retry — revert to BLOCKED so the user can try again
         queue.onUnblockComplete(userId, false);
         return { ok: true };
       }
 
       const errorType = rateLimitHandler.classifyError(errPayload ?? {});
-      const currentRetries = failedItem.retries ?? 0;
+      const currentRetries = item.retries ?? 0;
       const retryDelay = rateLimitHandler.getRetryDelay(errorType, currentRetries);
 
       if (errorType === ErrorType.RATE_LIMIT && retryDelay === null) {
@@ -162,10 +160,7 @@ async function handleMessage(message, sender) {
         await saveCooldownEnd(rateLimitHandler.getCooldownEnd());
         queue.pause();
         // Revert item back to QUEUED so it will be retried after cooldown
-        failedItem.state = BlockState.QUEUED;
-        failedItem.retries = 0;
-        failedItem.nextAttemptAt = null;
-        queue._notify();
+        queue.requeueForCooldown(userId);
         return { ok: true, cooldown: true };
       }
 

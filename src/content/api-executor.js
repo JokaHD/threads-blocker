@@ -1,5 +1,4 @@
 import { MessageType } from '../shared/messages.js';
-import { Timing } from '../shared/constants.js';
 
 export class APIExecutor {
   constructor(tokenProvider, apiFunctions) {
@@ -87,8 +86,8 @@ export class APIExecutor {
 
         if (response?.task) {
           console.log('[ThreadBlocker] Processing task:', response.task);
+          // The SW spaces dispatches (BLOCK_INTERVAL) across all tabs
           await this.processTask(response.task);
-          await this._sleep(Timing.BLOCK_INTERVAL);
         } else if (response?.cooldownEnd) {
           console.log('[ThreadBlocker] Queue is in cooldown');
           break;
