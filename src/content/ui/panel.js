@@ -274,8 +274,9 @@ export class Panel {
       clearInterval(this._cooldownInterval);
     }
 
-    tick();
+    // Arm before the first tick so an already-expired timestamp clears it
     this._cooldownInterval = setInterval(tick, 1000);
+    tick();
   }
 
   _hideCooldown() {

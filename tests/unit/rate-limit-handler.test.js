@@ -120,6 +120,16 @@ describe('startCooldown', () => {
 
 // ── isInCooldown ──────────────────────────────────────────────────────────────
 
+describe('restoreCooldown', () => {
+  it('restores state and re-arms the alarm at the persisted end time', () => {
+    const end = Date.now() + 60 * 60 * 1000;
+    handler.restoreCooldown(end);
+    expect(handler.isInCooldown()).toBe(true);
+    expect(handler.getCooldownEnd()).toBe(end);
+    expect(chrome.alarms.create).toHaveBeenCalledWith(RateLimitHandler.ALARM_NAME, { when: end });
+  });
+});
+
 describe('isInCooldown', () => {
   it('returns false initially', () => {
     expect(handler.isInCooldown()).toBe(false);

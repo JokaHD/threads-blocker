@@ -121,6 +121,9 @@ if (document.readyState === 'loading') {
     if (statusResponse?.status) {
       panel.update(items, statusResponse.status);
       inlineControls.setQueuePaused(statusResponse.status.paused);
+      if (statusResponse.status.paused && statusResponse.status.cooldownEnd) {
+        panel.setCooldownEnd(statusResponse.status.cooldownEnd);
+      }
       if (statusResponse.status.queued > 0 || statusResponse.status.unblocking > 0) {
         apiExecutor.startPolling();
       }
