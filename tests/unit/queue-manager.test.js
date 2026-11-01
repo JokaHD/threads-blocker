@@ -95,7 +95,7 @@ describe('getNextTask', () => {
     expect(task).toBeNull();
   });
 
-  it('returns an UNBLOCKING item (with _unblockInFlight guard)', () => {
+  it('returns an UNBLOCKING item once, while it is in flight', () => {
     qm.enqueue({ userId: '1', username: 'alice' });
     qm.getNextTask(); // → BLOCKING
     qm.onTaskComplete('1', true); // → BLOCKED
@@ -104,8 +104,6 @@ describe('getNextTask', () => {
     const task = qm.getNextTask();
     expect(task).toBeDefined();
     expect(task.action).toBe('unblock');
-    // Guard flag set
-    expect(qm.getItem('1')._unblockInFlight).toBe(true);
     // Second call should skip it (in-flight)
     const task2 = qm.getNextTask();
     expect(task2).toBeNull();

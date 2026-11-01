@@ -53,6 +53,17 @@ describe('Service Worker', () => {
     });
   }
 
+  // Dispatch the next task the way the executor does: after any retry
+  // hold-off and the dispatch interval have passed
+  async function dispatchNext() {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 10000);
+    try {
+      return await sendMessage({ type: MessageType.GET_NEXT_TASK });
+    } finally {
+      nowSpy.mockRestore();
+    }
+  }
+
   describe('REGISTER_EXECUTOR', () => {
     test('registers executor tab', async () => {
       const response = await sendMessage(
@@ -381,7 +392,7 @@ describe('Service Worker', () => {
     test('requeues every failed item', async () => {
       for (const userId of ['u1', 'u2']) {
         await sendMessage({ type: MessageType.ENQUEUE_BLOCK, userId, username: userId });
-        await sendMessage({ type: MessageType.GET_NEXT_TASK });
+        await dispatchNext();
         await sendMessage({
           type: MessageType.TASK_RESULT,
           userId,
@@ -414,6 +425,7 @@ describe('Service Worker', () => {
 
       // Simulate multiple rate limit failures to trigger cooldown
       for (let i = 0; i < 5; i++) {
+        await dispatchNext();
         await sendMessage({
           type: MessageType.TASK_RESULT,
           userId: 'user123',
@@ -442,6 +454,7 @@ describe('Service Worker', () => {
       await sendMessage({ type: MessageType.GET_NEXT_TASK });
 
       for (let i = 0; i < 5; i++) {
+        await dispatchNext();
         await sendMessage({
           type: MessageType.TASK_RESULT,
           userId: 'user123',
@@ -582,7 +595,7 @@ describe('Service Worker', () => {
       await sendMessage({ type: MessageType.GET_NEXT_TASK });
       await sendMessage({ type: MessageType.TASK_RESULT, userId: '9', success: true }); // → BLOCKED
       await sendMessage({ type: MessageType.REQUEST_UNBLOCK, userId: '9' }); // → UNBLOCKING
-      await sendMessage({ type: MessageType.GET_NEXT_TASK }); // 派發 unblock
+      await dispatchNext(); // 派發 unblock
       await sendMessage({
         type: MessageType.TASK_RESULT,
         userId: '9',
@@ -606,6 +619,7 @@ describe('Service Worker', () => {
       await sendMessage({ type: MessageType.GET_NEXT_TASK });
 
       for (let i = 0; i < 5; i++) {
+        await dispatchNext();
         await sendMessage({
           type: MessageType.TASK_RESULT,
           userId: 'user123',
