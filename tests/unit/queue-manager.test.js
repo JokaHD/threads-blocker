@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { setupChromeMocks, resetChromeMocks } from '../setup.js';
-import { BlockState, QueueFlag } from '../../src/shared/constants.js';
+import { BlockState, QueueFlag, Timing } from '../../src/shared/constants.js';
 
 setupChromeMocks();
 
@@ -370,11 +370,45 @@ describe('resetOrphanedTasks', () => {
     expect(qm.getAll().map((i) => i.username)).toEqual(['alice', 'bob']);
   });
 
-  it('reverts BLOCKING → QUEUED', () => {
+  it('reverts BLOCKING → QUEUED when the task has no known owner', () => {
     qm.enqueue({ userId: '1', username: 'alice' });
     qm.getNextTask();
     qm.resetOrphanedTasks();
     expect(qm.getItem('1').state).toBe(BlockState.QUEUED);
+  });
+
+  it("reverts the registering tab's own in-flight task (it reloaded mid-request)", () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.getNextTask(7);
+    qm.resetOrphanedTasks(7);
+    expect(qm.getItem('1').state).toBe(BlockState.QUEUED);
+  });
+
+  it("leaves another tab's in-flight task alone", () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.getNextTask(7);
+    qm.resetOrphanedTasks(8);
+    expect(qm.getItem('1').state).toBe(BlockState.BLOCKING);
+  });
+
+  it('reverts a stale in-flight task even from another tab', () => {
+    const now = Date.now();
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.getNextTask(7);
+    nowSpy.mockReturnValue(now + Timing.ORPHANED_TASK_TIMEOUT + 1);
+    qm.resetOrphanedTasks(8);
+    nowSpy.mockRestore();
+    expect(qm.getItem('1').state).toBe(BlockState.QUEUED);
+  });
+
+  it('keeps a requested unblock that was never dispatched', () => {
+    qm.enqueue({ userId: '1', username: 'alice' });
+    qm.getNextTask(7);
+    qm.onTaskComplete('1', true);
+    qm.requestUnblock('1');
+    qm.resetOrphanedTasks(8);
+    expect(qm.getItem('1').state).toBe(BlockState.UNBLOCKING);
   });
 
   it('does nothing when all states are stable', () => {
@@ -580,5 +614,44 @@ describe('manual retry resets the retry budget', () => {
     expect(item.retries).toBe(0);
     expect(item.nextAttemptAt).toBeNull();
     expect(item.error).toBeNull();
+  });
+});
+
+// ── dispatch interval ────────────────────────────────────────────────────────
+
+describe('dispatch interval', () => {
+  let paced;
+  let now;
+  let nowSpy;
+
+  beforeEach(() => {
+    now = Date.now();
+    nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+    paced = new QueueManager({ dispatchIntervalMs: 1500 });
+    paced.enqueue({ userId: '1', username: 'alice' });
+    paced.enqueue({ userId: '2', username: 'bob' });
+  });
+
+  afterEach(() => nowSpy.mockRestore());
+
+  it('holds the next dispatch until the interval after the last task settled', () => {
+    paced.getNextTask(1);
+    paced.onTaskComplete('1', true);
+
+    expect(paced.getNextTask(2)).toBeNull();
+    expect(paced.getNextRetryAt()).toBe(now + 1500);
+
+    now += 1500;
+    expect(paced.getNextTask(2)?.userId).toBe('2');
+  });
+
+  it('dispatches the first task immediately', () => {
+    expect(paced.getNextTask(1)?.userId).toBe('1');
+  });
+
+  it('frees a stale in-flight task on the next poll', () => {
+    paced.getNextTask(1);
+    now += Timing.ORPHANED_TASK_TIMEOUT + 1;
+    expect(paced.getNextTask(2)?.userId).toBe('1');
   });
 });

@@ -61,7 +61,7 @@ describe('Service Worker', () => {
         { tab: { id: 42 }, url: 'https://www.threads.com/' }
       );
 
-      expect(response).toEqual({ ok: true, executorTabId: 42 });
+      expect(response).toEqual({ ok: true });
     });
 
     test('handles missing tab', async () => {
@@ -72,7 +72,7 @@ describe('Service Worker', () => {
         { url: 'https://www.threads.com/' }
       );
 
-      expect(response).toEqual({ ok: true, executorTabId: null });
+      expect(response).toEqual({ ok: true });
     });
   });
 
@@ -124,6 +124,39 @@ describe('Service Worker', () => {
 
       expect(response.task).not.toBeNull();
       expect(response.task.userId).toBe('user123');
+    });
+  });
+
+  describe('multiple tabs', () => {
+    const tab = (id) => ({ tab: { id }, url: 'https://www.threads.com/' });
+
+    test('spaces dispatches across tabs by BLOCK_INTERVAL', async () => {
+      await sendMessage({
+        type: MessageType.ENQUEUE_BLOCK_BATCH,
+        entries: [
+          { userId: '1', username: 'a' },
+          { userId: '2', username: 'b' },
+        ],
+      });
+      await sendMessage({ type: MessageType.GET_NEXT_TASK }, tab(1));
+      await sendMessage({ type: MessageType.TASK_RESULT, userId: '1', success: true }, tab(1));
+
+      // Another tab polls right after: must wait out the interval
+      const next = await sendMessage({ type: MessageType.GET_NEXT_TASK }, tab(2));
+      expect(next.task).toBeNull();
+      expect(next.retryAfter).toBeGreaterThan(1000);
+    });
+
+    test("a second tab registering doesn't requeue the first tab's in-flight task", async () => {
+      await sendMessage({ type: MessageType.ENQUEUE_BLOCK, userId: '1', username: 'a' });
+      await sendMessage({ type: MessageType.GET_NEXT_TASK }, tab(1));
+
+      await sendMessage({ type: MessageType.REGISTER_EXECUTOR }, tab(2));
+
+      const { items } = await sendMessage({ type: MessageType.GET_ALL_STATES });
+      expect(items[0].state).toBe('blocking');
+      const next = await sendMessage({ type: MessageType.GET_NEXT_TASK }, tab(2));
+      expect(next.task).toBeNull();
     });
   });
 
@@ -434,8 +467,10 @@ describe('Service Worker', () => {
         userId: 'user123',
       });
 
-      // Get the unblock task
+      // Get the unblock task once the dispatch interval has passed
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 2000);
       const taskResponse = await sendMessage({ type: MessageType.GET_NEXT_TASK });
+      nowSpy.mockRestore();
       expect(taskResponse.task).not.toBeNull();
 
       // Complete the unblock

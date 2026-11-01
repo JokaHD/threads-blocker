@@ -30,6 +30,9 @@ export const ErrorType = {
 // Timing constants (ms)
 export const Timing = {
   BLOCK_INTERVAL: 1500,
+  // An in-flight task older than this lost its executor (tab closed or
+  // navigated away) and is re-queued
+  ORPHANED_TASK_TIMEOUT: 60 * 1000,
   RETRY_1_DELAY: 3000,
   RETRY_2_DELAY: 5000,
   // Experimental: Meta doesn't say how long a rate limit lasts (observed >24h

@@ -8,15 +8,12 @@ import {
   clearCooldown,
 } from './persistence.js';
 import { MessageType } from '../shared/messages.js';
-import { ErrorType, BlockState } from '../shared/constants.js';
+import { ErrorType, BlockState, Timing } from '../shared/constants.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-const queue = new QueueManager();
+const queue = new QueueManager({ dispatchIntervalMs: Timing.BLOCK_INTERVAL });
 const rateLimitHandler = new RateLimitHandler();
-
-/** Tab ID of the content script currently acting as executor */
-let executorTabId = null;
 
 // ── Queue persistence & notification ─────────────────────────────────────────
 
@@ -92,9 +89,8 @@ async function handleMessage(message, sender) {
 
   switch (type) {
     case MessageType.REGISTER_EXECUTOR: {
-      executorTabId = sender.tab?.id ?? null;
-      queue.resetOrphanedTasks();
-      return { ok: true, executorTabId };
+      queue.resetOrphanedTasks(sender.tab?.id ?? null);
+      return { ok: true };
     }
 
     case MessageType.ENQUEUE_BLOCK: {
@@ -119,7 +115,7 @@ async function handleMessage(message, sender) {
       if (rateLimitHandler.isInCooldown()) {
         return { task: null, cooldownEnd: rateLimitHandler.getCooldownEnd() };
       }
-      const task = queue.getNextTask();
+      const task = queue.getNextTask(sender.tab?.id ?? null);
       if (task) return { task };
       const nextRetryAt = queue.getNextRetryAt();
       if (nextRetryAt !== null) {

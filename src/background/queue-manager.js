@@ -1,12 +1,19 @@
-import { BlockState, QueueFlag } from '../shared/constants.js';
+import { BlockState, QueueFlag, Timing } from '../shared/constants.js';
 
 export class QueueManager {
-  constructor() {
+  /**
+   * @param {{dispatchIntervalMs?: number}} [opts] - minimum gap between one
+   *   task settling and the next being dispatched. Enforced here rather than
+   *   per executor so several threads.com tabs polling at once can't shorten it.
+   */
+  constructor({ dispatchIntervalMs = 0 } = {}) {
     /** @type {Map<string, object>} */
     this._items = new Map();
     this._paused = false;
     this._listeners = [];
     this._seqCounter = 0;
+    this._dispatchIntervalMs = dispatchIntervalMs;
+    this._lastSettledAt = -Infinity;
   }
 
   // Items are rendered and dispatched in `seq` order, not Map insertion order,
@@ -92,8 +99,22 @@ export class QueueManager {
 
   // ── Task dispatching ──────────────────────────────────────────────────────
 
-  getNextTask() {
+  /** Mark the in-flight task as finished; starts the dispatch interval. */
+  _settle() {
+    this._lastSettledAt = Date.now();
+  }
+
+  /**
+   * @param {number|null} [ownerTabId] - tab whose executor will run the task;
+   *   lets resetOrphanedTasks tell its own reload apart from another tab's.
+   */
+  getNextTask(ownerTabId = null) {
     if (this._paused) return null;
+
+    // Owner tab closed or navigated away mid-request: free the slot
+    if (this._resetTransientStates((item) => this._isStale(item))) this._notify();
+
+    if (Date.now() < this._lastSettledAt + this._dispatchIntervalMs) return null;
 
     const ordered = this._orderedItems();
 
@@ -108,6 +129,7 @@ export class QueueManager {
         if (item.nextAttemptAt && item.nextAttemptAt > Date.now()) continue;
         item.state = BlockState.BLOCKING;
         item.nextAttemptAt = null;
+        this._claim(item, ownerTabId);
         this._notify();
         return { userId: item.userId, username: item.username, action: 'block' };
       }
@@ -117,12 +139,18 @@ export class QueueManager {
     for (const item of ordered) {
       if (item.state === BlockState.UNBLOCKING && !item._unblockInFlight) {
         item._unblockInFlight = true;
+        this._claim(item, ownerTabId);
         this._notify();
         return { userId: item.userId, username: item.username, action: 'unblock' };
       }
     }
 
     return null;
+  }
+
+  _claim(item, ownerTabId) {
+    item._ownerTabId = ownerTabId;
+    item._dispatchedAt = Date.now();
   }
 
   // ── Cancellation ──────────────────────────────────────────────────────────
@@ -166,6 +194,7 @@ export class QueueManager {
   onTaskComplete(userId, success, error = null) {
     const item = this._items.get(userId);
     if (!item) return false;
+    this._settle();
 
     const hasPendingCancel = item.flags.includes(QueueFlag.PENDING_CANCEL);
 
@@ -202,6 +231,7 @@ export class QueueManager {
   onUnblockComplete(userId, success) {
     const item = this._items.get(userId);
     if (!item) return;
+    this._settle();
 
     if (success) {
       // UNBLOCKING → IDLE: remove entirely
@@ -254,6 +284,7 @@ export class QueueManager {
   scheduleRetry(userId, delayMs) {
     const item = this._items.get(userId);
     if (!item) return;
+    this._settle();
     item.state = BlockState.QUEUED;
     item.retries = (item.retries || 0) + 1;
     item.nextAttemptAt = Date.now() + delayMs;
@@ -261,15 +292,19 @@ export class QueueManager {
   }
 
   /**
-   * Earliest future nextAttemptAt among QUEUED items, or null.
+   * Earliest future time a waiting task becomes dispatchable (its retry
+   * hold-off or the dispatch interval, whichever is later), or null.
    */
   getNextRetryAt() {
     const now = Date.now();
+    const intervalEnd = this._lastSettledAt + this._dispatchIntervalMs;
     let earliest = null;
     for (const item of this._items.values()) {
-      if (item.state === BlockState.QUEUED && item.nextAttemptAt && item.nextAttemptAt > now) {
-        if (earliest === null || item.nextAttemptAt < earliest) earliest = item.nextAttemptAt;
-      }
+      let at;
+      if (item.state === BlockState.QUEUED) at = Math.max(item.nextAttemptAt ?? 0, intervalEnd);
+      else if (item.state === BlockState.UNBLOCKING && !item._unblockInFlight) at = intervalEnd;
+      else continue;
+      if (at > now && (earliest === null || at < earliest)) earliest = at;
     }
     return earliest;
   }
@@ -281,9 +316,10 @@ export class QueueManager {
   // tab registers or the SW restarts. Dropping them made that tab's later
   // UPDATE_RESOLVED_USER a silent no-op. A truly orphaned one is picked up
   // again on the next page load (content.js) or cancelled from the panel.
-  _resetTransientStates() {
+  _resetTransientStates(shouldReset = () => true) {
     let changed = false;
     for (const item of this._items.values()) {
+      if (!shouldReset(item)) continue;
       if (item.state === BlockState.BLOCKING) {
         item.state = BlockState.QUEUED;
         changed = true;
@@ -296,8 +332,29 @@ export class QueueManager {
     return changed;
   }
 
-  resetOrphanedTasks() {
-    if (this._resetTransientStates()) this._notify();
+  _isInFlight(item) {
+    return (
+      item.state === BlockState.BLOCKING ||
+      (item.state === BlockState.UNBLOCKING && item._unblockInFlight)
+    );
+  }
+
+  _isStale(item) {
+    return (
+      this._isInFlight(item) && !(item._dispatchedAt > Date.now() - Timing.ORPHANED_TASK_TIMEOUT)
+    );
+  }
+
+  /**
+   * A tab (re)registered: reset the tasks it had in flight — its reload killed
+   * them — plus ones with no known or live owner. Another tab's in-flight
+   * request is left alone, so opening a second tab can't dispatch it twice.
+   */
+  resetOrphanedTasks(tabId = null) {
+    const isOrphan = (item) =>
+      this._isInFlight(item) &&
+      (item._ownerTabId == null || item._ownerTabId === tabId || this._isStale(item));
+    if (this._resetTransientStates(isOrphan)) this._notify();
   }
 
   // ── Pause / Resume ────────────────────────────────────────────────────────
@@ -372,6 +429,7 @@ export class QueueManager {
 
   clearAll() {
     this._items.clear();
+    this._lastSettledAt = -Infinity;
     this._notify();
   }
 }
