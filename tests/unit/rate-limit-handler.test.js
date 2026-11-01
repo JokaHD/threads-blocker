@@ -22,12 +22,6 @@ describe('classifyError', () => {
     expect(handler.classifyError({ status: 429 })).toBe(ErrorType.RATE_LIMIT);
   });
 
-  it('classifies a rateLimited GraphQL response (HTTP 200) as RATE_LIMIT', () => {
-    expect(handler.classifyError({ status: 0, isNetworkError: true, rateLimited: true })).toBe(
-      ErrorType.RATE_LIMIT
-    );
-  });
-
   it('classifies 401 as AUTH_EXPIRED', () => {
     expect(handler.classifyError({ status: 401 })).toBe(ErrorType.AUTH_EXPIRED);
   });
@@ -121,12 +115,18 @@ describe('startCooldown', () => {
 // ── isInCooldown ──────────────────────────────────────────────────────────────
 
 describe('restoreCooldown', () => {
-  it('restores state and re-arms the alarm at the persisted end time', () => {
+  it('restores state and re-arms a missing alarm at the persisted end time', async () => {
     const end = Date.now() + 60 * 60 * 1000;
-    handler.restoreCooldown(end);
+    await handler.restoreCooldown(end);
     expect(handler.isInCooldown()).toBe(true);
     expect(handler.getCooldownEnd()).toBe(end);
     expect(chrome.alarms.create).toHaveBeenCalledWith(RateLimitHandler.ALARM_NAME, { when: end });
+  });
+
+  it('leaves an existing alarm alone', async () => {
+    chrome.alarms.get.mockResolvedValueOnce({ name: RateLimitHandler.ALARM_NAME });
+    await handler.restoreCooldown(Date.now() + 60 * 60 * 1000);
+    expect(chrome.alarms.create).not.toHaveBeenCalled();
   });
 });
 

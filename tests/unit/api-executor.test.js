@@ -67,29 +67,6 @@ describe('processTask', () => {
     });
   });
 
-  it('forwards the rateLimited flag in the failure payload', async () => {
-    apiFunctions.blockUser.mockResolvedValue({
-      success: false,
-      error: 'Rate limit exceeded',
-      rateLimited: true,
-    });
-
-    const task = { userId: '456', username: 'bob', action: 'block' };
-    await executor.processTask(task);
-
-    expect(mockRuntime.sendMessage).toHaveBeenCalledWith({
-      type: MessageType.TASK_RESULT,
-      userId: '456',
-      success: false,
-      error: {
-        status: 0,
-        message: 'Rate limit exceeded',
-        isNetworkError: true,
-        rateLimited: true,
-      },
-    });
-  });
-
   it('reports failure on exception', async () => {
     apiFunctions.blockUser.mockRejectedValue(new Error('Network failure'));
 

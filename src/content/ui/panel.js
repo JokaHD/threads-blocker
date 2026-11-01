@@ -199,8 +199,10 @@ export class Panel {
     // Pause button
     this._updatePauseBtn();
 
-    // Cooldown ended or was skipped (Retry Now / Resume) → drop the countdown
-    if (!status?.cooldownEnd && this._cooldownEnd) this._hideCooldown();
+    // Cooldown display follows the SW status: shown while it reports one,
+    // dropped once it ends or is skipped (Retry Now / Resume)
+    if (status?.cooldownEnd) this.setCooldownEnd(status.cooldownEnd);
+    else if (this._cooldownEnd) this._hideCooldown();
 
     // Retry-all button: only while something has failed
     const failed = items.filter((i) => i.state === BlockState.FAILED).length;
@@ -219,6 +221,7 @@ export class Panel {
    */
   setCooldownEnd(timestamp) {
     if (!this._el) return;
+    if (timestamp === this._cooldownEnd && this._cooldownInterval) return;
 
     this._cooldownEnd = timestamp;
 

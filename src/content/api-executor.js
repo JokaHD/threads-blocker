@@ -41,7 +41,6 @@ export class APIExecutor {
             status: result.status || 0,
             message: result.error || 'Unknown error',
             isNetworkError: !result.status,
-            ...(result.rateLimited && { rateLimited: true }),
           },
         });
       }

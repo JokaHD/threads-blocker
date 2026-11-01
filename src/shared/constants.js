@@ -53,6 +53,9 @@ export const ThreadsAPI = {
     block: '26803837702651619',
     unblock: '26247169961577940',
   },
+  // GraphQL error code Meta returns (with HTTP 200) when throttling:
+  // {"errors":[{"message":"Rate limit exceeded","severity":"CRITICAL","code":1675004}]}
+  RATE_LIMIT_ERROR_CODE: 1675004,
 };
 
 // Design tokens

@@ -316,11 +316,19 @@ describe('Panel', () => {
       expect(cooldownBtn.title).toMatch(/Retry Now/);
     });
 
+    test('shows cooldown from the status passed to update()', () => {
+      panel.init();
+      const items = [{ userId: '1', username: 'a', state: 'queued' }];
+      panel.update(items, { paused: true, cooldownEnd: Date.now() + 60000 });
+
+      const timeSpan = container.querySelector('.tb-panel-cooldown-time');
+      expect(timeSpan.textContent).toBe('1:00');
+    });
+
     test('hides cooldown once status no longer reports one (e.g. Retry Now)', () => {
       panel.init();
       const items = [{ userId: '1', username: 'a', state: 'queued' }];
       panel.update(items, { paused: true, cooldownEnd: Date.now() + 60000 });
-      panel.setCooldownEnd(Date.now() + 60000);
 
       panel.update(items, { paused: false, cooldownEnd: null });
 

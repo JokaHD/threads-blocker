@@ -69,9 +69,6 @@ function handleStorageChange(changes, area) {
   if (status.queued > 0 || status.unblocking > 0) {
     apiExecutor.startPolling();
   }
-  if (status.paused && status.cooldownEnd) {
-    panel.setCooldownEnd(status.cooldownEnd);
-  }
 }
 chrome.storage.onChanged.addListener(handleStorageChange);
 
@@ -121,9 +118,6 @@ if (document.readyState === 'loading') {
     if (statusResponse?.status) {
       panel.update(items, statusResponse.status);
       inlineControls.setQueuePaused(statusResponse.status.paused);
-      if (statusResponse.status.paused && statusResponse.status.cooldownEnd) {
-        panel.setCooldownEnd(statusResponse.status.cooldownEnd);
-      }
       if (statusResponse.status.queued > 0 || statusResponse.status.unblocking > 0) {
         apiExecutor.startPolling();
       }

@@ -8,8 +8,8 @@ export class RateLimitHandler {
     this._cooldownEnd = null;
   }
 
-  classifyError({ status, isNetworkError, rateLimited }) {
-    if (rateLimited || status === 429) return ErrorType.RATE_LIMIT;
+  classifyError({ status, isNetworkError }) {
+    if (status === 429) return ErrorType.RATE_LIMIT;
     if (status === 401) return ErrorType.AUTH_EXPIRED;
     if (status === 400 || status === 403) return ErrorType.PERMANENT;
     if (status >= 500 || isNetworkError) return ErrorType.TRANSIENT;
@@ -30,11 +30,13 @@ export class RateLimitHandler {
     chrome.alarms.create(ALARM_NAME, { delayInMinutes: Timing.COOLDOWN_MINUTES });
   }
 
-  /** Restore a persisted cooldown after SW restart; alarms may not survive a browser restart. */
-  restoreCooldown(cooldownEnd) {
+  /** Restore a persisted cooldown on SW init; re-arm the alarm only if a browser restart dropped it. */
+  async restoreCooldown(cooldownEnd) {
     this._inCooldown = true;
     this._cooldownEnd = cooldownEnd;
-    chrome.alarms.create(ALARM_NAME, { when: cooldownEnd });
+    if (!(await chrome.alarms.get(ALARM_NAME))) {
+      chrome.alarms.create(ALARM_NAME, { when: cooldownEnd });
+    }
   }
 
   clearCooldown() {

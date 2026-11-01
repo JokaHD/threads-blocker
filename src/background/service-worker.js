@@ -46,7 +46,7 @@ async function init() {
   if (cooldownEnd !== null) {
     if (Date.now() < cooldownEnd) {
       // Cooldown is still active – restore in-memory state
-      rateLimitHandler.restoreCooldown(cooldownEnd);
+      await rateLimitHandler.restoreCooldown(cooldownEnd);
       queue.pause();
     } else {
       // Cooldown has expired while SW was inactive
