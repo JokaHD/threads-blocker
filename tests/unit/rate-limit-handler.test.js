@@ -114,6 +114,22 @@ describe('startCooldown', () => {
 
 // ── isInCooldown ──────────────────────────────────────────────────────────────
 
+describe('restoreCooldown', () => {
+  it('restores state and re-arms a missing alarm at the persisted end time', async () => {
+    const end = Date.now() + 60 * 60 * 1000;
+    await handler.restoreCooldown(end);
+    expect(handler.isInCooldown()).toBe(true);
+    expect(handler.getCooldownEnd()).toBe(end);
+    expect(chrome.alarms.create).toHaveBeenCalledWith(RateLimitHandler.ALARM_NAME, { when: end });
+  });
+
+  it('leaves an existing alarm alone', async () => {
+    chrome.alarms.get.mockResolvedValueOnce({ name: RateLimitHandler.ALARM_NAME });
+    await handler.restoreCooldown(Date.now() + 60 * 60 * 1000);
+    expect(chrome.alarms.create).not.toHaveBeenCalled();
+  });
+});
+
 describe('isInCooldown', () => {
   it('returns false initially', () => {
     expect(handler.isInCooldown()).toBe(false);

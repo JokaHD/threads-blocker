@@ -29,6 +29,7 @@ export const mockStorage = {
 const alarmCallbacks = [];
 export const mockAlarms = {
   create: jest.fn(),
+  get: jest.fn(() => Promise.resolve(undefined)),
   clear: jest.fn(() => Promise.resolve(true)),
   onAlarm: {
     addListener: jest.fn((cb) => alarmCallbacks.push(cb)),

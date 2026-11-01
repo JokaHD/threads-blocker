@@ -30,6 +30,15 @@ export class RateLimitHandler {
     chrome.alarms.create(ALARM_NAME, { delayInMinutes: Timing.COOLDOWN_MINUTES });
   }
 
+  /** Restore a persisted cooldown on SW init; re-arm the alarm only if a browser restart dropped it. */
+  async restoreCooldown(cooldownEnd) {
+    this._inCooldown = true;
+    this._cooldownEnd = cooldownEnd;
+    if (!(await chrome.alarms.get(ALARM_NAME))) {
+      chrome.alarms.create(ALARM_NAME, { when: cooldownEnd });
+    }
+  }
+
   clearCooldown() {
     this._inCooldown = false;
     this._cooldownEnd = null;

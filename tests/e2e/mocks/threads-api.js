@@ -18,6 +18,12 @@ export const mockResponses = {
     ],
   },
 
+  // Real throttle response captured from threads.com (HTTP 200)
+  blockGraphqlRateLimit: {
+    errors: [{ message: 'Rate limit exceeded', severity: 'CRITICAL', code: 1675004 }],
+    extensions: { is_final: true },
+  },
+
   unblockSuccess: {
     data: {
       user_unblock: {

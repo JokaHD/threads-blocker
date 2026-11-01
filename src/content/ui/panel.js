@@ -199,6 +199,11 @@ export class Panel {
     // Pause button
     this._updatePauseBtn();
 
+    // Cooldown display follows the SW status: shown while it reports one,
+    // dropped once it ends or is skipped (Retry Now / Resume)
+    if (status?.cooldownEnd) this.setCooldownEnd(status.cooldownEnd);
+    else if (this._cooldownEnd) this._hideCooldown();
+
     // Retry-all button: only while something has failed
     const failed = items.filter((i) => i.state === BlockState.FAILED).length;
     this._retryAllBtn.style.display = failed > 0 ? '' : 'none';
@@ -216,6 +221,7 @@ export class Panel {
    */
   setCooldownEnd(timestamp) {
     if (!this._el) return;
+    if (timestamp === this._cooldownEnd && this._cooldownInterval) return;
 
     this._cooldownEnd = timestamp;
 
@@ -224,18 +230,26 @@ export class Panel {
       const btn = document.createElement('div');
       btn.className = 'tb-panel-cooldown-btn';
 
+      btn.title = COOLDOWN_TOOLTIP;
+
       const label = document.createElement('span');
-      label.textContent = 'Cooldown: ';
+      label.textContent = 'Rate limited · retry in ';
 
       const timeSpan = document.createElement('span');
       timeSpan.className = 'tb-panel-cooldown-time';
 
+      const info = document.createElement('span');
+      info.className = 'tb-panel-cooldown-info';
+      info.innerHTML = Icons.info;
+
       btn.appendChild(label);
       btn.appendChild(timeSpan);
+      btn.appendChild(info);
 
       const retryNowBtn = document.createElement('button');
       retryNowBtn.className = 'tb-panel-cooldown-retry-btn';
       retryNowBtn.textContent = 'Retry Now';
+      retryNowBtn.title = 'Resume the queue now, skipping the cooldown';
       retryNowBtn.addEventListener('click', () => {
         chrome.runtime
           .sendMessage({ type: MessageType.RESUME_QUEUE })
@@ -255,25 +269,27 @@ export class Panel {
 
     const tick = () => {
       const remaining = Math.max(0, this._cooldownEnd - Date.now());
-      const secs = Math.ceil(remaining / 1000);
-      const m = Math.floor(secs / 60);
-      const s = secs % 60;
-      this._cooldownTimeSpan.textContent = `${m}:${String(s).padStart(2, '0')}`;
-
-      if (remaining <= 0) {
-        clearInterval(this._cooldownInterval);
-        this._cooldownInterval = null;
-        if (this._cooldownBtn) this._cooldownBtn.style.display = 'none';
-        if (this._retryNowBtn) this._retryNowBtn.style.display = 'none';
-      }
+      this._cooldownTimeSpan.textContent = formatCountdown(remaining);
+      if (remaining <= 0) this._hideCooldown();
     };
 
     if (this._cooldownInterval) {
       clearInterval(this._cooldownInterval);
     }
 
-    tick();
+    // Arm before the first tick so an already-expired timestamp clears it
     this._cooldownInterval = setInterval(tick, 1000);
+    tick();
+  }
+
+  _hideCooldown() {
+    if (this._cooldownInterval) {
+      clearInterval(this._cooldownInterval);
+      this._cooldownInterval = null;
+    }
+    this._cooldownEnd = null;
+    if (this._cooldownBtn) this._cooldownBtn.style.display = 'none';
+    if (this._retryNowBtn) this._retryNowBtn.style.display = 'none';
   }
 
   /**
@@ -392,4 +408,18 @@ export class Panel {
         return state;
     }
   }
+}
+
+const COOLDOWN_TOOLTIP =
+  'Experimental: Threads rate-limited this session. The cooldown is fixed at 24h ' +
+  "because Threads doesn't say how long the limit actually lasts. " +
+  'Click Retry Now to try again right away.';
+
+/** 1:02:03 for >= 1h, otherwise 2:03. */
+function formatCountdown(ms) {
+  const secs = Math.ceil(ms / 1000);
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = String(secs % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
 }

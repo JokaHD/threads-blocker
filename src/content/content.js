@@ -69,9 +69,6 @@ function handleStorageChange(changes, area) {
   if (status.queued > 0 || status.unblocking > 0) {
     apiExecutor.startPolling();
   }
-  if (status.paused && status.cooldownEnd) {
-    panel.setCooldownEnd(status.cooldownEnd);
-  }
 }
 chrome.storage.onChanged.addListener(handleStorageChange);
 

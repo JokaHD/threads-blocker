@@ -4,7 +4,7 @@
 
 import { ThreadsAPI } from '../shared/constants.js';
 
-const { ENDPOINT: API_ENDPOINT, IG_APP_ID, DOC_IDS } = ThreadsAPI;
+const { ENDPOINT: API_ENDPOINT, IG_APP_ID, DOC_IDS, RATE_LIMIT_ERROR_CODE } = ThreadsAPI;
 
 /**
  * Block a user on Threads.
@@ -117,6 +117,9 @@ async function makeGraphQLRequest(docId, variables, tokens, friendlyName) {
         success: false,
         error: data.errors[0].message || 'GraphQL error',
         graphqlErrors: data.errors,
+        // Meta throttles with HTTP 200 + a GraphQL error; normalize to 429 so
+        // it takes the same rate-limit path as a real HTTP 429.
+        ...(data.errors.some(isRateLimitError) && { status: 429 }),
       };
     }
 
@@ -139,6 +142,10 @@ async function makeGraphQLRequest(docId, variables, tokens, friendlyName) {
       error: err.message || 'Network error',
     };
   }
+}
+
+function isRateLimitError(err) {
+  return err?.code === RATE_LIMIT_ERROR_CODE || /rate limit/i.test(err?.message ?? '');
 }
 
 /**

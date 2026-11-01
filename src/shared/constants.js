@@ -32,7 +32,9 @@ export const Timing = {
   BLOCK_INTERVAL: 1500,
   RETRY_1_DELAY: 3000,
   RETRY_2_DELAY: 5000,
-  COOLDOWN_MINUTES: 30,
+  // Experimental: Meta doesn't say how long a rate limit lasts (observed >24h
+  // for GraphQL code 1675004). Fixed for now; the user can Retry Now anytime.
+  COOLDOWN_MINUTES: 24 * 60,
   CONFIRM_UNBLOCK_TIMEOUT: 3000,
   ANCHOR_TIMEOUT: 5 * 60 * 1000,
   ANIMATION_DURATION: 200,
@@ -51,6 +53,9 @@ export const ThreadsAPI = {
     block: '26803837702651619',
     unblock: '26247169961577940',
   },
+  // GraphQL error code Meta returns (with HTTP 200) when throttling:
+  // {"errors":[{"message":"Rate limit exceeded","severity":"CRITICAL","code":1675004}]}
+  RATE_LIMIT_ERROR_CODE: 1675004,
 };
 
 // Design tokens

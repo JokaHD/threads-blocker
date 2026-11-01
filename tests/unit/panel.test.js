@@ -297,6 +297,45 @@ describe('Panel', () => {
       expect(timeSpan.textContent).toBe('1:04');
     });
 
+    test('shows hours for long cooldowns', () => {
+      panel.init();
+
+      panel.setCooldownEnd(Date.now() + 24 * 60 * 60 * 1000);
+
+      const timeSpan = container.querySelector('.tb-panel-cooldown-time');
+      expect(timeSpan.textContent).toBe('24:00:00');
+    });
+
+    test('explains the experimental duration on hover', () => {
+      panel.init();
+
+      panel.setCooldownEnd(Date.now() + 60000);
+
+      const cooldownBtn = container.querySelector('.tb-panel-cooldown-btn');
+      expect(cooldownBtn.title).toMatch(/experimental/i);
+      expect(cooldownBtn.title).toMatch(/Retry Now/);
+    });
+
+    test('shows cooldown from the status passed to update()', () => {
+      panel.init();
+      const items = [{ userId: '1', username: 'a', state: 'queued' }];
+      panel.update(items, { paused: true, cooldownEnd: Date.now() + 60000 });
+
+      const timeSpan = container.querySelector('.tb-panel-cooldown-time');
+      expect(timeSpan.textContent).toBe('1:00');
+    });
+
+    test('hides cooldown once status no longer reports one (e.g. Retry Now)', () => {
+      panel.init();
+      const items = [{ userId: '1', username: 'a', state: 'queued' }];
+      panel.update(items, { paused: true, cooldownEnd: Date.now() + 60000 });
+
+      panel.update(items, { paused: false, cooldownEnd: null });
+
+      const cooldownBtn = container.querySelector('.tb-panel-cooldown-btn');
+      expect(cooldownBtn.style.display).toBe('none');
+    });
+
     test('hides cooldown when expired', () => {
       panel.init();
 
