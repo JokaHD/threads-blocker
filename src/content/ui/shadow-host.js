@@ -572,13 +572,28 @@ function getExtensionStyles() {
 
     .tb-panel-cooldown-btn {
       flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 2px;
       font-size: 12px;
       color: var(--tb-warning);
+      cursor: help;
     }
 
     .tb-panel-cooldown-time {
       font-weight: 600;
       font-variant-numeric: tabular-nums;
+    }
+
+    .tb-panel-cooldown-info {
+      display: inline-flex;
+      margin-left: 4px;
+      opacity: 0.8;
+    }
+
+    .tb-panel-cooldown-info svg {
+      width: 12px;
+      height: 12px;
     }
 
     .tb-panel-cooldown-retry-btn {
