@@ -127,6 +127,11 @@ async function handleMessage(message, sender) {
     case MessageType.TASK_RESULT: {
       const { userId, success, error: errPayload } = message;
 
+      // A result from a tab that no longer owns the task: it went stale and
+      // was re-dispatched to another tab, whose result is the one that counts
+      const owner = queue.getItem(userId)?._ownerTabId;
+      if (owner != null && owner !== (sender.tab?.id ?? null)) return { ok: true };
+
       if (success) {
         const item = queue.getItem(userId);
         const wasUnblocking = item?.state === 'unblocking';

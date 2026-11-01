@@ -649,6 +649,23 @@ describe('dispatch interval', () => {
     expect(paced.getNextTask(1)?.userId).toBe('1');
   });
 
+  it("doesn't dispatch a block while another tab's unblock is in flight", () => {
+    paced.cancel('2');
+    paced.getNextTask(1);
+    paced.onTaskComplete('1', true);
+    paced.requestUnblock('1');
+    now += 1500;
+    expect(paced.getNextTask(1)?.action).toBe('unblock');
+    paced.enqueue({ userId: '3', username: 'carol' });
+    expect(paced.getNextTask(2)).toBeNull();
+  });
+
+  it('tells waiting tabs when an in-flight task will go stale', () => {
+    paced.getNextTask(1);
+    expect(paced.getNextTask(2)).toBeNull();
+    expect(paced.getNextRetryAt()).toBe(now + Timing.ORPHANED_TASK_TIMEOUT);
+  });
+
   it('frees a stale in-flight task on the next poll', () => {
     paced.getNextTask(1);
     now += Timing.ORPHANED_TASK_TIMEOUT + 1;

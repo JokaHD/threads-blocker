@@ -118,10 +118,9 @@ export class QueueManager {
 
     const ordered = this._orderedItems();
 
-    // Only one active task at a time: check for in-progress BLOCKING
-    for (const item of ordered) {
-      if (item.state === BlockState.BLOCKING) return null;
-    }
+    // Only one active task at a time across all tabs: a block or unblock
+    // already in flight holds the slot
+    if (ordered.some((item) => this._isInFlight(item))) return null;
 
     // First, look for a QUEUED item whose retry hold-off (if any) has elapsed
     for (const item of ordered) {
@@ -293,7 +292,8 @@ export class QueueManager {
 
   /**
    * Earliest future time a waiting task becomes dispatchable (its retry
-   * hold-off or the dispatch interval, whichever is later), or null.
+   * hold-off or the dispatch interval, whichever is later), or when an
+   * in-flight task goes stale and frees the slot, or null.
    */
   getNextRetryAt() {
     const now = Date.now();
@@ -303,6 +303,8 @@ export class QueueManager {
       let at;
       if (item.state === BlockState.QUEUED) at = Math.max(item.nextAttemptAt ?? 0, intervalEnd);
       else if (item.state === BlockState.UNBLOCKING && !item._unblockInFlight) at = intervalEnd;
+      // Keep waiting tabs polling so a closed owner tab's task is reclaimed
+      else if (this._isInFlight(item)) at = item._dispatchedAt + Timing.ORPHANED_TASK_TIMEOUT;
       else continue;
       if (at > now && (earliest === null || at < earliest)) earliest = at;
     }
