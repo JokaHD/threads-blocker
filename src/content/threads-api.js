@@ -117,6 +117,7 @@ async function makeGraphQLRequest(docId, variables, tokens, friendlyName) {
         success: false,
         error: data.errors[0].message || 'GraphQL error',
         graphqlErrors: data.errors,
+        rateLimited: data.errors.some(isRateLimitError),
       };
     }
 
@@ -139,6 +140,14 @@ async function makeGraphQLRequest(docId, variables, tokens, friendlyName) {
       error: err.message || 'Network error',
     };
   }
+}
+
+// Meta throttles with HTTP 200 + a GraphQL error, not 429:
+// {"errors":[{"message":"Rate limit exceeded","severity":"CRITICAL","code":1675004}]}
+const RATE_LIMIT_ERROR_CODE = 1675004;
+
+function isRateLimitError(err) {
+  return err?.code === RATE_LIMIT_ERROR_CODE || /rate limit/i.test(err?.message ?? '');
 }
 
 /**

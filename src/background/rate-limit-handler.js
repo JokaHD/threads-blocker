@@ -8,8 +8,8 @@ export class RateLimitHandler {
     this._cooldownEnd = null;
   }
 
-  classifyError({ status, isNetworkError }) {
-    if (status === 429) return ErrorType.RATE_LIMIT;
+  classifyError({ status, isNetworkError, rateLimited }) {
+    if (rateLimited || status === 429) return ErrorType.RATE_LIMIT;
     if (status === 401) return ErrorType.AUTH_EXPIRED;
     if (status === 400 || status === 403) return ErrorType.PERMANENT;
     if (status >= 500 || isNetworkError) return ErrorType.TRANSIENT;

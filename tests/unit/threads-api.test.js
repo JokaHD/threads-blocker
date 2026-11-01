@@ -70,6 +70,30 @@ describe('blockUser', () => {
     expect(result.error).toBe('Rate limited');
   });
 
+  it('flags Meta GraphQL rate limit (code 1675004) as rateLimited', async () => {
+    setFetchResponse({
+      ok: true,
+      json: {
+        errors: [{ message: 'Rate limit exceeded', severity: 'CRITICAL', code: 1675004 }],
+        extensions: { is_final: true },
+      },
+    });
+
+    const result = await blockUser('12345', tokens);
+
+    expect(result.success).toBe(false);
+    expect(result.rateLimited).toBe(true);
+  });
+
+  it('does not flag unrelated GraphQL errors as rateLimited', async () => {
+    setFetchResponse({ ok: true, json: { errors: [{ message: 'Something broke', code: 1 }] } });
+
+    const result = await blockUser('12345', tokens);
+
+    expect(result.success).toBe(false);
+    expect(result.rateLimited).toBeFalsy();
+  });
+
   it('returns failure on network error', async () => {
     global.fetch.mockRejectedValueOnce(new Error('Network failure'));
 

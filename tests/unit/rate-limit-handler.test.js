@@ -22,6 +22,12 @@ describe('classifyError', () => {
     expect(handler.classifyError({ status: 429 })).toBe(ErrorType.RATE_LIMIT);
   });
 
+  it('classifies a rateLimited GraphQL response (HTTP 200) as RATE_LIMIT', () => {
+    expect(handler.classifyError({ status: 0, isNetworkError: true, rateLimited: true })).toBe(
+      ErrorType.RATE_LIMIT
+    );
+  });
+
   it('classifies 401 as AUTH_EXPIRED', () => {
     expect(handler.classifyError({ status: 401 })).toBe(ErrorType.AUTH_EXPIRED);
   });
