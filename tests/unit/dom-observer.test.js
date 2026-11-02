@@ -328,18 +328,18 @@ describe('DOMObserver', () => {
       document.body.innerHTML = `
         <div class="comment"><a href="/@alice">Alice</a><p>text</p><span>x</span></div>
         <div role="dialog">
-          ${likerRow('zy___t.t', 'zy___t.t的大頭貼照')}
+          ${likerRow('zq___x.y', 'zq___x.y的大頭貼照')}
         </div>
       `;
 
       const comments = observer.findComments(document.body);
-      expect(comments.map((c) => c.username).sort()).toEqual(['alice', 'zy___t.t']);
+      expect(comments.map((c) => c.username).sort()).toEqual(['alice', 'zq___x.y']);
     });
 
     it('skips user list rows whose container is already marked', () => {
       document.body.innerHTML = `
         <div role="dialog">
-          ${likerRow('zy___t.t', 'zy___t.t的大頭貼照')}
+          ${likerRow('zq___x.y', 'zq___x.y的大頭貼照')}
         </div>
       `;
 
@@ -352,9 +352,9 @@ describe('DOMObserver', () => {
 
     it('marks both the comment and the user list row of the same username', () => {
       document.body.innerHTML = `
-        <div class="comment"><a href="/@zy___t.t">zy</a><p>text</p><span>x</span></div>
+        <div class="comment"><a href="/@zq___x.y">zy</a><p>text</p><span>x</span></div>
         <div role="dialog">
-          ${likerRow('zy___t.t', 'zy___t.t的大頭貼照')}
+          ${likerRow('zq___x.y', 'zq___x.y的大頭貼照')}
         </div>
       `;
 
@@ -363,7 +363,7 @@ describe('DOMObserver', () => {
       const comments = observer.findComments(document.body);
       expect(comments).toHaveLength(2);
       expect(new Set(comments.map((c) => c.container)).size).toBe(2);
-      expect(comments.every((c) => c.username === 'zy___t.t')).toBe(true);
+      expect(comments.every((c) => c.username === 'zq___x.y')).toBe(true);
     });
   });
 

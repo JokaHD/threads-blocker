@@ -324,12 +324,12 @@ describe('threadsSiteRule', () => {
 
     it('extracts liker usernames from a likes dialog', () => {
       document.body.innerHTML = likesDialog(
-        likerRow('zy___t.t', 'zy___t.t的大頭貼照') +
-          likerRow('coldtea1127', 'coldtea1127的大頭貼照', 'ラムネビー玉コロコロ')
+        likerRow('zq___x.y', 'zq___x.y的大頭貼照') +
+          likerRow('liker_5678', 'liker_5678的大頭貼照', 'ラムネビー玉コロコロ')
       );
 
       const rows = threadsSiteRule.findUserListRows(document.body);
-      expect(rows.map((r) => r.username)).toEqual(['zy___t.t', 'coldtea1127']);
+      expect(rows.map((r) => r.username)).toEqual(['zq___x.y', 'liker_5678']);
     });
 
     it('returns the row element (contains both avatar img and pressable) as container', () => {
@@ -354,15 +354,13 @@ describe('threadsSiteRule', () => {
     });
 
     it('does not mistake a display name for the username (avatar alt boundary check)', () => {
-      // display name "cold" 是 username "coldtea1127" 的 substring,
+      // display name "cold" 是 username "liker_5678" 的 substring,
       // 單純 alt.includes(text) 會誤中 — 必須做字元邊界檢查
-      document.body.innerHTML = likesDialog(
-        likerRow('coldtea1127', 'coldtea1127的大頭貼照', 'cold')
-      );
+      document.body.innerHTML = likesDialog(likerRow('liker_5678', 'liker_5678的大頭貼照', 'cold'));
 
       const rows = threadsSiteRule.findUserListRows(document.body);
       expect(rows).toHaveLength(1);
-      expect(rows[0].username).toBe('coldtea1127');
+      expect(rows[0].username).toBe('liker_5678');
     });
 
     it('walks past a non-avatar img (e.g. media thumbnail) to the real avatar', () => {
@@ -464,11 +462,11 @@ describe('threadsSiteRule', () => {
 
     it('extracts the quoter from a quote row via the post permalink', () => {
       document.body.innerHTML = likesDialog(
-        quoteRow({ quoter: 'eason_2345', permalink: '/@eason_2345/post/Dc79vY9ki6l' })
+        quoteRow({ quoter: 'quoter_1234', permalink: '/@quoter_1234/post/AbCdEfGhIjK' })
       );
 
       const rows = threadsSiteRule.findUserListRows(document.body);
-      expect(rows.map((r) => r.username)).toEqual(['eason_2345']);
+      expect(rows.map((r) => r.username)).toEqual(['quoter_1234']);
       expect(rows[0].container.className).toBe('row');
       expect(rows[0].container.querySelector('img[alt]')).not.toBeNull();
     });
@@ -476,33 +474,33 @@ describe('threadsSiteRule', () => {
     it('never extracts the quoted author embedded inside a quote row', () => {
       document.body.innerHTML = likesDialog(
         quoteRow({
-          quoter: 'eason_2345',
-          permalink: '/@eason_2345/post/Dc79vY9ki6l',
-          quotedAlt: 'linweichen2003的大頭貼照',
-          quotedName: 'linweichen2003',
+          quoter: 'quoter_1234',
+          permalink: '/@quoter_1234/post/AbCdEfGhIjK',
+          quotedAlt: 'quoted_2000的大頭貼照',
+          quotedName: 'quoted_2000',
         })
       );
 
       const rows = threadsSiteRule.findUserListRows(document.body);
-      expect(rows.map((r) => r.username)).toEqual(['eason_2345']);
+      expect(rows.map((r) => r.username)).toEqual(['quoter_1234']);
     });
 
     it('mixes quote rows and anchor-less liker rows in the same dialog', () => {
       document.body.innerHTML = likesDialog(
         likerRow('alice_1', 'alice_1的大頭貼照') +
-          quoteRow({ quoter: 'eason_2345', permalink: '/@eason_2345/post/Dc79vY9ki6l' })
+          quoteRow({ quoter: 'quoter_1234', permalink: '/@quoter_1234/post/AbCdEfGhIjK' })
       );
 
       const rows = threadsSiteRule.findUserListRows(document.body);
-      expect(rows.map((r) => r.username).sort()).toEqual(['alice_1', 'eason_2345']);
+      expect(rows.map((r) => r.username).sort()).toEqual(['alice_1', 'quoter_1234']);
     });
 
     it('skips a row whose permalinks name two different users (ambiguous)', () => {
       document.body.innerHTML = likesDialog(
         quoteRow({
-          quoter: 'eason_2345',
-          permalink: '/@eason_2345/post/Dc79vY9ki6l',
-          extraAnchor: '/@linweichen2003/post/Dc7rh_jmdx0',
+          quoter: 'quoter_1234',
+          permalink: '/@quoter_1234/post/AbCdEfGhIjK',
+          extraAnchor: '/@quoted_2000/post/XyZ_abc1234',
         })
       );
 
@@ -511,7 +509,7 @@ describe('threadsSiteRule', () => {
 
     it('skips a row containing an unrecognized /@ anchor shape', () => {
       document.body.innerHTML = likesDialog(
-        quoteRow({ quoter: 'eason_2345', permalink: '/@eason_2345/followers' })
+        quoteRow({ quoter: 'quoter_1234', permalink: '/@quoter_1234/followers' })
       );
 
       expect(threadsSiteRule.findUserListRows(document.body)).toEqual([]);
@@ -520,7 +518,7 @@ describe('threadsSiteRule', () => {
     it('skips a quote row when the avatar alt does not validate the permalink owner', () => {
       // permalink 指向的人跟列上頭像對不起來 → 寧可漏標
       document.body.innerHTML = likesDialog(
-        quoteRow({ quoter: 'someone_else', permalink: '/@eason_2345/post/Dc79vY9ki6l' })
+        quoteRow({ quoter: 'someone_else', permalink: '/@quoter_1234/post/AbCdEfGhIjK' })
       );
 
       expect(threadsSiteRule.findUserListRows(document.body)).toEqual([]);
