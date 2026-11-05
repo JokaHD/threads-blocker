@@ -403,7 +403,7 @@ function getExtensionStyles() {
       display: flex;
       align-items: center;
       margin: 16px -20px 0;
-      padding: 6px 14px 6px 8px;
+      padding: 6px 12px;
       border-top: 1px solid var(--tb-border);
       font-size: 13px;
       color: var(--tb-text);
@@ -419,9 +419,8 @@ function getExtensionStyles() {
       margin-top: 0;
     }
 
-    /* One pill across the row: [label ··· switch] | manage. The label keeps
-       its place at the left edge (18px in from the card) and the controls
-       stay at the right, as before the pill; the outline only groups them.
+    /* One pill across the row, centered in the card (equal side gaps):
+       [label ··· switch] | manage; the outline groups them.
        The label lives inside the switch button, so the whole left segment
        toggles */
     .tb-kw-group {
@@ -542,7 +541,7 @@ function getExtensionStyles() {
       flex-direction: column;
       width: 100%;
       max-width: 460px;
-      height: 80vh;
+      height: 70vh;
       background: var(--tb-bg);
       border: 1px solid var(--tb-border);
       border-radius: var(--tb-radius-md);
@@ -587,7 +586,11 @@ function getExtensionStyles() {
       display: grid;
       align-content: start;
       gap: 14px;
-      padding: 20px 20px 18px;
+      padding: 20px 8px 18px;
+      /* Room for the scrollbar is kept on both sides from the start, so the
+         content never narrows or shifts when it appears; with the gutters
+         the 8px side padding still reads as about 20px */
+      scrollbar-gutter: stable both-edges;
     }
 
     .km * {
