@@ -177,25 +177,26 @@ function getExtensionStyles() {
     /* ============================================================
        FAB — Floating Action Button (entry point)
        ============================================================ */
-    /* Compact launcher: 56x48 (not square on purpose), must match
+    /* Compact launcher: 68x58 (not square on purpose; was 56x48, too small
+       for the label and progress badge), must match
        StackLayout.COLLAPSED_WIDTH in stack-placement.js */
     .tb-fab {
       position: relative;
       align-self: flex-end;
       box-sizing: border-box;
-      width: 56px;
-      height: 48px;
+      width: 68px;
+      height: 58px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 2px;
+      gap: 3px;
       padding: 0;
       border: 1px solid var(--tb-border);
-      border-radius: 14px;
+      border-radius: 16px;
       background: var(--tb-bg);
       color: var(--tb-text);
-      font-size: 10px;
+      font-size: 12px;
       font-weight: 600;
       letter-spacing: 0.02em;
       cursor: pointer;
@@ -204,8 +205,8 @@ function getExtensionStyles() {
     }
 
     .tb-fab svg {
-      width: 18px;
-      height: 18px;
+      width: 22px;
+      height: 22px;
     }
 
     .tb-fab-label {
@@ -215,16 +216,16 @@ function getExtensionStyles() {
     /* Queue progress on the launcher (done/total) */
     .tb-fab-badge {
       position: absolute;
-      top: -8px;
-      right: -8px;
-      min-width: 18px;
-      padding: 2px 5px;
-      border-radius: 9px;
+      top: -10px;
+      right: -10px;
+      min-width: 22px;
+      padding: 2px 6px;
+      border-radius: 11px;
       background: var(--tb-primary);
       color: #fff;
-      font-size: 10px;
+      font-size: 12px;
       font-weight: 700;
-      line-height: 14px;
+      line-height: 18px;
       font-variant-numeric: tabular-nums;
       text-align: center;
       box-shadow: 0 0 0 2px var(--tb-bg);

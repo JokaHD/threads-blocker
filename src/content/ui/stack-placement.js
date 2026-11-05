@@ -21,7 +21,7 @@ export const StackLayout = {
   DEFAULT_RIGHT: 24,
   // Block mode card (expanded) / FAB launcher (collapsed, see .tb-fab CSS)
   EXPANDED_WIDTH: 280,
-  COLLAPSED_WIDTH: 56,
+  COLLAPSED_WIDTH: 68,
   // Closest the stack may get to the viewport edge when extending right
   MIN_EDGE: 8,
   GAP: 16,

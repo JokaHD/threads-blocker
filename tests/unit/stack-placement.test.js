@@ -51,8 +51,8 @@ describe('computeStackPlacement', () => {
 
   it('puts the collapsed FAB right beside the posts', () => {
     const p = computeStackPlacement({ ...observed, expanded: false });
-    // left = 1157 + 16 = 1173; right = 1745 - (1173 + 56)
-    expect(p).toEqual({ mode: 'beside-content', right: 516, width: StackLayout.COLLAPSED_WIDTH });
+    // left = 1157 + 16 = 1173; right = 1745 - (1173 + 68)
+    expect(p).toEqual({ mode: 'beside-content', right: 504, width: StackLayout.COLLAPSED_WIDTH });
   });
 
   it('opens the card from the same left edge as the FAB, on wide gaps too', () => {
@@ -124,8 +124,8 @@ describe('StackPlacement', () => {
     tracker.refresh();
     start();
 
-    expect(stack.style.getPropertyValue('--tb-stack-right')).toBe('516px');
-    expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('56px');
+    expect(stack.style.getPropertyValue('--tb-stack-right')).toBe('504px');
+    expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('68px');
     expect(placement.getState()).toMatchObject({
       mode: 'beside-content',
       railFound: true,
@@ -156,14 +156,14 @@ describe('StackPlacement', () => {
 
     blockMode(false);
     expect(placement.getState()).toMatchObject({ mode: 'beside-content', expanded: false });
-    expect(stack.style.getPropertyValue('--tb-stack-right')).toBe('516px');
+    expect(stack.style.getPropertyValue('--tb-stack-right')).toBe('504px');
   });
 
   it('writes the defaults when no rail is present', () => {
     start();
 
     expect(stack.style.getPropertyValue('--tb-stack-right')).toBe('24px');
-    expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('56px');
+    expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('68px');
     expect(placement.getState().railFound).toBe(false);
   });
 
