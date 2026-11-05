@@ -61,13 +61,11 @@ export class InlineControls {
     this._clickHandler = (e) => {
       if (!this._blockMode) return;
 
-      // The right rail is never a target. Its clicks navigate as usual —
-      // unless something is selected: the route change would exit block
-      // mode and silently drop the selection, so swallow it like below.
-      const inRail = railTracker.contains(e.target);
-      if (inRail && this._selection.count() === 0) return;
+      // The right rail is native Threads UI, never a target: its clicks
+      // always navigate, like the left nav, even if that drops a selection.
+      if (railTracker.contains(e.target)) return;
 
-      const comment = inRail ? null : e.target.closest(`[${COMMENT_ID_ATTR}]`);
+      const comment = e.target.closest(`[${COMMENT_ID_ATTR}]`);
       if (!comment) {
         // Unmarked comment (heuristic miss): don't let it navigate away —
         // the route change would exit block mode and drop the selection.
