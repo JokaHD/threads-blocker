@@ -603,6 +603,17 @@ describe('threadsSiteRule right context rail', () => {
       expect(threadsSiteRule.findRightRail()).toBe(rail);
     });
 
+    it("skips a previous route's hidden layout kept in the DOM", () => {
+      // Inserted first and first in tree order: getElementById returns it
+      const stale = document.createElement('div');
+      stale.id = 'barcelona-page-layout';
+      stale.innerHTML = '<div style="position: sticky"></div>';
+      document.body.innerHTML = '';
+      document.body.appendChild(stale);
+      const { rail } = mountThreadsLayout({ append: true });
+      expect(threadsSiteRule.findRightRail()).toBe(rail);
+    });
+
     it('prefers a semantic aside / complementary landmark', () => {
       mountLayout();
       const aside = document.createElement('div');

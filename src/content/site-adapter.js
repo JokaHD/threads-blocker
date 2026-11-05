@@ -87,7 +87,8 @@ export const threadsSiteRule = {
    *   1. `aside, [role="complementary"]` — semantic; absent today, kept so a
    *      future ARIA landmark is picked up first
    *   2. `#barcelona-page-layout > *`   — Meta's layout root id; the rail is
-   *      its direct sticky child (fragile if the id is renamed)
+   *      its direct sticky child (fragile if the id is renamed). The id can
+   *      repeat: a hidden copy per previous SPA route, so all are checked
    *   3. elementsFromPoint probe near the right viewport edge — layout-only,
    *      survives id/structure changes but depends on hit-testing
    * Uncached layout probe — read it through RailTracker (rail-tracker.js),
@@ -104,8 +105,9 @@ export const threadsSiteRule = {
       if (this._isRightRailShaped(el)) return el;
     }
 
-    const layout = document.getElementById(PAGE_LAYOUT_ID);
-    if (layout) {
+    // Every match, not getElementById: after SPA navigation the previous
+    // route's layout stays in the DOM, hidden, with the same id (2026-11-06)
+    for (const layout of document.querySelectorAll(`[id="${PAGE_LAYOUT_ID}"]`)) {
       for (const el of layout.children) {
         if (this._isRightRailShaped(el)) return el;
       }
