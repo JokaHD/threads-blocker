@@ -66,14 +66,15 @@ const NON_BODY_TEXT_SELECTOR = [
 //      (chosen; risk medium: an i18n attribute React keeps on every text run,
 //      breaks only if Threads drops it). Leaves out topic chips and tags
 //      (span inside a block link) and the "1 / 5" counter (divs inside).
-//   2. Semantic tier only (NON_BODY_TEXT_SELECTOR), used when a post has no
+//   2. Semantic tier only (NON_BODY_TEXT_SELECTOR), used when a post has no own
 //      span[dir="auto"] at all, i.e. the structure changed (risk: lets topic
 //      chips, tags and the counter in).
 //   3. Obfuscated class names (rejected: they change with every deploy).
 const BODY_SPAN_SELECTOR = 'span[dir="auto"]';
 
-// Which tier getBodyTextNodes used, per call (window.__TB_DEBUG__())
-const bodyTierCounts = { measured: 0, semantic: 0 };
+// Which tier getBodyTextNodes used, per call (window.__TB_DEBUG__()).
+// measuredEmpty: measured tier found no body where the semantic tier saw text
+const bodyTierCounts = { measured: 0, semantic: 0, measuredEmpty: 0 };
 
 /** Tier 1: the text node is a body text run (see BODY_SPAN_SELECTOR) */
 function isInBodySpan(node, container) {
@@ -573,15 +574,23 @@ export const threadsSiteRule = {
    */
   getBodyTextNodes(container) {
     const nodes = semanticBodyTextNodes(container);
-    if (container.querySelector(BODY_SPAN_SELECTOR)) {
-      bodyTierCounts.measured += 1;
-      return nodes.filter((node) => isInBodySpan(node, container));
+    const ownSpan = [...container.querySelectorAll(BODY_SPAN_SELECTOR)].some(
+      (span) => span.closest(`[${COMMENT_ID_ATTR}]`) === container
+    );
+    if (!ownSpan) {
+      bodyTierCounts.semantic += 1;
+      return nodes;
     }
-    bodyTierCounts.semantic += 1;
-    return nodes;
+    bodyTierCounts.measured += 1;
+    const body = nodes.filter((node) => isInBodySpan(node, container));
+    // Not a fallback: most of these are image-only posts whose topic tags or
+    // counter the semantic tier would wrongly take as body. A rising share
+    // of them is the drift signal (the body changed, the header didn't)
+    if (body.length === 0 && nodes.length > 0) bodyTierCounts.measuredEmpty += 1;
+    return body;
   },
 
-  /** @returns {{measured: number, semantic: number}} getBodyTextNodes calls per tier */
+  /** @returns {{measured: number, semantic: number, measuredEmpty: number}} calls per tier */
   getBodyTierCounts() {
     return { ...bodyTierCounts };
   },

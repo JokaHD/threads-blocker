@@ -148,6 +148,30 @@ describe('threadsSiteRule', () => {
       expect(after.measured - before.measured).toBe(1);
       expect(after.semantic - before.semantic).toBe(1);
     });
+
+    test('counts posts where the measured tier finds nothing the semantic tier would', () => {
+      // Drift: the body lost its span[dir=auto] wrapper, the header kept it
+      const drifted = document.createElement('div');
+      drifted.setAttribute('data-tb-comment-id', 'fake_user');
+      drifted.innerHTML = `
+        <div><a role="link" href="/@fake_user"><span dir="auto"><span>fake_user</span></span></a></div>
+        <div><p>改版後的內文</p></div>`;
+      const before = threadsSiteRule.getBodyTierCounts();
+
+      expect(threadsSiteRule.getBodyTextNodes(drifted)).toEqual([]);
+      expect(threadsSiteRule.getBodyTierCounts().measuredEmpty - before.measuredEmpty).toBe(1);
+    });
+
+    test("a quoted post's structure doesn't pick the outer post's tier", () => {
+      const outer = document.createElement('div');
+      outer.setAttribute('data-tb-comment-id', 'fake_user');
+      outer.innerHTML = `
+        <p>外層的內文</p>
+        <div data-tb-comment-id="quoted_user"><span dir="auto"><span>被引用</span></span></div>`;
+      expect(threadsSiteRule.getBodyTextNodes(outer).map((n) => n.data.trim())).toEqual([
+        '外層的內文',
+      ]);
+    });
   });
 
   describe('isSupportedPath', () => {

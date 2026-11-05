@@ -161,7 +161,8 @@ export class KeywordHighlighter {
       posts: this._entries.size,
       ranges: this._highlights?.get(KEYWORD_HIGHLIGHT_NAME)?.size ?? 0,
       pendingHits: this._pending.size,
-      // Body reads per adapter tier: "semantic" growing means Threads changed
+      // Body reads per adapter tier: a rising "semantic" or "measuredEmpty"
+      // share means Threads changed its post markup
       bodyTiers: this._siteRule.getBodyTierCounts?.() ?? null,
       ...this._counters,
     };
