@@ -83,7 +83,6 @@ export function getDebugState() {
       toolbar: !!toolbar,
       toolbarVisible: toolbar?.classList.contains('tb-toolbar-visible') || false,
       panel: !!panel,
-      panelMinimized: panel?.classList.contains('tb-panel-minimized') || false,
     },
 
     // Right context rail + where the stack was placed to avoid it

@@ -15,7 +15,8 @@ function run() {
 
   const links = [...document.querySelectorAll(rule.usernameSelector)];
   const valid = links.filter((link) => rule.extractUsername(link.getAttribute('href')));
-  const scannable = valid.filter((link) => !rule.shouldExcludeLink(link));
+  const rail = rule.findRightRail();
+  const scannable = valid.filter((link) => !rule.shouldExcludeLink(link, rail));
 
   // Container resolution per scannable link: findContainer() is the shipped
   // walk; whether the result carries data-pressable-container tells us if
@@ -50,7 +51,7 @@ function run() {
     navPresent: !!document.querySelector('nav, [role="navigation"]'),
     // diagnostic only: the rail collapses on narrow viewports, so absence
     // is not drift by itself
-    rightRailFound: !!rule.findRightRail(),
+    rightRailFound: !!rail,
     pathSupported: rule.isSupportedPath(location.pathname),
     uiVisible: rule.isUIVisibleOnUrl(location.href),
     theme: rule.getTheme(),

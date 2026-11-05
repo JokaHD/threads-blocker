@@ -59,7 +59,9 @@ export class InlineControls {
     this._clickHandler = (e) => {
       if (!this._blockMode) return;
 
-      const comment = e.target.closest(`[${COMMENT_ID_ATTR}]`);
+      // A rail mark not yet cleared by the next scan is never a target
+      const marked = e.target.closest(`[${COMMENT_ID_ATTR}]`);
+      const comment = marked && !threadsSiteRule.isInRightRail(marked) ? marked : null;
       if (!comment) {
         // Unmarked comment (heuristic miss): don't let it navigate away —
         // the route change would exit block mode and drop the selection.

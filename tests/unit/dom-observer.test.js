@@ -413,4 +413,30 @@ describe('DOMObserver right context rail', () => {
 
     expect(usernames).toEqual(['author']);
   });
+
+  it('clears rail marks left by a scan that ran before the rail was laid out', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1745 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 828 });
+    document.body.innerHTML = `
+      <div id="barcelona-page-layout">
+        <div class="rail" style="position: sticky">
+          <div class="stale tb-selected" ${COMMENT_ID_ATTR}="suggested"></div>
+        </div>
+      </div>`;
+    document.querySelector('.rail').getBoundingClientRect = () => ({
+      left: 1412,
+      width: 320,
+      height: 828,
+      top: 0,
+      right: 1732,
+    });
+
+    const observer = new DOMObserver();
+    observer.init();
+    observer.findComments(document.body);
+
+    const stale = document.querySelector('.stale');
+    expect(stale.hasAttribute(COMMENT_ID_ATTR)).toBe(false);
+    expect(stale.classList.contains('tb-selected')).toBe(false);
+  });
 });

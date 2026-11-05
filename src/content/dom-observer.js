@@ -50,6 +50,10 @@ export class DOMObserver {
     const seenUsernames = new Set();
     // Once per scan: the rail check reads layout, and this loop runs per link
     const rail = this._siteRule.findRightRail();
+    // A scan before the rail was laid out (late mount, or a zero-size rail
+    // on a narrow window that was then widened) may have marked rail users;
+    // marks otherwise only clear on route change
+    if (rail) this._unmarkInside(rail);
 
     for (const link of links) {
       const href = link.getAttribute('href');
@@ -131,6 +135,16 @@ export class DOMObserver {
       if (claimed.contains(container)) return true;
     }
     return false;
+  }
+
+  /**
+   * Drop marks (and block-mode classes) from every element inside `root`.
+   */
+  _unmarkInside(root) {
+    root.querySelectorAll(`[${COMMENT_ID_ATTR}]`).forEach((el) => {
+      el.removeAttribute(COMMENT_ID_ATTR);
+      el.classList.remove('tb-blockmode-target', 'tb-selected', 'tb-hover');
+    });
   }
 
   /**
