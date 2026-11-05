@@ -5,6 +5,8 @@
 import { InlineControls } from '../../src/content/ui/inline-controls.js';
 import { COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
 import { MessageType } from '../../src/shared/messages.js';
+import { railTracker } from '../../src/content/rail-tracker.js';
+import { mountThreadsLayout } from './helpers/rail-fixture.js';
 
 describe('InlineControls', () => {
   let inlineControls;
@@ -47,7 +49,122 @@ describe('InlineControls', () => {
 
       const fab = container.querySelector('.tb-fab');
       expect(fab).not.toBeNull();
-      expect(fab.textContent).toContain('Block Mode');
+      expect(fab.querySelector('.tb-fab-label').textContent).toBe('Block');
+      expect(fab.getAttribute('aria-label')).toBe('Enter block mode');
+    });
+
+    test('provides a queue slot inside the block mode card', () => {
+      inlineControls.init();
+
+      const slot = inlineControls.getQueueSlot();
+      expect(slot).not.toBeNull();
+      expect(container.querySelector('.tb-card').contains(slot)).toBe(true);
+    });
+  });
+
+  describe('queue badge', () => {
+    test('is hidden while the queue is empty', () => {
+      inlineControls.init();
+      inlineControls.setQueueSummary({ done: 0, total: 0, failed: 0, paused: false });
+
+      expect(container.querySelector('.tb-fab-badge').hidden).toBe(true);
+    });
+
+    test('shows done/total and describes it for screen readers', () => {
+      inlineControls.init();
+      inlineControls.setQueueSummary({ done: 3, total: 10, failed: 0, paused: false });
+
+      const badge = container.querySelector('.tb-fab-badge');
+      expect(badge.hidden).toBe(false);
+      expect(badge.textContent).toBe('3/10');
+      expect(container.querySelector('.tb-fab').getAttribute('aria-label')).toBe(
+        'Enter block mode (3/10 blocked)'
+      );
+    });
+
+    test('flags failures over pause', () => {
+      inlineControls.init();
+      const badge = () => container.querySelector('.tb-fab-badge');
+
+      inlineControls.setQueueSummary({ done: 1, total: 4, failed: 0, paused: true });
+      expect(badge().classList.contains('tb-fab-badge--paused')).toBe(true);
+
+      inlineControls.setQueueSummary({ done: 1, total: 4, failed: 2, paused: true });
+      expect(badge().classList.contains('tb-fab-badge--failed')).toBe(true);
+      expect(badge().classList.contains('tb-fab-badge--paused')).toBe(false);
+    });
+  });
+
+  describe('right context rail', () => {
+    afterEach(() => {
+      document.getElementById('barcelona-page-layout')?.remove();
+      railTracker.refresh(); // back to "no rail"
+    });
+
+    function mountRail() {
+      const { layout } = mountThreadsLayout({
+        railHtml: `<div ${COMMENT_ID_ATTR}="suggested"><a class="rail-link" href="/@suggested">s</a></div>`,
+        append: true, // keep the test's UI container in the body
+      });
+      railTracker.refresh();
+
+      inlineControls.init();
+      container.querySelector('.tb-fab').click(); // enter block mode
+
+      return () => {
+        const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+        layout.querySelector('.rail-link').dispatchEvent(click);
+        return click;
+      };
+    }
+
+    test('rail clicks pass through block mode, even on a stale mark', () => {
+      const clickRailLink = mountRail();
+
+      expect(clickRailLink().defaultPrevented).toBe(false);
+      expect(mockSelectionManager.toggle).not.toHaveBeenCalled();
+    });
+
+    test('rail navigation is swallowed while something is selected', () => {
+      const clickRailLink = mountRail();
+      mockSelectionManager.count.mockReturnValue(2);
+
+      expect(clickRailLink().defaultPrevented).toBe(true);
+      expect(mockSelectionManager.toggle).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('block action', () => {
+    test('keeps block mode open after enqueueing, clearing only the selection', () => {
+      global.chrome = { runtime: { sendMessage: jest.fn(async () => ({ ok: true })) } };
+      mockSelectionManager.getSelected.mockReturnValue(['alice']);
+      mockIdResolver.resolve.mockResolvedValue({ userId: '1' });
+      inlineControls.init();
+      container.querySelector('.tb-fab').click(); // enter block mode
+
+      container.querySelector('.tb-card-block-btn').click();
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: MessageType.ENQUEUE_BLOCK_BATCH })
+      );
+      expect(mockSelectionManager.clearSelection).toHaveBeenCalled();
+      expect(document.body.classList.contains('tb-blockmode')).toBe(true);
+      expect(container.querySelector('.tb-card').classList.contains('tb-card-visible')).toBe(true);
+    });
+  });
+
+  describe('block mode change event', () => {
+    test('fires on enter and exit so the stack can re-place', () => {
+      inlineControls.init();
+      const seen = [];
+      const listener = (e) => seen.push(e.detail.active);
+      window.addEventListener('tb-blockmode-change', listener);
+
+      container.querySelector('.tb-fab').click();
+      inlineControls._exitBlockMode();
+      window.removeEventListener('tb-blockmode-change', listener);
+
+      expect(seen).toEqual([true, false]);
     });
   });
 

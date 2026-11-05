@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { Panel } from '../../src/content/ui/panel.js';
+import { Panel, summarizeQueue } from '../../src/content/ui/panel.js';
 import { BlockState } from '../../src/shared/constants.js';
 import { MessageType } from '../../src/shared/messages.js';
 
@@ -40,21 +40,20 @@ describe('Panel', () => {
       expect(el.getAttribute('role')).toBe('region');
     });
 
-    test('creates badge, header, progress bar, body, and footer', () => {
+    test('creates header, progress bar, body, and footer', () => {
       panel.init();
 
-      expect(container.querySelector('.tb-panel-badge')).not.toBeNull();
       expect(container.querySelector('.tb-panel-header')).not.toBeNull();
       expect(container.querySelector('.tb-panel-progress-bar')).not.toBeNull();
       expect(container.querySelector('.tb-panel-body')).not.toBeNull();
       expect(container.querySelector('.tb-panel-footer')).not.toBeNull();
     });
 
-    test('starts minimized', () => {
+    test("has no minimized mode (collapsing is the FAB launcher's job)", () => {
       panel.init();
 
-      const el = container.querySelector('.tb-panel');
-      expect(el.classList.contains('tb-panel-minimized')).toBe(true);
+      expect(container.querySelector('.tb-panel-badge')).toBeNull();
+      expect(container.querySelector('.tb-panel-minimize-btn')).toBeNull();
     });
   });
 
@@ -75,18 +74,29 @@ describe('Panel', () => {
       expect(el.classList.contains('tb-panel-hidden')).toBe(false);
     });
 
-    test('updates badge text with progress', () => {
+    test('reports a queue summary for the FAB badge', () => {
+      const onSummary = jest.fn();
+      panel = new Panel(container, { onSummary });
       panel.init();
       panel.update(
         [
           { userId: '1', username: 'user1', state: BlockState.BLOCKED },
           { userId: '2', username: 'user2', state: BlockState.QUEUED },
+          { userId: '3', username: 'user3', state: BlockState.FAILED },
         ],
-        {}
+        { paused: false }
       );
 
-      const badge = container.querySelector('.tb-panel-badge-text');
-      expect(badge.textContent).toBe('1/2');
+      expect(onSummary).toHaveBeenCalledWith({ done: 1, total: 3, failed: 1, paused: false });
+    });
+
+    test('reports an empty summary when the queue drains', () => {
+      const onSummary = jest.fn();
+      panel = new Panel(container, { onSummary });
+      panel.init();
+      panel.update([], {});
+
+      expect(onSummary).toHaveBeenCalledWith({ done: 0, total: 0, failed: 0, paused: false });
     });
 
     test('updates progress bar width', () => {
@@ -185,20 +195,14 @@ describe('Panel', () => {
     });
   });
 
-  describe('minimize toggle', () => {
-    test('toggles minimized state when badge clicked', () => {
-      panel.init();
-
-      const badge = container.querySelector('.tb-panel-badge');
-      const el = container.querySelector('.tb-panel');
-
-      expect(el.classList.contains('tb-panel-minimized')).toBe(true);
-
-      badge.click();
-      expect(el.classList.contains('tb-panel-minimized')).toBe(false);
-
-      badge.click();
-      expect(el.classList.contains('tb-panel-minimized')).toBe(true);
+  describe('summarizeQueue', () => {
+    test('treats a rate-limit cooldown as paused', () => {
+      const items = [{ userId: '1', username: 'user1', state: BlockState.QUEUED }];
+      expect(summarizeQueue(items, { paused: false, cooldownEnd: Date.now() + 1000 }).paused).toBe(
+        true
+      );
+      expect(summarizeQueue(items, { paused: true }).paused).toBe(true);
+      expect(summarizeQueue(items, undefined).paused).toBe(false);
     });
   });
 

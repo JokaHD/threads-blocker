@@ -13,9 +13,11 @@ import { IDResolver } from './id-resolver.js';
 import { TokenProvider } from './token-provider.js';
 import { APIExecutor } from './api-executor.js';
 import { SelectionManager } from './selection-manager.js';
-import { getShadowRoot } from './ui/shadow-host.js';
+import { getShadowRoot, getStackContainer } from './ui/shadow-host.js';
 import { InlineControls } from './ui/inline-controls.js';
 import { Panel } from './ui/panel.js';
+import { StackPlacement } from './ui/stack-placement.js';
+import { railTracker } from './rail-tracker.js';
 import { MessageType } from '../shared/messages.js';
 import { BlockState } from '../shared/constants.js';
 import { installDebugGlobal } from './debug.js';
@@ -26,6 +28,13 @@ console.log('[ThreadBlocker] Content script loaded on', window.location.href);
 // Initialize Shadow DOM first
 getShadowRoot();
 
+// Shared right-rail view (scan, block mode, stack placement)
+railTracker.init();
+
+// Keep the stack clear of the right context rail
+const stackPlacement = new StackPlacement(getStackContainer());
+stackPlacement.init();
+
 // Initialize modules
 const domObserver = new DOMObserver();
 domObserver.init();
@@ -34,7 +43,6 @@ const idResolver = new IDResolver();
 const tokenProvider = new TokenProvider();
 const selectionManager = new SelectionManager();
 const inlineControls = new InlineControls(selectionManager, idResolver);
-const panel = new Panel();
 
 // Wrap API functions to use tokenProvider
 async function blockUserWithTokens(userId) {
@@ -85,6 +93,7 @@ function processExistingComments() {
   for (const comment of comments) {
     processComment(comment);
   }
+  stackPlacement.updateIfUnanchored();
 }
 
 // Start DOM observation
@@ -93,14 +102,20 @@ domObserver.startObserving((newComments) => {
   for (const comment of newComments) {
     processComment(comment);
   }
+  // Posts just laid out: the stack hugs their right edge
+  stackPlacement.updateIfUnanchored();
 });
 
-// Initialize UI (all in Shadow DOM)
+// Initialize UI (all in Shadow DOM). The queue Panel lives inside the
+// block mode card; the collapsed FAB mirrors its progress as a badge.
 inlineControls.init();
+const panel = new Panel(inlineControls.getQueueSlot(), {
+  onSummary: (summary) => inlineControls.setQueueSummary(summary),
+});
 panel.init();
 
 // Install debug global
-installDebugGlobal();
+installDebugGlobal({ stackPlacement });
 
 // Process existing comments after DOM is ready
 if (document.readyState === 'loading') {

@@ -9,6 +9,7 @@ import { Icons } from './icons.js';
 import { getUIContainer, getStackContainer } from './shadow-host.js';
 import { COMMENT_ID_ATTR } from '../dom-observer.js';
 import { threadsSiteRule } from '../site-adapter.js';
+import { railTracker } from '../rail-tracker.js';
 
 export class InlineControls {
   constructor(selectionManager, idResolver, container = null) {
@@ -40,9 +41,15 @@ export class InlineControls {
     // Create FAB (shown when not in block mode)
     this._fab = document.createElement('button');
     this._fab.className = 'tb-fab';
-    this._fab.innerHTML = `${Icons.shield}<span>Block Mode</span>`;
+    this._fab.innerHTML = `${Icons.shield}<span class="tb-fab-label">Block</span>`;
     this._fab.title = 'Enter block mode: click comments to select';
     this._fab.setAttribute('aria-label', 'Enter block mode');
+
+    // Queue progress, shown on the FAB while the queue is non-empty
+    this._fabBadge = document.createElement('span');
+    this._fabBadge.className = 'tb-fab-badge';
+    this._fabBadge.hidden = true;
+    this._fab.appendChild(this._fabBadge);
     this._fab.addEventListener('click', () => this._enterBlockMode());
     stackContainer.appendChild(this._fab);
 
@@ -53,7 +60,13 @@ export class InlineControls {
     this._clickHandler = (e) => {
       if (!this._blockMode) return;
 
-      const comment = e.target.closest(`[${COMMENT_ID_ATTR}]`);
+      // The right rail is never a target. Its clicks navigate as usual —
+      // unless something is selected: the route change would exit block
+      // mode and silently drop the selection, so swallow it like below.
+      const inRail = railTracker.contains(e.target);
+      if (inRail && this._selection.count() === 0) return;
+
+      const comment = inRail ? null : e.target.closest(`[${COMMENT_ID_ATTR}]`);
       if (!comment) {
         // Unmarked comment (heuristic miss): don't let it navigate away —
         // the route change would exit block mode and drop the selection.
@@ -84,6 +97,7 @@ export class InlineControls {
     this._hoverHandler = (e) => {
       if (!this._blockMode) return;
 
+      // Rail content is never marked (scan exclusion + unmark on rail change)
       const comment = e.target.closest(`[${COMMENT_ID_ATTR}]`);
 
       // Remove hover from previous
@@ -204,9 +218,14 @@ export class InlineControls {
     exitOnly.textContent = 'Exit →';
     exitOnly.addEventListener('click', () => this._exitBlockMode());
 
+    // Queue progress (Panel) mounts here — see getQueueSlot()
+    const queueSlot = document.createElement('div');
+    queueSlot.className = 'tb-card-queue';
+
     card.appendChild(countArea);
     card.appendChild(actions);
     card.appendChild(exitOnly);
+    card.appendChild(queueSlot);
 
     container.appendChild(card);
 
@@ -214,6 +233,36 @@ export class InlineControls {
     this._cardCountNum = countNum;
     this._cardActions = actions;
     this._cardExitOnly = exitOnly;
+    this._queueSlot = queueSlot;
+  }
+
+  /**
+   * Container inside the block mode card where the queue Panel lives, so
+   * the collapsed UI is a single button.
+   */
+  getQueueSlot() {
+    return this._queueSlot ?? null;
+  }
+
+  /**
+   * Mirror queue progress onto the FAB badge (fed by Panel via content.js).
+   * @param {{done: number, total: number, failed: number, paused: boolean}} summary
+   */
+  setQueueSummary({ done, total, failed, paused }) {
+    if (!this._fabBadge) return;
+    this._fabBadge.hidden = total === 0;
+    this._fabBadge.textContent = `${done}/${total}`;
+    this._fabBadge.classList.toggle('tb-fab-badge--failed', failed > 0);
+    this._fabBadge.classList.toggle('tb-fab-badge--paused', paused && failed === 0);
+    const label = total === 0 ? 'Enter block mode' : `Enter block mode (${done}/${total} blocked)`;
+    this._fab.setAttribute('aria-label', label);
+  }
+
+  /** StackPlacement re-places the stack when the card opens or closes. */
+  _notifyBlockModeChange() {
+    window.dispatchEvent(
+      new CustomEvent('tb-blockmode-change', { detail: { active: this._blockMode } })
+    );
   }
 
   _updateCard() {
@@ -258,8 +307,9 @@ export class InlineControls {
       })
       .catch((e) => console.error('[ThreadBlocker] Enqueue batch failed:', e.message));
 
+    // Stay in block mode: the card's queue section shows the progress, and
+    // the user keeps selecting or collapses via Exit when done
     this._selection.clearSelection();
-    this._exitBlockMode();
 
     this.resolveUsers(selected);
   }
@@ -455,6 +505,7 @@ export class InlineControls {
     // Add body class - this triggers CSS that disables pointer-events on links
     document.body.classList.add('tb-blockmode');
     this._syncHostBackground();
+    this._notifyBlockModeChange();
   }
 
   /**
@@ -491,6 +542,7 @@ export class InlineControls {
 
     this._lastHovered = null;
     this._selection.clearSelection();
+    this._notifyBlockModeChange();
   }
 
   _updateHighlights() {

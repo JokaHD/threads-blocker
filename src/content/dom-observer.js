@@ -4,6 +4,7 @@
  */
 
 import { getSiteRule } from './site-adapter.js';
+import { railTracker, RAIL_CHANGE_EVENT } from './rail-tracker.js';
 
 const COMMENT_ID_ATTR = 'data-tb-comment-id';
 
@@ -15,6 +16,11 @@ export class DOMObserver {
     this._debounceTimer = null;
     this._lastUrl = location.href;
     this._siteRule = null;
+    // A scan before the rail was laid out (late mount, or a zero-size rail
+    // on a narrow window that was then widened) may have marked rail users
+    this._onRailChange = (e) => {
+      if (e.detail?.rail) this._unmarkInside(e.detail.rail);
+    };
   }
 
   /**
@@ -48,14 +54,17 @@ export class DOMObserver {
     const results = [];
     const claimedContainers = new Set();
     const seenUsernames = new Set();
+    // Right rail content (focused author, quotes, follow suggestions) is
+    // never a target; resolved once per scan, read per link
+    const rail = railTracker.current();
 
     for (const link of links) {
       const href = link.getAttribute('href');
       const username = this._siteRule.extractUsername(href);
       if (!username) continue;
 
-      // Skip non-comment links (avatars, navigation, compose areas)
-      if (this._siteRule.shouldExcludeLink(link)) continue;
+      // Skip non-comment links (avatars, navigation, compose areas, right rail)
+      if (rail?.contains(link) || this._siteRule.shouldExcludeLink(link)) continue;
 
       const alreadySeen = seenUsernames.has(username);
       seenUsernames.add(username);
@@ -132,6 +141,16 @@ export class DOMObserver {
   }
 
   /**
+   * Drop marks (and block-mode classes) from every element inside `root`.
+   */
+  _unmarkInside(root) {
+    root.querySelectorAll(`[${COMMENT_ID_ATTR}]`).forEach((el) => {
+      el.removeAttribute(COMMENT_ID_ATTR);
+      el.classList.remove('tb-blockmode-target', 'tb-selected', 'tb-hover');
+    });
+  }
+
+  /**
    * Mark a container as processed.
    * @param {Element} container
    * @param {string} username
@@ -150,6 +169,7 @@ export class DOMObserver {
     }
 
     this._onNewComments = onNewComments;
+    window.addEventListener(RAIL_CHANGE_EVENT, this._onRailChange);
 
     // Main DOM observer with debounce
     this._observer = new MutationObserver(() => {
@@ -177,6 +197,7 @@ export class DOMObserver {
    * Stop observing.
    */
   stopObserving() {
+    window.removeEventListener(RAIL_CHANGE_EVENT, this._onRailChange);
     if (this._observer) {
       this._observer.disconnect();
       this._observer = null;
@@ -206,10 +227,7 @@ export class DOMObserver {
     console.log('[ThreadBlocker] Route changed to', location.href);
 
     // Clear old markers
-    document.querySelectorAll(`[${COMMENT_ID_ATTR}]`).forEach((el) => {
-      el.removeAttribute(COMMENT_ID_ATTR);
-      el.classList.remove('tb-blockmode-target', 'tb-selected');
-    });
+    this._unmarkInside(document);
 
     // Dispatch route change event for other components
     window.dispatchEvent(new CustomEvent('tb-route-change', { detail: { url: location.href } }));

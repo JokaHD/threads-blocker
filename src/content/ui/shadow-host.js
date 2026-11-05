@@ -113,6 +113,10 @@ function getExtensionStyles() {
       --tb-primary: #2563EB;
       --tb-danger: #DC2626;
       --tb-danger-hover: #B91C1C;
+      /* Block action: the danger red desaturated (hsl 0 45% 50%), so the
+         primary button doesn't shout; white text stays >= 4.5:1 */
+      --tb-block-action: #B94646;
+      --tb-block-action-hover: #9F3C3C;
       --tb-success: #16A34A;
       --tb-warning: #F59E0B;
       --tb-bg: rgba(25, 25, 25, 0.95);
@@ -156,12 +160,13 @@ function getExtensionStyles() {
     .tb-stack {
       position: fixed;
       bottom: 112px;
-      right: 24px;
+      /* Set by StackPlacement to clear the right context rail */
+      right: var(--tb-stack-right, 24px);
       display: flex;
       flex-direction: column;
       align-items: stretch;
       gap: 8px;
-      width: 280px;
+      width: var(--tb-stack-width, 280px);
       pointer-events: none;
     }
 
@@ -172,26 +177,70 @@ function getExtensionStyles() {
     /* ============================================================
        FAB — Floating Action Button (entry point)
        ============================================================ */
+    /* Compact launcher: 56x48 (not square on purpose), must match
+       StackLayout.COLLAPSED_WIDTH in stack-placement.js */
     .tb-fab {
+      position: relative;
       align-self: flex-end;
+      box-sizing: border-box;
+      width: 56px;
+      height: 48px;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 8px;
-      padding: 14px 22px;
-      border: none;
-      border-radius: 16px;
+      justify-content: center;
+      gap: 2px;
+      padding: 0;
+      border: 1px solid var(--tb-border);
+      border-radius: 14px;
       background: var(--tb-bg);
       color: var(--tb-text);
-      font-size: 15px;
+      font-size: 10px;
       font-weight: 600;
+      letter-spacing: 0.02em;
       cursor: pointer;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
       transition: all 200ms ease;
     }
 
     .tb-fab svg {
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
+    }
+
+    .tb-fab-label {
+      line-height: 1;
+    }
+
+    /* Queue progress on the launcher (done/total) */
+    .tb-fab-badge {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      min-width: 18px;
+      padding: 2px 5px;
+      border-radius: 9px;
+      background: var(--tb-primary);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 14px;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      box-shadow: 0 0 0 2px var(--tb-bg);
+    }
+
+    .tb-fab-badge[hidden] {
+      display: none;
+    }
+
+    .tb-fab-badge--paused {
+      background: var(--tb-warning);
+      color: #000;
+    }
+
+    .tb-fab-badge--failed {
+      background: var(--tb-danger);
     }
 
     .tb-fab:hover {
@@ -268,7 +317,7 @@ function getExtensionStyles() {
     .tb-card-block-btn {
       width: 100%;
       padding: 14px 20px;
-      background: var(--tb-danger);
+      background: var(--tb-block-action);
       color: #fff;
       border: none;
       border-radius: var(--tb-radius-sm);
@@ -279,7 +328,7 @@ function getExtensionStyles() {
     }
 
     .tb-card-block-btn:hover {
-      background: var(--tb-danger-hover);
+      background: var(--tb-block-action-hover);
     }
 
     .tb-card-block-btn:active {
@@ -336,8 +385,27 @@ function getExtensionStyles() {
     /* ============================================================
        Panel — queue progress (bottom-right, above FAB)
        ============================================================ */
+    /* Queue section at the bottom of the block mode card */
+    .tb-card-queue {
+      margin: 16px -20px -20px;
+      border-top: 1px solid var(--tb-border);
+    }
+
+    .tb-card-queue:empty,
+    .tb-card-queue:has(> .tb-panel-hidden) {
+      display: none;
+    }
+
+    .tb-card-queue .tb-panel {
+      border: none;
+      border-radius: 0 0 16px 16px;
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      max-height: min(320px, 45vh);
+    }
+
     .tb-panel {
-      order: -1;
       max-height: 360px;
       display: flex;
       flex-direction: column;
@@ -350,8 +418,7 @@ function getExtensionStyles() {
       overflow: hidden;
     }
 
-    .tb-panel-hidden,
-    .tb-panel-route-hidden {
+    .tb-panel-hidden {
       display: none;
     }
 
@@ -368,22 +435,6 @@ function getExtensionStyles() {
     .tb-panel-title {
       flex: 1;
       font-weight: 600;
-    }
-
-    .tb-panel-minimize-btn {
-      background: transparent;
-      border: none;
-      color: var(--tb-text-muted);
-      cursor: pointer;
-      padding: 2px 4px;
-      border-radius: 4px;
-      font-size: 14px;
-      line-height: 1;
-    }
-
-    .tb-panel-minimize-btn:hover {
-      color: var(--tb-text);
-      background: var(--tb-border);
     }
 
     .tb-panel-progress-bar {
@@ -609,44 +660,6 @@ function getExtensionStyles() {
 
     .tb-panel-cooldown-retry-btn:hover {
       background: #D97706;
-    }
-
-    /* Minimized state */
-    .tb-panel.tb-panel-minimized {
-      align-self: flex-end;
-      width: 48px;
-      height: 48px;
-      max-height: 48px;
-      border-radius: 50%;
-      cursor: pointer;
-    }
-
-    .tb-panel.tb-panel-minimized .tb-panel-header,
-    .tb-panel.tb-panel-minimized .tb-panel-progress-bar,
-    .tb-panel.tb-panel-minimized .tb-panel-body,
-    .tb-panel.tb-panel-minimized .tb-panel-pause-btn,
-    .tb-panel.tb-panel-minimized .tb-panel-footer,
-    .tb-panel.tb-panel-minimized .tb-panel-cooldown-area {
-      display: none;
-    }
-
-    .tb-panel-badge {
-      display: none;
-      width: 100%;
-      height: 100%;
-      align-items: center;
-      justify-content: center;
-      background: var(--tb-primary);
-      color: #fff;
-      font-size: 12px;
-      font-weight: 700;
-      border: none;
-      border-radius: 50%;
-      cursor: pointer;
-    }
-
-    .tb-panel.tb-panel-minimized .tb-panel-badge {
-      display: flex;
     }
 
     /* ============================================================

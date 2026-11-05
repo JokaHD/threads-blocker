@@ -9,3 +9,24 @@
 export function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+/**
+ * Coalesce calls into one `fn()` per animation frame.
+ * @returns {{schedule: () => void, cancel: () => void}}
+ */
+export function rafThrottle(fn) {
+  let frame = null;
+  return {
+    schedule() {
+      if (frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        fn();
+      });
+    },
+    cancel() {
+      if (frame !== null) cancelAnimationFrame(frame);
+      frame = null;
+    },
+  };
+}

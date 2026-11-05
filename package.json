@@ -54,7 +54,9 @@
           "panel",
           "inline-controls",
           "shadow-host",
-          "sidebar"
+          "sidebar",
+          "stack-placement",
+          "rail-tracker"
         ]
       },
       {
@@ -76,7 +78,9 @@
           "**/tests/unit/panel.test.js",
           "**/tests/unit/inline-controls.test.js",
           "**/tests/unit/shadow-host.test.js",
-          "**/tests/unit/sidebar.test.js"
+          "**/tests/unit/sidebar.test.js",
+          "**/tests/unit/stack-placement.test.js",
+          "**/tests/unit/rail-tracker.test.js"
         ]
       }
     ]

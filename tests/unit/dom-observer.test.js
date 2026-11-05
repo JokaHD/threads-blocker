@@ -2,6 +2,8 @@
 
 import { DOMObserver, COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
 import { threadsSiteRule } from '../../src/content/site-adapter.js';
+import { railTracker } from '../../src/content/rail-tracker.js';
+import { mountThreadsLayout } from './helpers/rail-fixture.js';
 
 describe('DOMObserver', () => {
   let observer;
@@ -379,5 +381,48 @@ describe('DOMObserver', () => {
       expect(marked).toHaveLength(2);
       expect(marked.map((m) => m.username).sort()).toEqual(['user1', 'user2']);
     });
+  });
+});
+
+describe('DOMObserver right context rail', () => {
+  let observer;
+
+  const mountLayout = (railHtml) =>
+    mountThreadsLayout({
+      centerHtml:
+        '<div data-pressable-container="true"><a href="/@author">author</a><span></span><span></span></div>',
+      railHtml,
+    }).rail;
+
+  beforeEach(() => {
+    observer = new DOMObserver();
+    observer.init();
+  });
+
+  afterEach(() => {
+    observer.stopObserving();
+    document.body.innerHTML = '';
+    railTracker.refresh(); // reset the shared cache to "no rail"
+  });
+
+  it('does not mark users inside the right rail', () => {
+    mountLayout(
+      '<div data-pressable-container="true"><a href="/@suggested">suggested</a><span></span><span></span></div>'
+    );
+
+    const usernames = observer.findComments(document.body).map((c) => c.username);
+
+    expect(usernames).toEqual(['author']);
+  });
+
+  it('clears rail marks left by a scan that ran before the rail was laid out', () => {
+    observer.startObserving(() => {});
+    mountLayout(`<div class="stale tb-selected" ${COMMENT_ID_ATTR}="suggested"></div>`);
+
+    railTracker.refresh(); // rail appears → tb-rail-change
+
+    const stale = document.querySelector('.stale');
+    expect(stale.hasAttribute(COMMENT_ID_ATTR)).toBe(false);
+    expect(stale.classList.contains('tb-selected')).toBe(false);
   });
 });

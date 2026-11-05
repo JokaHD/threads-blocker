@@ -1,4 +1,5 @@
 import { threadsSiteRule, getSiteRule } from '../../src/content/site-adapter.js';
+import { OBSERVED, setViewport, stubRect, mountThreadsLayout } from './helpers/rail-fixture.js';
 
 describe('threadsSiteRule', () => {
   describe('match', () => {
@@ -573,5 +574,110 @@ describe('getSiteRule', () => {
   it('match regex returns false for other URLs', () => {
     expect(threadsSiteRule.match.test('https://www.example.com/')).toBe(false);
     expect(threadsSiteRule.match.test('https://threads.net/')).toBe(false);
+  });
+});
+
+describe('threadsSiteRule right context rail', () => {
+  const { VW, VH } = OBSERVED;
+
+  beforeEach(() => setViewport());
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  const railRect = (el, opts = {}) =>
+    stubRect(el, { left: OBSERVED.RAIL_LEFT, width: OBSERVED.RAIL_WIDTH, ...opts });
+
+  const mountLayout = (railStyle) =>
+    mountThreadsLayout({
+      centerHtml: '<a class="post-link" href="/@author">author</a>',
+      railHtml: `<a class="rail-link" href="/@suggested">suggested</a>
+        <div data-pressable-container="true"><span class="rail-text">x</span></div>`,
+      railStyle,
+    }).rail;
+
+  describe('findRightRail', () => {
+    it('finds the sticky rail under #barcelona-page-layout', () => {
+      const rail = mountLayout();
+      expect(threadsSiteRule.findRightRail()).toBe(rail);
+    });
+
+    it('prefers a semantic aside / complementary landmark', () => {
+      mountLayout();
+      const aside = document.createElement('div');
+      aside.setAttribute('role', 'complementary');
+      aside.style.position = 'fixed';
+      railRect(aside, { left: 1400 });
+      document.body.appendChild(aside);
+      expect(threadsSiteRule.findRightRail()).toBe(aside);
+    });
+
+    it('falls back to an elementsFromPoint probe when the layout id is gone', () => {
+      document.body.innerHTML = `
+        <div class="renamed">
+          <div class="rail" style="position: sticky"><span class="hit">x</span></div>
+        </div>`;
+      const rail = document.querySelector('.rail');
+      railRect(rail);
+      document.elementsFromPoint = jest.fn(() => [document.querySelector('.hit')]);
+      try {
+        expect(threadsSiteRule.findRightRail()).toBe(rail);
+        expect(document.elementsFromPoint).toHaveBeenCalledWith(VW - 40, VH / 2);
+      } finally {
+        delete document.elementsFromPoint;
+      }
+    });
+
+    it('rejects a non-sticky column', () => {
+      mountLayout('position: relative');
+      expect(threadsSiteRule.findRightRail()).toBeNull();
+    });
+
+    it('rejects a column left of the right side of the viewport', () => {
+      const rail = mountLayout();
+      railRect(rail, { left: 500 });
+      expect(threadsSiteRule.findRightRail()).toBeNull();
+    });
+
+    it('rejects a collapsed rail', () => {
+      const rail = mountLayout();
+      railRect(rail, { width: 0 });
+      expect(threadsSiteRule.findRightRail()).toBeNull();
+    });
+
+    it('returns null in rect-less environments', () => {
+      document.body.innerHTML =
+        '<div id="barcelona-page-layout"><div style="position: sticky"></div></div>';
+      expect(threadsSiteRule.findRightRail()).toBeNull();
+    });
+  });
+
+  describe('getContentRight', () => {
+    function pressable(parent, { left, width }) {
+      const el = document.createElement('div');
+      el.setAttribute('data-pressable-container', 'true');
+      parent.appendChild(el);
+      return stubRect(el, { left, width, height: 100 });
+    }
+
+    it('takes the widest post right edge outside the rail and nav', () => {
+      const rail = mountLayout();
+      const center = document.querySelector('.center');
+      pressable(center, { left: 519, width: 638 }); // post → 1157
+      pressable(center, { left: 560, width: 500 }); // quoted embed → 1060
+      pressable(rail, { left: 1430, width: 280 }); // rail item, ignored
+      const nav = document.createElement('nav');
+      document.body.appendChild(nav);
+      pressable(nav, { left: 0, width: 1300 }); // nav item, ignored
+
+      expect(threadsSiteRule.getContentRight(rail)).toBe(1157);
+    });
+
+    it('returns null before any post is laid out', () => {
+      const rail = mountLayout();
+      pressable(document.querySelector('.center'), { left: 0, width: 0 });
+      expect(threadsSiteRule.getContentRight(rail)).toBeNull();
+    });
   });
 });

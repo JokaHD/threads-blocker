@@ -31,6 +31,14 @@ const SUPPORTED_PATH_PATTERNS = [
   /^\/search(\/.*)?$/, // search page (with sub-tabs)
 ];
 
+// Right context rail (see findRightRail). Layout root id observed on
+// threads.com 2026-11-05; width bounds bracket the observed 320px column.
+const PAGE_LAYOUT_ID = 'barcelona-page-layout';
+const RAIL_MIN_WIDTH = 200;
+const RAIL_MAX_WIDTH = 480;
+const CONTENT_SAMPLE_LIMIT = 20;
+const CONTENT_VISIT_LIMIT = 200;
+
 // Media lightbox view — UI is hidden even though path is under /@*
 const MEDIA_VIEW_PATTERN = /\/post\/[^/]+\/media/;
 
@@ -69,6 +77,94 @@ export const threadsSiteRule = {
   },
 
   /**
+   * Find the right-hand context rail (added 2026-11): a sticky ~320px
+   * column showing the focused user's profile, quotes and follow
+   * suggestions. Present on every supported page; collapsed (not rendered
+   * or zero-size) on narrow windows. It carries no semantic marker, so every
+   * candidate must also pass _isRightRailShaped().
+   *
+   * Candidates, most to least stable (verified 2026-11-05 debug, vw 1745):
+   *   1. `aside, [role="complementary"]` — semantic; absent today, kept so a
+   *      future ARIA landmark is picked up first
+   *   2. `#barcelona-page-layout > *`   — Meta's layout root id; the rail is
+   *      its direct sticky child (fragile if the id is renamed)
+   *   3. elementsFromPoint probe near the right viewport edge — layout-only,
+   *      survives id/structure changes but depends on hit-testing
+   * Uncached layout probe — read it through RailTracker (rail-tracker.js),
+   * which shares one result between scanning, block mode and placement.
+   * Failure mode: null → links are scanned as before and the extension
+   * stack stays at its default position. Never a wrong exclusion of the
+   * center column, because the shape check requires the right ~45% of the
+   * viewport.
+   *
+   * @returns {Element|null}
+   */
+  findRightRail() {
+    for (const el of document.querySelectorAll('aside, [role="complementary"]')) {
+      if (this._isRightRailShaped(el)) return el;
+    }
+
+    const layout = document.getElementById(PAGE_LAYOUT_ID);
+    if (layout) {
+      for (const el of layout.children) {
+        if (this._isRightRailShaped(el)) return el;
+      }
+    }
+
+    if (typeof document.elementsFromPoint === 'function') {
+      const hits = document.elementsFromPoint(window.innerWidth - 40, window.innerHeight / 2);
+      for (const hit of hits) {
+        for (let el = hit; el && el !== document.body; el = el.parentElement) {
+          if (this._isRightRailShaped(el)) return el;
+        }
+      }
+    }
+
+    return null;
+  },
+
+  /**
+   * Rail shape: sticky/fixed, column-sized, tall, and on the right side.
+   * Rect-based, so it is always false in rect-less test environments.
+   */
+  _isRightRailShaped(el) {
+    const rect = el.getBoundingClientRect();
+    if (rect.width < RAIL_MIN_WIDTH || rect.width > RAIL_MAX_WIDTH) return false;
+    if (rect.height < window.innerHeight * 0.5) return false;
+    if (rect.left < window.innerWidth * 0.55) return false;
+    const position = getComputedStyle(el).position;
+    return position === 'sticky' || position === 'fixed';
+  },
+
+  /**
+   * Right edge of the center (feed) column, for placing UI beside the rail.
+   * Measured from post containers outside the rail and nav —
+   * `[data-pressable-container]`, the same Meta attribute findContainer
+   * trusts — bounded to the first CONTENT_SAMPLE_LIMIT laid-out ones (posts
+   * share one right edge; the max absorbs narrower quoted embeds), and to
+   * CONTENT_VISIT_LIMIT candidates overall.
+   *
+   * @param {Element|null} rail
+   * @param {{left: number}} [railRect] - the rail's rect, if already read
+   * @returns {number|null} null when no post is laid out yet
+   */
+  getContentRight(rail, railRect = rail?.getBoundingClientRect()) {
+    const railLeft = railRect?.left ?? Infinity;
+    let max = null;
+    let sampled = 0;
+    let visited = 0;
+    for (const el of document.querySelectorAll('[data-pressable-container]')) {
+      if (++visited > CONTENT_VISIT_LIMIT) break;
+      if (rail?.contains(el) || this.isNavigationLink(el)) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.right > railLeft) continue;
+      if (max === null || rect.right > max) max = Math.round(rect.right);
+      if (++sampled >= CONTENT_SAMPLE_LIMIT) break;
+    }
+    return max;
+  },
+
+  /**
    * Check if a link is inside a compose/post area (contains editable elements).
    */
   isComposeAreaLink(link) {
@@ -97,7 +193,8 @@ export const threadsSiteRule = {
   /**
    * Should a block-mode click on `target` be swallowed so it cannot navigate?
    * Intentional navigation (sidebar / nav bar) and dialog tab switches stay
-   * clickable.
+   * clickable. (The right rail is let through before this, at the block
+   * mode handler's entry — see InlineControls.)
    */
   isBlockModeNavigationTrigger(target) {
     const trigger = target.closest?.(this.navigationTriggerSelector);
