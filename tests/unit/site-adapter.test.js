@@ -99,6 +99,7 @@ describe('threadsSiteRule', () => {
           <div><a role="link" href="/search?q=b&amp;serp_type=tags"><div><span dir="auto"><span>某話題</span></span></div></a></div>
           <div><span dir="auto"><a role="link" href="/@fake_user/post/ABC"><time><span><abbr><span>2小時</span></abbr></span></time></a></span></div>
           <div><div role="button"><svg><title>更多</title></svg></div></div>
+          <div><div><div><span dir="auto">作者</span></div></div></div>
           <div><div><span dir="auto"><span>明天股市會大跌</span></span></div></div>
           <div><div><span dir="auto"><span>第二段</span></span></div></div>
           <div><span dir="auto"><div><div><span>1</span><div><span>/</span></div><span>5</span></div></div></span></div>

@@ -79,6 +79,9 @@ const bodyTierCounts = { measured: 0, semantic: 0 };
 function isInBodySpan(node, container) {
   const span = node.parentElement.closest(BODY_SPAN_SELECTOR);
   if (!span || !container.contains(span)) return false;
+  // Body runs are always wrapped once more (span[dir=auto] > span); text set
+  // straight on span[dir=auto] is a label, e.g. the "作者" badge on replies
+  if (node.parentElement === span) return false;
   const link = span.closest('a');
   if (link && container.contains(link)) return false;
   for (let el = node.parentElement; el !== span; el = el.parentElement) {
