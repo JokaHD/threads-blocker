@@ -24,6 +24,8 @@ export default [
         ShadowRoot: 'readonly',
         MutationObserver: 'readonly',
         ResizeObserver: 'readonly',
+        requestAnimationFrame: 'readonly',
+        cancelAnimationFrame: 'readonly',
         Event: 'readonly',
         NodeFilter: 'readonly',
         CustomEvent: 'readonly',

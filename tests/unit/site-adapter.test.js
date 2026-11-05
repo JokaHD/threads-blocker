@@ -664,26 +664,32 @@ describe('threadsSiteRule right context rail', () => {
     });
   });
 
-  describe('exclusion', () => {
-    it('shouldExcludeLink excludes links inside the rail', () => {
-      mountLayout();
-      expect(threadsSiteRule.shouldExcludeLink(document.querySelector('.rail-link'))).toBe(true);
-      expect(threadsSiteRule.shouldExcludeLink(document.querySelector('.post-link'))).toBe(false);
+  describe('getContentRight', () => {
+    function pressable(parent, { left, width }) {
+      const el = document.createElement('div');
+      el.setAttribute('data-pressable-container', 'true');
+      el.getBoundingClientRect = () => ({ left, width, right: left + width, top: 0, height: 100 });
+      parent.appendChild(el);
+      return el;
+    }
+
+    it('takes the widest post right edge outside the rail and nav', () => {
+      const rail = mountLayout();
+      const center = document.querySelector('.center');
+      pressable(center, { left: 519, width: 638 }); // post → 1157
+      pressable(center, { left: 560, width: 500 }); // quoted embed → 1060
+      pressable(rail, { left: 1430, width: 280 }); // rail item, ignored
+      const nav = document.createElement('nav');
+      document.body.appendChild(nav);
+      pressable(nav, { left: 0, width: 1300 }); // nav item, ignored
+
+      expect(threadsSiteRule.getContentRight(rail)).toBe(1157);
     });
 
-    it('shouldExcludeLink uses a precomputed rail when given', () => {
-      mountLayout();
-      const link = document.querySelector('.rail-link');
-      expect(threadsSiteRule.shouldExcludeLink(link, null)).toBe(false);
-    });
-
-    it('block mode lets rail clicks through instead of swallowing them', () => {
-      mountLayout();
-      const trigger = (sel) =>
-        threadsSiteRule.isBlockModeNavigationTrigger(document.querySelector(sel));
-      expect(trigger('.rail-link')).toBe(false);
-      expect(trigger('.rail-text')).toBe(false);
-      expect(trigger('.post-link')).toBe(true);
+    it('returns null before any post is laid out', () => {
+      const rail = mountLayout();
+      pressable(document.querySelector('.center'), { left: 0, width: 0 });
+      expect(threadsSiteRule.getContentRight(rail)).toBeNull();
     });
   });
 });

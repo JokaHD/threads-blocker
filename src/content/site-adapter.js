@@ -36,6 +36,7 @@ const SUPPORTED_PATH_PATTERNS = [
 const PAGE_LAYOUT_ID = 'barcelona-page-layout';
 const RAIL_MIN_WIDTH = 200;
 const RAIL_MAX_WIDTH = 480;
+const CONTENT_SAMPLE_LIMIT = 20;
 
 // Media lightbox view — UI is hidden even though path is under /@*
 const MEDIA_VIEW_PATTERN = /\/post\/[^/]+\/media/;
@@ -88,6 +89,8 @@ export const threadsSiteRule = {
    *      its direct sticky child (fragile if the id is renamed)
    *   3. elementsFromPoint probe near the right viewport edge — layout-only,
    *      survives id/structure changes but depends on hit-testing
+   * Uncached layout probe — read it through RailTracker (rail-tracker.js),
+   * which shares one result between scanning, block mode and placement.
    * Failure mode: null → links are scanned as before and the extension
    * stack stays at its default position. Never a wrong exclusion of the
    * center column, because the shape check requires the right ~45% of the
@@ -133,15 +136,27 @@ export const threadsSiteRule = {
   },
 
   /**
-   * Is `el` inside the right context rail? Rail content (focused author,
-   * quotes, follow suggestions) is never a block-mode target.
+   * Right edge of the center (feed) column, for placing UI beside the rail.
+   * Measured from post containers outside the rail and nav —
+   * `[data-pressable-container]`, the same Meta attribute findContainer
+   * trusts — bounded to the first CONTENT_SAMPLE_LIMIT laid-out ones (posts
+   * share one right edge; the max absorbs narrower quoted embeds).
    *
-   * @param {Element} el
-   * @param {Element|null} [rail] - precomputed findRightRail() result; pass
-   *   it when checking many elements in one scan
+   * @param {Element|null} rail
+   * @returns {number|null} null when no post is laid out yet
    */
-  isInRightRail(el, rail = this.findRightRail()) {
-    return !!rail && rail.contains(el);
+  getContentRight(rail) {
+    const railLeft = rail?.getBoundingClientRect().left ?? Infinity;
+    let max = null;
+    let sampled = 0;
+    for (const el of document.querySelectorAll('[data-pressable-container]')) {
+      if (rail?.contains(el) || this.isNavigationLink(el)) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.right > railLeft) continue;
+      if (max === null || rect.right > max) max = Math.round(rect.right);
+      if (++sampled >= CONTENT_SAMPLE_LIMIT) break;
+    }
+    return max;
   },
 
   /**
@@ -154,13 +169,8 @@ export const threadsSiteRule = {
   /**
    * Single gate: should this link be excluded from comment scanning?
    */
-  shouldExcludeLink(link, rail = this.findRightRail()) {
-    return (
-      this.isAvatarLink(link) ||
-      this.isNavigationLink(link) ||
-      this.isComposeAreaLink(link) ||
-      this.isInRightRail(link, rail)
-    );
+  shouldExcludeLink(link) {
+    return this.isAvatarLink(link) || this.isNavigationLink(link) || this.isComposeAreaLink(link);
   },
 
   /**
@@ -177,14 +187,14 @@ export const threadsSiteRule = {
 
   /**
    * Should a block-mode click on `target` be swallowed so it cannot navigate?
-   * Intentional navigation (sidebar / nav bar, right context rail) and
-   * dialog tab switches stay clickable.
+   * Intentional navigation (sidebar / nav bar) and dialog tab switches stay
+   * clickable. (The right rail is let through before this, at the block
+   * mode handler's entry — see InlineControls.)
    */
   isBlockModeNavigationTrigger(target) {
     const trigger = target.closest?.(this.navigationTriggerSelector);
     if (!trigger) return false;
     if (this.isNavigationLink(trigger)) return false;
-    if (this.isInRightRail(trigger)) return false;
     if (trigger.closest('[role="tablist"], [role="tab"]')) return false;
     return true;
   },

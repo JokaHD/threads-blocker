@@ -5,6 +5,7 @@
 import { InlineControls } from '../../src/content/ui/inline-controls.js';
 import { COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
 import { MessageType } from '../../src/shared/messages.js';
+import { railTracker } from '../../src/content/rail-tracker.js';
 
 describe('InlineControls', () => {
   let inlineControls;
@@ -90,6 +91,39 @@ describe('InlineControls', () => {
       inlineControls.setQueueSummary({ done: 1, total: 4, failed: 2, paused: true });
       expect(badge().classList.contains('tb-fab-badge--failed')).toBe(true);
       expect(badge().classList.contains('tb-fab-badge--paused')).toBe(false);
+    });
+  });
+
+  describe('right context rail', () => {
+    afterEach(() => {
+      document.getElementById('barcelona-page-layout')?.remove();
+      railTracker.refresh(); // back to "no rail"
+    });
+
+    test('rail clicks pass through block mode, even on a stale mark', () => {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1745 });
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 828 });
+      const layout = document.createElement('div');
+      layout.id = 'barcelona-page-layout';
+      layout.innerHTML = `<div class="rail" style="position: sticky">
+          <div ${COMMENT_ID_ATTR}="suggested"><a class="rail-link" href="/@suggested">s</a></div>
+        </div>`;
+      document.body.appendChild(layout);
+      layout.querySelector('.rail').getBoundingClientRect = () => ({
+        left: 1412,
+        width: 320,
+        height: 828,
+      });
+      railTracker.refresh();
+
+      inlineControls.init();
+      container.querySelector('.tb-fab').click(); // enter block mode
+
+      const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+      layout.querySelector('.rail-link').dispatchEvent(click);
+
+      expect(click.defaultPrevented).toBe(false);
+      expect(mockSelectionManager.toggle).not.toHaveBeenCalled();
     });
   });
 

@@ -5,7 +5,7 @@ import {
   StackPlacement,
   StackLayout,
 } from '../../src/content/ui/stack-placement.js';
-import { COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
+import { RailTracker } from '../../src/content/rail-tracker.js';
 
 const VW = 1745;
 const VH = 828;
@@ -29,7 +29,7 @@ function mountLayout({ railLeft = 1412, postRight = 1157 } = {}) {
   const rail = document.querySelector('.rail');
   rail.getBoundingClientRect = rectOf({ left: railLeft, width: 320, height: VH });
   const post = document.querySelector('.post');
-  post.setAttribute(COMMENT_ID_ATTR, 'alice');
+  post.setAttribute('data-pressable-container', 'true');
   post.getBoundingClientRect = rectOf({ left: postRight - 638, width: 638, height: 300 });
   return { rail, post };
 }
@@ -105,103 +105,106 @@ describe('computeStackPlacement', () => {
 
 describe('StackPlacement', () => {
   let stack;
+  let tracker;
   let placement;
 
   beforeEach(() => {
-    jest.useFakeTimers();
     setViewport(VW, VH);
     stack = document.createElement('div');
+    tracker = new RailTracker();
   });
 
   afterEach(() => {
     placement?.destroy();
     placement = null;
-    jest.useRealTimers();
+    tracker.destroy();
     document.body.innerHTML = '';
   });
 
+  function start() {
+    placement = new StackPlacement(stack, tracker);
+    placement.init();
+    return placement;
+  }
+
+  const blockMode = (active) =>
+    window.dispatchEvent(new CustomEvent('tb-blockmode-change', { detail: { active } }));
+
   it('applies the placement through CSS variables', () => {
     mountLayout();
-    placement = new StackPlacement(stack);
-    placement.init();
+    tracker.refresh();
+    start();
 
     expect(stack.style.getPropertyValue('--tb-stack-right')).toBe('349px');
     expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('56px');
-    expect(placement.getState()).toMatchObject({ mode: 'in-gap', railFound: true });
+    expect(placement.getState()).toMatchObject({
+      mode: 'in-gap',
+      railFound: true,
+      contentRight: 1157,
+    });
   });
 
-  it('re-places immediately when block mode opens and closes', () => {
-    mountLayout();
-    placement = new StackPlacement(stack);
-    placement.init();
-
-    window.dispatchEvent(new CustomEvent('tb-blockmode-change', { detail: { active: true } }));
-    expect(placement.getState()).toMatchObject({ mode: 'extend-right', expanded: true });
-    expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('280px');
-
-    window.dispatchEvent(new CustomEvent('tb-blockmode-change', { detail: { active: false } }));
-    expect(placement.getState()).toMatchObject({ mode: 'in-gap', expanded: false });
-  });
-
-  it('ignores marked elements inside the rail when measuring the center column', () => {
+  it('ignores post containers inside the rail when measuring the center column', () => {
     const { rail } = mountLayout();
     const inRail = rail.querySelector('.rail-item');
-    inRail.setAttribute(COMMENT_ID_ATTR, 'suggested');
+    inRail.setAttribute('data-pressable-container', 'true');
     inRail.getBoundingClientRect = rectOf({ left: 1430, width: 280, height: 60 });
-
-    placement = new StackPlacement(stack);
-    placement.init();
+    tracker.refresh();
+    start();
 
     expect(placement.getState().contentRight).toBe(1157);
   });
 
+  it('re-places immediately when block mode opens and closes', () => {
+    mountLayout();
+    tracker.refresh();
+    start();
+
+    blockMode(true);
+    expect(placement.getState()).toMatchObject({ mode: 'extend-right', expanded: true });
+    expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('280px');
+
+    blockMode(false);
+    expect(placement.getState()).toMatchObject({ mode: 'in-gap', expanded: false });
+  });
+
   it('writes the defaults when no rail is present', () => {
-    document.body.innerHTML = '<div id="barcelona-page-layout"><div></div></div>';
-    placement = new StackPlacement(stack);
-    placement.init();
+    start();
 
     expect(stack.style.getPropertyValue('--tb-stack-right')).toBe('24px');
     expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('56px');
     expect(placement.getState().railFound).toBe(false);
   });
 
-  it('re-places after a late-mounted rail (throttled mutation)', async () => {
-    placement = new StackPlacement(stack);
-    placement.init();
+  it('re-places when the tracker reports a late-mounted rail', () => {
+    start();
     expect(placement.getState().mode).toBe('default');
 
     mountLayout();
-    await Promise.resolve(); // flush MutationObserver microtask
-    jest.advanceTimersByTime(StackLayout.UPDATE_THROTTLE_MS);
+    tracker.refresh(); // emits tb-rail-change
 
     expect(placement.getState().mode).toBe('in-gap');
   });
 
-  it('re-places on window resize', () => {
-    placement = new StackPlacement(stack);
-    placement.init();
-    placement._mutationObserver.disconnect(); // isolate the resize trigger
-    mountLayout();
+  it('re-places on window resize, once per frame', () => {
+    start();
+    const spy = jest.spyOn(placement, 'update');
+    const frames = [];
+    const raf = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      frames.push(cb);
+      return frames.length;
+    });
 
     window.dispatchEvent(new Event('resize'));
-    jest.advanceTimersByTime(StackLayout.UPDATE_THROTTLE_MS);
-
-    expect(placement.getState().mode).toBe('in-gap');
-  });
-
-  it('throttles bursts into a single update', () => {
-    placement = new StackPlacement(stack);
-    placement.init();
-    const spy = jest.spyOn(placement, 'update');
-
-    for (let i = 0; i < 10; i++) placement.scheduleUpdate();
-    jest.advanceTimersByTime(StackLayout.UPDATE_THROTTLE_MS);
+    window.dispatchEvent(new Event('resize'));
+    frames.forEach((cb) => cb());
+    raf.mockRestore();
 
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it('is a no-op without a stack element', () => {
-    placement = new StackPlacement(null);
+    placement = new StackPlacement(null, tracker);
     expect(() => placement.init()).not.toThrow();
     expect(placement.getState()).toBeNull();
   });

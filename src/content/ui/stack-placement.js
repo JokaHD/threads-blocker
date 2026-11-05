@@ -14,7 +14,7 @@
  */
 
 import { threadsSiteRule } from '../site-adapter.js';
-import { COMMENT_ID_ATTR } from '../dom-observer.js';
+import { railTracker, RAIL_CHANGE_EVENT } from '../rail-tracker.js';
 
 export const StackLayout = {
   DEFAULT_RIGHT: 24,
@@ -24,7 +24,6 @@ export const StackLayout = {
   // Closest the stack may get to the viewport edge when extending right
   MIN_EDGE: 8,
   GAP: 16,
-  UPDATE_THROTTLE_MS: 250,
 };
 
 /**
@@ -64,66 +63,51 @@ export function computeStackPlacement({ viewportWidth, railRect, contentRight, e
 export class StackPlacement {
   /**
    * @param {HTMLElement} stackEl - the .tb-stack container
+   * @param {import('../rail-tracker.js').RailTracker} [tracker]
    */
-  constructor(stackEl) {
+  constructor(stackEl, tracker = railTracker) {
     this._stack = stackEl;
-    this._timer = null;
-    this._mutationObserver = null;
-    this._resizeObserver = null;
-    this._observedRail = null;
-    this._onResize = () => this.scheduleUpdate();
+    this._tracker = tracker;
+    this._expanded = false;
+    this._frame = null;
+    this._last = null;
+    this._onRailChange = () => this.update();
     this._onBlockModeChange = (e) => {
       this._expanded = e.detail?.active === true;
-      // Immediate: the card must open in place, not jump after a throttle
+      // Immediate: the card must open in place, not jump a frame later
       this.update();
     };
-    this._expanded = false;
-    this._last = null;
+    // Viewport width moves `right` even when the rail box stays put
+    this._onResize = () => {
+      if (this._frame !== null) return;
+      this._frame = requestAnimationFrame(() => {
+        this._frame = null;
+        this.update();
+      });
+    };
   }
 
   init() {
     if (!this._stack) return;
-
-    window.addEventListener('resize', this._onResize);
-    window.addEventListener('tb-route-change', this._onResize);
+    window.addEventListener(RAIL_CHANGE_EVENT, this._onRailChange);
     window.addEventListener('tb-blockmode-change', this._onBlockModeChange);
-
-    // Rail mounts late and re-renders on navigation; only schedules here
-    this._mutationObserver = new MutationObserver(() => this.scheduleUpdate());
-    this._mutationObserver.observe(document.body, { childList: true, subtree: true });
-
-    if (typeof ResizeObserver === 'function') {
-      this._resizeObserver = new ResizeObserver(() => this.scheduleUpdate());
-    }
-
+    window.addEventListener('resize', this._onResize);
     this.update();
   }
 
   destroy() {
-    window.removeEventListener('resize', this._onResize);
-    window.removeEventListener('tb-route-change', this._onResize);
+    window.removeEventListener(RAIL_CHANGE_EVENT, this._onRailChange);
     window.removeEventListener('tb-blockmode-change', this._onBlockModeChange);
-    this._mutationObserver?.disconnect();
-    this._resizeObserver?.disconnect();
-    clearTimeout(this._timer);
-    this._timer = null;
-  }
-
-  /** Trailing throttle: at most one layout read per UPDATE_THROTTLE_MS. */
-  scheduleUpdate() {
-    if (this._timer !== null) return;
-    this._timer = setTimeout(() => {
-      this._timer = null;
-      this.update();
-    }, StackLayout.UPDATE_THROTTLE_MS);
+    window.removeEventListener('resize', this._onResize);
+    if (this._frame !== null) cancelAnimationFrame(this._frame);
+    this._frame = null;
   }
 
   update() {
-    const rail = threadsSiteRule.findRightRail();
-    this._watchRail(rail);
-
+    const rail = this._tracker.get();
     const railRect = rail?.getBoundingClientRect() ?? null;
-    const contentRight = rail ? this._measureContentRight(rail) : null;
+    // Measured fresh on every open, so posts that loaded after the rail count
+    const contentRight = rail ? threadsSiteRule.getContentRight(rail) : null;
     const placement = computeStackPlacement({
       viewportWidth: window.innerWidth,
       railRect,
@@ -147,28 +131,5 @@ export class StackPlacement {
   /** Last applied placement, for window.__TB_DEBUG__(). */
   getState() {
     return this._last;
-  }
-
-  /**
-   * Right edge of the center column, measured from marked posts outside
-   * the rail. Null when none is laid out yet.
-   */
-  _measureContentRight(rail) {
-    const railLeft = rail.getBoundingClientRect().left;
-    let max = null;
-    for (const el of document.querySelectorAll(`[${COMMENT_ID_ATTR}]`)) {
-      if (rail.contains(el)) continue;
-      const rect = el.getBoundingClientRect();
-      if (rect.width <= 0 || rect.right > railLeft) continue;
-      if (max === null || rect.right > max) max = Math.round(rect.right);
-    }
-    return max;
-  }
-
-  _watchRail(rail) {
-    if (!this._resizeObserver || rail === this._observedRail) return;
-    if (this._observedRail) this._resizeObserver.unobserve(this._observedRail);
-    if (rail) this._resizeObserver.observe(rail);
-    this._observedRail = rail;
   }
 }

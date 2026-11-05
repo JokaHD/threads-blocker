@@ -2,6 +2,7 @@
 
 import { DOMObserver, COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
 import { threadsSiteRule } from '../../src/content/site-adapter.js';
+import { railTracker } from '../../src/content/rail-tracker.js';
 
 describe('DOMObserver', () => {
   let observer;
@@ -383,11 +384,10 @@ describe('DOMObserver', () => {
 });
 
 describe('DOMObserver right context rail', () => {
-  afterEach(() => {
-    document.body.innerHTML = '';
-  });
+  let observer;
 
-  it('does not mark users inside the right rail', () => {
+  /** Rail as observed 2026-11-05: sticky 320px child of #barcelona-page-layout. */
+  function mountLayout(railHtml) {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1745 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 828 });
     document.body.innerHTML = `
@@ -395,45 +395,45 @@ describe('DOMObserver right context rail', () => {
         <div class="center">
           <div data-pressable-container="true"><a href="/@author">author</a><span></span><span></span></div>
         </div>
-        <div class="rail" style="position: sticky">
-          <div data-pressable-container="true"><a href="/@suggested">suggested</a><span></span><span></span></div>
-        </div>
+        <div class="rail" style="position: sticky">${railHtml}</div>
       </div>`;
-    document.querySelector('.rail').getBoundingClientRect = () => ({
+    const rail = document.querySelector('.rail');
+    rail.getBoundingClientRect = () => ({
       left: 1412,
       width: 320,
       height: 828,
       top: 0,
       right: 1732,
     });
+    return rail;
+  }
 
-    const observer = new DOMObserver();
+  beforeEach(() => {
+    observer = new DOMObserver();
     observer.init();
+  });
+
+  afterEach(() => {
+    observer.stopObserving();
+    document.body.innerHTML = '';
+    railTracker.refresh(); // reset the shared cache to "no rail"
+  });
+
+  it('does not mark users inside the right rail', () => {
+    mountLayout(
+      '<div data-pressable-container="true"><a href="/@suggested">suggested</a><span></span><span></span></div>'
+    );
+
     const usernames = observer.findComments(document.body).map((c) => c.username);
 
     expect(usernames).toEqual(['author']);
   });
 
   it('clears rail marks left by a scan that ran before the rail was laid out', () => {
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1745 });
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 828 });
-    document.body.innerHTML = `
-      <div id="barcelona-page-layout">
-        <div class="rail" style="position: sticky">
-          <div class="stale tb-selected" ${COMMENT_ID_ATTR}="suggested"></div>
-        </div>
-      </div>`;
-    document.querySelector('.rail').getBoundingClientRect = () => ({
-      left: 1412,
-      width: 320,
-      height: 828,
-      top: 0,
-      right: 1732,
-    });
+    observer.startObserving(() => {});
+    mountLayout(`<div class="stale tb-selected" ${COMMENT_ID_ATTR}="suggested"></div>`);
 
-    const observer = new DOMObserver();
-    observer.init();
-    observer.findComments(document.body);
+    railTracker.refresh(); // rail appears → tb-rail-change
 
     const stale = document.querySelector('.stale');
     expect(stale.hasAttribute(COMMENT_ID_ATTR)).toBe(false);

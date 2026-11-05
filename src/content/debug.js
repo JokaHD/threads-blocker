@@ -5,6 +5,7 @@
 
 import { getSiteRule } from './site-adapter.js';
 import { getShadowRoot, shadowHostExists } from './ui/shadow-host.js';
+import { railTracker } from './rail-tracker.js';
 
 // Live module instances handed over by content.js (see installDebugGlobal)
 let debugSources = {};
@@ -85,16 +86,8 @@ export function getDebugState() {
       panel: !!panel,
     },
 
-    // Right context rail + where the stack was placed to avoid it
-    rightRail: (() => {
-      const rail = siteRule?.findRightRail() ?? null;
-      const r = rail?.getBoundingClientRect();
-      return {
-        found: !!rail,
-        rect: r ? { left: Math.round(r.left), width: Math.round(r.width) } : null,
-        markedInside: rail?.querySelectorAll('[data-tb-comment-id]').length ?? 0,
-      };
-    })(),
+    // Right context rail (found / box live in stackPlacement below)
+    rightRailMarkedInside: railTracker.get()?.querySelectorAll('[data-tb-comment-id]').length ?? 0,
     stackPlacement: debugSources.stackPlacement?.getState() ?? null,
 
     // Block mode

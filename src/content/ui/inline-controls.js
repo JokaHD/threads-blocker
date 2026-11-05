@@ -9,6 +9,7 @@ import { Icons } from './icons.js';
 import { getUIContainer, getStackContainer } from './shadow-host.js';
 import { COMMENT_ID_ATTR } from '../dom-observer.js';
 import { threadsSiteRule } from '../site-adapter.js';
+import { railTracker } from '../rail-tracker.js';
 
 export class InlineControls {
   constructor(selectionManager, idResolver, container = null) {
@@ -58,10 +59,10 @@ export class InlineControls {
     // Document-level click handler (always active, checks block mode)
     this._clickHandler = (e) => {
       if (!this._blockMode) return;
+      // The right rail is outside block mode: its clicks navigate as usual
+      if (railTracker.contains(e.target)) return;
 
-      // A rail mark not yet cleared by the next scan is never a target
-      const marked = e.target.closest(`[${COMMENT_ID_ATTR}]`);
-      const comment = marked && !threadsSiteRule.isInRightRail(marked) ? marked : null;
+      const comment = e.target.closest(`[${COMMENT_ID_ATTR}]`);
       if (!comment) {
         // Unmarked comment (heuristic miss): don't let it navigate away —
         // the route change would exit block mode and drop the selection.
@@ -92,7 +93,9 @@ export class InlineControls {
     this._hoverHandler = (e) => {
       if (!this._blockMode) return;
 
-      const comment = e.target.closest(`[${COMMENT_ID_ATTR}]`);
+      const comment = railTracker.contains(e.target)
+        ? null
+        : e.target.closest(`[${COMMENT_ID_ATTR}]`);
 
       // Remove hover from previous
       if (this._lastHovered && this._lastHovered !== comment) {

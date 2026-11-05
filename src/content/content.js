@@ -17,6 +17,7 @@ import { getShadowRoot, getStackContainer } from './ui/shadow-host.js';
 import { InlineControls } from './ui/inline-controls.js';
 import { Panel } from './ui/panel.js';
 import { StackPlacement } from './ui/stack-placement.js';
+import { railTracker } from './rail-tracker.js';
 import { MessageType } from '../shared/messages.js';
 import { BlockState } from '../shared/constants.js';
 import { installDebugGlobal } from './debug.js';
@@ -26,6 +27,9 @@ console.log('[ThreadBlocker] Content script loaded on', window.location.href);
 
 // Initialize Shadow DOM first
 getShadowRoot();
+
+// Shared right-rail view (scan, block mode, stack placement)
+railTracker.init();
 
 // Initialize modules
 const domObserver = new DOMObserver();
