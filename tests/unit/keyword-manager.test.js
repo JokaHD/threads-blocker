@@ -90,6 +90,31 @@ describe('KeywordManager', () => {
     expect(root.querySelector('#km-foot').textContent).toContain('2026/11/6');
   });
 
+  test('ignores edits until the stored list has loaded', async () => {
+    const data = installChrome({ keywords: KEYWORDS });
+    let answer;
+    const realGet = chrome.storage.local.get;
+    chrome.storage.local.get = jest.fn(
+      (keys) => new Promise((r) => (answer = () => r(realGet(keys))))
+    );
+    root = document.createElement('main');
+    document.body.appendChild(root);
+    manager = new KeywordManager(root, { newId: () => 'early' });
+    const loading = manager.init();
+
+    // The overlay focuses the input at once: a submit can beat storage
+    submit('太早');
+    root.querySelector('#km-global-switch').click();
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+
+    answer();
+    await loading;
+    expect(data.keywords).toEqual(KEYWORDS);
+    submit('之後');
+    await settle();
+    expect(data.keywords.map((k) => k.text)).toEqual(['詐騙', '加賴', 'line', '之後']);
+  });
+
   test('shows an empty state without keywords', async () => {
     await mount({});
     expect(root.querySelector('#km-empty').hidden).toBe(false);

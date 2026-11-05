@@ -32,6 +32,9 @@ export class KeywordManager {
     this._pinned = new Set();
     this._pendingDelete = null; // { id, timer }
     this._destroyed = false;
+    // Until the stored list is read, an edit would save over it (the overlay
+    // focuses the input at once, so a submit can beat storage)
+    this._loaded = false;
     this._onStorageChange = (changes, area) => this._handleStorageChange(changes, area);
   }
 
@@ -47,6 +50,7 @@ export class KeywordManager {
     this._stats = data[KeywordStorageKey.STATS] ?? null;
     // Closed while storage was still answering: don't leave a listener behind
     if (this._destroyed) return;
+    this._loaded = true;
     chrome.storage.onChanged.addListener(this._onStorageChange);
     this._render();
   }
@@ -113,6 +117,7 @@ export class KeywordManager {
   }
 
   _add(raw) {
+    if (!this._loaded) return undefined;
     const text = normalizeKeyword(raw);
     if (!text) {
       return this._showError(
@@ -157,6 +162,7 @@ export class KeywordManager {
   }
 
   _setEnabled(on) {
+    if (!this._loaded) return undefined;
     this._enabled = on;
     this._render();
     return chrome.storage.local.set({ [KeywordStorageKey.ENABLED]: on });
