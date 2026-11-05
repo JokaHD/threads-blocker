@@ -136,7 +136,7 @@ function getExtensionStyles() {
       --tb-danger-text: #e3a0a0;
       --tb-danger-line: #5a3434;
       /* Same amber as ::highlight(tb-keyword) in content.css */
-      --tb-kw-mark: rgba(214, 168, 72, 0.3);
+      --tb-kw-mark: rgba(230, 170, 40, 0.38);
     }
 
     /* Light theme */
@@ -151,7 +151,7 @@ function getExtensionStyles() {
         --tb-warn-text: #9a6a1c;
         --tb-danger-text: #a33a3a;
         --tb-danger-line: #e6bcbc;
-        --tb-kw-mark: rgba(240, 196, 90, 0.45);
+        --tb-kw-mark: rgba(245, 190, 50, 0.5);
       }
     }
 
@@ -403,7 +403,7 @@ function getExtensionStyles() {
       display: flex;
       align-items: center;
       margin: 16px -20px 0;
-      padding: 10px 18px;
+      padding: 6px 14px 6px 8px;
       border-top: 1px solid var(--tb-border);
       font-size: 13px;
       color: var(--tb-text);
@@ -419,20 +419,26 @@ function getExtensionStyles() {
       margin-top: 0;
     }
 
-    /* One pill: [label + switch] | manage. The label lives inside the
-       switch button, so the whole left segment toggles */
+    /* One pill across the row: [label ··· switch] | manage. The label keeps
+       its place at the left edge (18px in from the card) and the controls
+       stay at the right, as before the pill; the outline only groups them.
+       The label lives inside the switch button, so the whole left segment
+       toggles */
     .tb-kw-group {
-      display: inline-flex;
+      display: flex;
+      flex: 1;
       align-items: stretch;
       border: 1px solid var(--tb-border);
       border-radius: 999px;
     }
 
     .tb-kw-switch {
-      display: inline-flex;
+      display: flex;
+      flex: 1;
       align-items: center;
+      justify-content: space-between;
       gap: 10px;
-      padding: 5px 10px 5px 14px;
+      padding: 4px 10px 4px 9px;
       border: none;
       border-radius: 999px 0 0 999px;
       background: none;
@@ -527,7 +533,8 @@ function getExtensionStyles() {
       pointer-events: auto;
     }
 
-    /* Fixed frame; the manager scrolls inside, so ✕ stays in reach */
+    /* Fixed frame sized by the window only, never by the keyword count;
+       the manager scrolls inside, so ✕ stays in reach */
     .tb-kw-modal {
       position: relative;
       box-sizing: border-box;
@@ -535,7 +542,7 @@ function getExtensionStyles() {
       flex-direction: column;
       width: 100%;
       max-width: 460px;
-      max-height: 80vh;
+      height: 80vh;
       background: var(--tb-bg);
       border: 1px solid var(--tb-border);
       border-radius: var(--tb-radius-md);
