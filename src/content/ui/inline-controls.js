@@ -23,6 +23,7 @@ export class InlineControls {
     this._cardActions = null;
     this._clickHandler = null;
     this._hoverHandler = null;
+    this._routeChangeHandler = null;
     this._lastHovered = null;
     this._confirmDialog = null;
     // Queue pause mirrored from the SW's queueNotify broadcast (content.js)
@@ -116,7 +117,8 @@ export class InlineControls {
     document.addEventListener('mouseover', this._hoverHandler, true);
 
     // Listen for route changes to hide UI on media view
-    window.addEventListener('tb-route-change', () => this._handleRouteChange());
+    this._routeChangeHandler = () => this._handleRouteChange();
+    window.addEventListener('tb-route-change', this._routeChangeHandler);
 
     // Listen for selection changes to update card
     this._selection.onChange(() => {
@@ -467,26 +469,6 @@ export class InlineControls {
     }
   }
 
-  get multiSelectMode() {
-    return this._blockMode;
-  }
-
-  setMultiSelectMode(enabled) {
-    if (enabled) {
-      this._enterBlockMode();
-    } else {
-      this._exitBlockMode();
-    }
-  }
-
-  _toggleBlockMode() {
-    if (this._blockMode) {
-      this._tryExit();
-    } else {
-      this._enterBlockMode();
-    }
-  }
-
   _enterBlockMode() {
     this._blockMode = true;
 
@@ -563,6 +545,9 @@ export class InlineControls {
     }
     if (this._hoverHandler) {
       document.removeEventListener('mouseover', this._hoverHandler, true);
+    }
+    if (this._routeChangeHandler) {
+      window.removeEventListener('tb-route-change', this._routeChangeHandler);
     }
     if (this._fab) {
       this._fab.remove();

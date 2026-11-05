@@ -663,26 +663,6 @@ function getExtensionStyles() {
     }
 
     /* ============================================================
-       Overlay — full-screen click interceptor for block mode
-       ============================================================ */
-    .tb-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 2147483646;
-      cursor: crosshair;
-      pointer-events: auto;
-      /* Transparent - user sees page underneath */
-      background: transparent;
-    }
-
-    .tb-overlay-hidden {
-      display: none;
-    }
-
-    /* ============================================================
        Confirm Dialog — exit block mode confirmation
        ============================================================ */
     .tb-confirm-backdrop {

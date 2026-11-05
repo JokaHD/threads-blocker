@@ -60,16 +60,3 @@ export const ThreadsAPI = {
   // {"errors":[{"message":"Rate limit exceeded","severity":"CRITICAL","code":1675004}]}
   RATE_LIMIT_ERROR_CODE: 1675004,
 };
-
-// Design tokens
-export const Colors = {
-  PRIMARY: '#2563EB',
-  DANGER: '#DC2626',
-  SUCCESS: '#16A34A',
-  WARNING: '#F59E0B',
-  SURFACE: '#F8FAFC',
-  TEXT: '#1E293B',
-  BORDER: '#E2E8F0',
-  SELECTION_BG: '#EFF6FF',
-  TOOLBAR_BG: '#1E293B',
-};
