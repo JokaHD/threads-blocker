@@ -44,19 +44,33 @@ const swBuild = {
   target: 'chrome120',
 };
 
+// Bundle options page (IIFE, loaded by a plain <script> in options.html)
+const optionsBuild = {
+  entryPoints: ['src/options/options.js'],
+  bundle: true,
+  outfile: `${outDir}/options.js`,
+  format: 'iife',
+  define,
+  minifySyntax,
+  target: 'chrome120',
+};
+
 // Copy static assets into dist/
 cpSync('styles/content.css', `${outDir}/content.css`);
 cpSync('manifest.json', `${outDir}/manifest.json`);
 cpSync('icons', `${outDir}/icons`, { recursive: true });
+cpSync('src/options/options.html', `${outDir}/options.html`);
+cpSync('src/options/options.css', `${outDir}/options.css`);
+
+const builds = [contentBuild, swBuild, optionsBuild];
 
 if (isWatch) {
-  const ctx1 = await esbuild.context(contentBuild);
-  const ctx2 = await esbuild.context(swBuild);
-  await ctx1.watch();
-  await ctx2.watch();
+  for (const options of builds) {
+    const ctx = await esbuild.context(options);
+    await ctx.watch();
+  }
   console.log('Watching for changes...');
 } else {
-  await esbuild.build(contentBuild);
-  await esbuild.build(swBuild);
+  await Promise.all(builds.map((options) => esbuild.build(options)));
   console.log('Build complete.');
 }

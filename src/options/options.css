@@ -1,0 +1,241 @@
+/* Keyword manager — extension design system (same palette family as the
+   in-page UI tokens in shadow-host.js), following the OS theme */
+:root {
+  --km-bg: #f6f6f7;
+  --km-surface: #ffffff;
+  --km-line: #e2e2e6;
+  --km-text: #1e1e22;
+  --km-muted: #6b6b74;
+  --km-switch-on: #5a6478;
+  --km-switch-off: #c9c9cf;
+  --km-btn: #2f3a57;
+  --km-btn-text: #eef1f8;
+  --km-warn: #9a6a1c;
+  --km-danger: #a33a3a;
+  --km-danger-line: #e6bcbc;
+  --km-mark-line: rgba(170, 80, 80, 0.85);
+  --km-mark-text: #6b2a2a;
+  --km-focus: #2563eb;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --km-bg: #141416;
+    --km-surface: #1c1c1f;
+    --km-line: #2e2e33;
+    --km-text: #e4e4e7;
+    --km-muted: #8b8b94;
+    --km-switch-off: #3a3a3f;
+    --km-warn: #d9b37a;
+    --km-danger: #e3a0a0;
+    --km-danger-line: #5a3434;
+    --km-mark-line: rgba(201, 128, 128, 0.85);
+    --km-mark-text: #f0d2d2;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--km-bg);
+  color: var(--km-text);
+  font:
+    14px/1.5 -apple-system,
+    'Segoe UI',
+    'Noto Sans TC',
+    sans-serif;
+}
+
+.km {
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 40px 16px 64px;
+  display: grid;
+  gap: 14px;
+}
+
+.km-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.km-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.km-global {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--km-muted);
+  font-size: 13px;
+}
+
+.km-hint {
+  margin: -8px 0 0;
+  color: var(--km-muted);
+  font-size: 12px;
+}
+
+.km-add {
+  display: flex;
+  gap: 8px;
+}
+
+.km-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--km-line);
+  border-radius: 8px;
+  background: var(--km-surface);
+  color: var(--km-text);
+  font: inherit;
+}
+
+.km-btn {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--km-btn);
+  color: var(--km-btn-text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.km-error {
+  margin: -8px 0 0;
+  color: var(--km-warn);
+  font-size: 12px;
+}
+
+.km-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.km-table th {
+  padding: 6px;
+  border-bottom: 1px solid var(--km-line);
+  color: var(--km-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.km-table td {
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--km-line);
+  white-space: nowrap;
+}
+
+.km-table .km-num {
+  text-align: right;
+}
+
+.km-col-on {
+  width: 40px;
+}
+
+.km-col-del {
+  width: 64px;
+}
+
+/* Keyword previewed with the in-page highlight style (option B) */
+.km-kw {
+  color: var(--km-mark-text);
+  text-decoration: underline 2px var(--km-mark-line);
+  text-underline-offset: 3px;
+}
+
+.km-row--off .km-kw {
+  color: var(--km-muted);
+  text-decoration-color: var(--km-switch-off);
+}
+
+.km-switch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: var(--km-switch-on);
+  cursor: pointer;
+  flex: none;
+}
+
+.km-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 14px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #f0f0f0;
+  transition: left 150ms ease;
+}
+
+.km-switch[aria-checked='false'] {
+  background: var(--km-switch-off);
+}
+
+.km-switch[aria-checked='false']::after {
+  left: 2px;
+}
+
+.km-del {
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--km-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.km-del--confirm {
+  border-color: var(--km-danger-line);
+  color: var(--km-danger);
+  font-size: 12px;
+}
+
+.km-empty,
+.km-foot {
+  margin: 0;
+  color: var(--km-muted);
+  font-size: 12px;
+}
+
+.km-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.km button:focus-visible,
+.km-input:focus-visible {
+  outline: 2px solid var(--km-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .km-switch::after {
+    transition: none;
+  }
+}

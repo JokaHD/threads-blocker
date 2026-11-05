@@ -3,6 +3,7 @@
   "name": "Threads Blocker",
   "version": "1.0.0",
   "description": "在 Threads 留言區快速批次封鎖帳號",
+  "minimum_chrome_version": "120",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
@@ -16,6 +17,16 @@
   "background": {
     "service_worker": "service-worker.js",
     "type": "module"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "commands": {
+    "toggle-keyword-highlight": {
+      "suggested_key": { "default": "Alt+Shift+H" },
+      "description": "切換關鍵字標示"
+    }
   },
   "content_scripts": [
     {
