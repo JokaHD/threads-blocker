@@ -47,14 +47,18 @@ export class RailTracker {
   }
 
   /**
-   * Cached rail while it is still in the DOM; otherwise re-probe (rail not
-   * laid out yet, or React swapped the element). Box changes of a cached
-   * rail are caught by the resize listener and ResizeObserver instead, so
-   * per-scan callers skip the full probe once the rail is known.
+   * Cached rail while it is still laid out; otherwise re-probe (rail not
+   * laid out yet, React swapped the element, or SPA navigation hid it: the
+   * previous route stays connected but zero-size). Other box changes of a
+   * cached rail are caught by the resize listener and ResizeObserver, so
+   * per-scan callers skip the full probe once the rail is known — one rect
+   * read instead.
    * @returns {Element|null}
    */
   current() {
-    return this._rail?.isConnected ? this._rail : this.refresh();
+    const rail = this._rail;
+    if (rail?.isConnected && rail.getBoundingClientRect().width > 0) return rail;
+    return this.refresh();
   }
 
   /** Is `el` inside the rail? Cheap: reads the cache only. */

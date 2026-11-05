@@ -63,6 +63,19 @@ describe('RailTracker', () => {
     expect(probe).toHaveBeenCalledTimes(1);
   });
 
+  it('current() re-probes a rail hidden by SPA navigation', () => {
+    tracker.init();
+    // Threads keeps the previous route in the DOM, hidden: still connected
+    rail.getBoundingClientRect = () => ({ left: 0, width: 0 });
+    const next = document.createElement('div');
+    next.getBoundingClientRect = () => ({ left: 1412, width: 320 });
+    document.body.appendChild(next);
+    found = next;
+
+    expect(tracker.current()).toBe(next);
+    expect(tracker.contains(rail.querySelector('.inside'))).toBe(false);
+  });
+
   it('re-probes on window resize (rail laid out without a mutation)', () => {
     found = null;
     tracker.init();
