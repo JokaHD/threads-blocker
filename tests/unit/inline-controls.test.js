@@ -125,11 +125,11 @@ describe('InlineControls', () => {
       expect(mockSelectionManager.toggle).not.toHaveBeenCalled();
     });
 
-    test('rail navigation is swallowed while something is selected', () => {
+    test('rail clicks still navigate while something is selected', () => {
       const clickRailLink = mountRail();
       mockSelectionManager.count.mockReturnValue(2);
 
-      expect(clickRailLink().defaultPrevented).toBe(true);
+      expect(clickRailLink().defaultPrevented).toBe(false);
       expect(mockSelectionManager.toggle).not.toHaveBeenCalled();
     });
   });
