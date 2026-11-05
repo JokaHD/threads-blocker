@@ -23,6 +23,8 @@ export default [
         HTMLElement: 'readonly',
         ShadowRoot: 'readonly',
         MutationObserver: 'readonly',
+        ResizeObserver: 'readonly',
+        Event: 'readonly',
         NodeFilter: 'readonly',
         CustomEvent: 'readonly',
         MouseEvent: 'readonly',

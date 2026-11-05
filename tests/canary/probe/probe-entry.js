@@ -48,6 +48,9 @@ function run() {
       lsd: !!tokenProvider._getLsd(),
     },
     navPresent: !!document.querySelector('nav, [role="navigation"]'),
+    // diagnostic only: the rail collapses on narrow viewports, so absence
+    // is not drift by itself
+    rightRailFound: !!rule.findRightRail(),
     pathSupported: rule.isSupportedPath(location.pathname),
     uiVisible: rule.isUIVisibleOnUrl(location.href),
     theme: rule.getTheme(),

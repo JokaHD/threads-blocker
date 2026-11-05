@@ -31,6 +31,12 @@ const SUPPORTED_PATH_PATTERNS = [
   /^\/search(\/.*)?$/, // search page (with sub-tabs)
 ];
 
+// Right context rail (see findRightRail). Layout root id observed on
+// threads.com 2026-11-05; width bounds bracket the observed 320px column.
+const PAGE_LAYOUT_ID = 'barcelona-page-layout';
+const RAIL_MIN_WIDTH = 200;
+const RAIL_MAX_WIDTH = 480;
+
 // Media lightbox view — UI is hidden even though path is under /@*
 const MEDIA_VIEW_PATTERN = /\/post\/[^/]+\/media/;
 
@@ -69,6 +75,76 @@ export const threadsSiteRule = {
   },
 
   /**
+   * Find the right-hand context rail (added 2026-11): a sticky ~320px
+   * column showing the focused user's profile, quotes and follow
+   * suggestions. Present on every supported page; collapsed (not rendered
+   * or zero-size) on narrow windows. It carries no semantic marker, so every
+   * candidate must also pass _isRightRailShaped().
+   *
+   * Candidates, most to least stable (verified 2026-11-05 debug, vw 1745):
+   *   1. `aside, [role="complementary"]` — semantic; absent today, kept so a
+   *      future ARIA landmark is picked up first
+   *   2. `#barcelona-page-layout > *`   — Meta's layout root id; the rail is
+   *      its direct sticky child (fragile if the id is renamed)
+   *   3. elementsFromPoint probe near the right viewport edge — layout-only,
+   *      survives id/structure changes but depends on hit-testing
+   * Failure mode: null → links are scanned as before and the extension
+   * stack stays at its default position. Never a wrong exclusion of the
+   * center column, because the shape check requires the right ~45% of the
+   * viewport.
+   *
+   * @returns {Element|null}
+   */
+  findRightRail() {
+    for (const el of document.querySelectorAll('aside, [role="complementary"]')) {
+      if (this._isRightRailShaped(el)) return el;
+    }
+
+    const layout = document.getElementById(PAGE_LAYOUT_ID);
+    if (layout) {
+      for (const el of layout.children) {
+        if (this._isRightRailShaped(el)) return el;
+      }
+    }
+
+    if (typeof document.elementsFromPoint === 'function') {
+      const hits = document.elementsFromPoint(window.innerWidth - 40, window.innerHeight / 2);
+      for (const hit of hits) {
+        for (let el = hit; el && el !== document.body; el = el.parentElement) {
+          if (this._isRightRailShaped(el)) return el;
+        }
+      }
+    }
+
+    return null;
+  },
+
+  /**
+   * Rail shape: sticky/fixed, column-sized, tall, and on the right side.
+   * Rect-based, so it is always false in rect-less test environments.
+   */
+  _isRightRailShaped(el) {
+    const rect = el.getBoundingClientRect();
+    if (rect.width < RAIL_MIN_WIDTH || rect.width > RAIL_MAX_WIDTH) return false;
+    if (rect.height < window.innerHeight * 0.5) return false;
+    if (rect.left < window.innerWidth * 0.55) return false;
+    const position = getComputedStyle(el).position;
+    return position === 'sticky' || position === 'fixed';
+  },
+
+  /**
+   * Is `el` inside the right context rail? Rail content (focused author,
+   * quotes, follow suggestions) is never a block-mode target.
+   *
+   * @param {Element} el
+   * @param {Element|null} [rail] - precomputed findRightRail() result; pass
+   *   it when checking many elements in one scan
+   */
+  isInRightRail(el, rail = this.findRightRail()) {
+    return !!rail && rail.contains(el);
+  },
+
+  /**
    * Check if a link is inside a compose/post area (contains editable elements).
    */
   isComposeAreaLink(link) {
@@ -78,8 +154,13 @@ export const threadsSiteRule = {
   /**
    * Single gate: should this link be excluded from comment scanning?
    */
-  shouldExcludeLink(link) {
-    return this.isAvatarLink(link) || this.isNavigationLink(link) || this.isComposeAreaLink(link);
+  shouldExcludeLink(link, rail = this.findRightRail()) {
+    return (
+      this.isAvatarLink(link) ||
+      this.isNavigationLink(link) ||
+      this.isComposeAreaLink(link) ||
+      this.isInRightRail(link, rail)
+    );
   },
 
   /**
@@ -96,13 +177,14 @@ export const threadsSiteRule = {
 
   /**
    * Should a block-mode click on `target` be swallowed so it cannot navigate?
-   * Intentional navigation (sidebar / nav bar) and dialog tab switches stay
-   * clickable.
+   * Intentional navigation (sidebar / nav bar, right context rail) and
+   * dialog tab switches stay clickable.
    */
   isBlockModeNavigationTrigger(target) {
     const trigger = target.closest?.(this.navigationTriggerSelector);
     if (!trigger) return false;
     if (this.isNavigationLink(trigger)) return false;
+    if (this.isInRightRail(trigger)) return false;
     if (trigger.closest('[role="tablist"], [role="tab"]')) return false;
     return true;
   },

@@ -6,6 +6,9 @@
 import { getSiteRule } from './site-adapter.js';
 import { getShadowRoot, shadowHostExists } from './ui/shadow-host.js';
 
+// Live module instances handed over by content.js (see installDebugGlobal)
+let debugSources = {};
+
 /**
  * Get current debug state as JSON.
  * Can be called from console via window.__TB_DEBUG__()
@@ -83,6 +86,18 @@ export function getDebugState() {
       panelMinimized: panel?.classList.contains('tb-panel-minimized') || false,
     },
 
+    // Right context rail + where the stack was placed to avoid it
+    rightRail: (() => {
+      const rail = siteRule?.findRightRail() ?? null;
+      const r = rail?.getBoundingClientRect();
+      return {
+        found: !!rail,
+        rect: r ? { left: Math.round(r.left), width: Math.round(r.width) } : null,
+        markedInside: rail?.querySelectorAll('[data-tb-comment-id]').length ?? 0,
+      };
+    })(),
+    stackPlacement: debugSources.stackPlacement?.getState() ?? null,
+
     // Block mode
     blockMode: document.body.classList.contains('tb-blockmode'),
 
@@ -121,7 +136,9 @@ export function logDebugState() {
  * Note: Cannot inject into page context due to CSP, so this only works
  * from the extension's console context.
  */
-export function installDebugGlobal() {
+export function installDebugGlobal(sources = {}) {
+  debugSources = sources;
+
   // Store reference for internal use (content script context only)
   window.__TB_DEBUG__ = logDebugState;
 

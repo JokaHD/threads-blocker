@@ -156,12 +156,13 @@ function getExtensionStyles() {
     .tb-stack {
       position: fixed;
       bottom: 112px;
-      right: 24px;
+      /* Set by StackPlacement to clear the right context rail */
+      right: var(--tb-stack-right, 24px);
       display: flex;
       flex-direction: column;
       align-items: stretch;
       gap: 8px;
-      width: 280px;
+      width: var(--tb-stack-width, 280px);
       pointer-events: none;
     }
 

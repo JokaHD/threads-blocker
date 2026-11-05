@@ -13,9 +13,10 @@ import { IDResolver } from './id-resolver.js';
 import { TokenProvider } from './token-provider.js';
 import { APIExecutor } from './api-executor.js';
 import { SelectionManager } from './selection-manager.js';
-import { getShadowRoot } from './ui/shadow-host.js';
+import { getShadowRoot, getStackContainer } from './ui/shadow-host.js';
 import { InlineControls } from './ui/inline-controls.js';
 import { Panel } from './ui/panel.js';
+import { StackPlacement } from './ui/stack-placement.js';
 import { MessageType } from '../shared/messages.js';
 import { BlockState } from '../shared/constants.js';
 import { installDebugGlobal } from './debug.js';
@@ -99,8 +100,12 @@ domObserver.startObserving((newComments) => {
 inlineControls.init();
 panel.init();
 
+// Keep the stack clear of the right context rail
+const stackPlacement = new StackPlacement(getStackContainer());
+stackPlacement.init();
+
 // Install debug global
-installDebugGlobal();
+installDebugGlobal({ stackPlacement });
 
 // Process existing comments after DOM is ready
 if (document.readyState === 'loading') {

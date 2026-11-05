@@ -575,3 +575,115 @@ describe('getSiteRule', () => {
     expect(threadsSiteRule.match.test('https://threads.net/')).toBe(false);
   });
 });
+
+describe('threadsSiteRule right context rail', () => {
+  const VW = 1745;
+  const VH = 828;
+
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: VW });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: VH });
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  /** Shape observed 2026-11-05: sticky, 320 wide, full height, at x=1412. */
+  function railRect(el, { left = 1412, width = 320, height = VH } = {}) {
+    el.getBoundingClientRect = () => ({ left, width, height, top: 0, right: left + width });
+  }
+
+  function mountLayout(railStyle = 'position: sticky') {
+    document.body.innerHTML = `
+      <div id="barcelona-page-layout">
+        <div class="center"><a class="post-link" href="/@author">author</a></div>
+        <div class="rail" style="${railStyle}">
+          <a class="rail-link" href="/@suggested">suggested</a>
+          <div data-pressable-container="true"><span class="rail-text">x</span></div>
+        </div>
+      </div>`;
+    const rail = document.querySelector('.rail');
+    railRect(rail);
+    return rail;
+  }
+
+  describe('findRightRail', () => {
+    it('finds the sticky rail under #barcelona-page-layout', () => {
+      const rail = mountLayout();
+      expect(threadsSiteRule.findRightRail()).toBe(rail);
+    });
+
+    it('prefers a semantic aside / complementary landmark', () => {
+      mountLayout();
+      const aside = document.createElement('div');
+      aside.setAttribute('role', 'complementary');
+      aside.style.position = 'fixed';
+      railRect(aside, { left: 1400 });
+      document.body.appendChild(aside);
+      expect(threadsSiteRule.findRightRail()).toBe(aside);
+    });
+
+    it('falls back to an elementsFromPoint probe when the layout id is gone', () => {
+      document.body.innerHTML = `
+        <div class="renamed">
+          <div class="rail" style="position: sticky"><span class="hit">x</span></div>
+        </div>`;
+      const rail = document.querySelector('.rail');
+      railRect(rail);
+      document.elementsFromPoint = jest.fn(() => [document.querySelector('.hit')]);
+      try {
+        expect(threadsSiteRule.findRightRail()).toBe(rail);
+        expect(document.elementsFromPoint).toHaveBeenCalledWith(VW - 40, VH / 2);
+      } finally {
+        delete document.elementsFromPoint;
+      }
+    });
+
+    it('rejects a non-sticky column', () => {
+      mountLayout('position: relative');
+      expect(threadsSiteRule.findRightRail()).toBeNull();
+    });
+
+    it('rejects a column left of the right side of the viewport', () => {
+      const rail = mountLayout();
+      railRect(rail, { left: 500 });
+      expect(threadsSiteRule.findRightRail()).toBeNull();
+    });
+
+    it('rejects a collapsed rail', () => {
+      const rail = mountLayout();
+      railRect(rail, { width: 0 });
+      expect(threadsSiteRule.findRightRail()).toBeNull();
+    });
+
+    it('returns null in rect-less environments', () => {
+      document.body.innerHTML =
+        '<div id="barcelona-page-layout"><div style="position: sticky"></div></div>';
+      expect(threadsSiteRule.findRightRail()).toBeNull();
+    });
+  });
+
+  describe('exclusion', () => {
+    it('shouldExcludeLink excludes links inside the rail', () => {
+      mountLayout();
+      expect(threadsSiteRule.shouldExcludeLink(document.querySelector('.rail-link'))).toBe(true);
+      expect(threadsSiteRule.shouldExcludeLink(document.querySelector('.post-link'))).toBe(false);
+    });
+
+    it('shouldExcludeLink uses a precomputed rail when given', () => {
+      mountLayout();
+      const link = document.querySelector('.rail-link');
+      expect(threadsSiteRule.shouldExcludeLink(link, null)).toBe(false);
+    });
+
+    it('block mode lets rail clicks through instead of swallowing them', () => {
+      mountLayout();
+      const trigger = (sel) =>
+        threadsSiteRule.isBlockModeNavigationTrigger(document.querySelector(sel));
+      expect(trigger('.rail-link')).toBe(false);
+      expect(trigger('.rail-text')).toBe(false);
+      expect(trigger('.post-link')).toBe(true);
+    });
+  });
+});

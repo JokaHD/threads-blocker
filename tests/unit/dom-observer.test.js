@@ -381,3 +381,36 @@ describe('DOMObserver', () => {
     });
   });
 });
+
+describe('DOMObserver right context rail', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('does not mark users inside the right rail', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1745 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 828 });
+    document.body.innerHTML = `
+      <div id="barcelona-page-layout">
+        <div class="center">
+          <div data-pressable-container="true"><a href="/@author">author</a><span></span><span></span></div>
+        </div>
+        <div class="rail" style="position: sticky">
+          <div data-pressable-container="true"><a href="/@suggested">suggested</a><span></span><span></span></div>
+        </div>
+      </div>`;
+    document.querySelector('.rail').getBoundingClientRect = () => ({
+      left: 1412,
+      width: 320,
+      height: 828,
+      top: 0,
+      right: 1732,
+    });
+
+    const observer = new DOMObserver();
+    observer.init();
+    const usernames = observer.findComments(document.body).map((c) => c.username);
+
+    expect(usernames).toEqual(['author']);
+  });
+});

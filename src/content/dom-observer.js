@@ -48,14 +48,16 @@ export class DOMObserver {
     const results = [];
     const claimedContainers = new Set();
     const seenUsernames = new Set();
+    // Once per scan: the rail check reads layout, and this loop runs per link
+    const rail = this._siteRule.findRightRail();
 
     for (const link of links) {
       const href = link.getAttribute('href');
       const username = this._siteRule.extractUsername(href);
       if (!username) continue;
 
-      // Skip non-comment links (avatars, navigation, compose areas)
-      if (this._siteRule.shouldExcludeLink(link)) continue;
+      // Skip non-comment links (avatars, navigation, compose areas, right rail)
+      if (this._siteRule.shouldExcludeLink(link, rail)) continue;
 
       const alreadySeen = seenUsernames.has(username);
       seenUsernames.add(username);
