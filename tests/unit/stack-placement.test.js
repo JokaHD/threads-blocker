@@ -35,61 +35,71 @@ function mountLayout({ railLeft = 1412, postRight = 1157 } = {}) {
 }
 
 describe('computeStackPlacement', () => {
+  // Debug-observed layout (2026-11-05): vw 1745, rail at 1412, posts end at 1157
+  const observed = { viewportWidth: VW, railRect: { left: 1412, width: 320 }, contentRight: 1157 };
+
   it('keeps the default spot when there is no rail', () => {
-    expect(
-      computeStackPlacement({ viewportWidth: VW, railRect: null, contentRight: 1157 })
-    ).toEqual({
+    const p = computeStackPlacement({ ...observed, railRect: null, expanded: false });
+    expect(p).toEqual({
       mode: 'default',
       right: StackLayout.DEFAULT_RIGHT,
-      width: StackLayout.DEFAULT_WIDTH,
+      width: StackLayout.COLLAPSED_WIDTH,
     });
   });
 
   it('treats a collapsed (zero-width) rail as absent', () => {
     const p = computeStackPlacement({
-      viewportWidth: VW,
+      ...observed,
       railRect: { left: VW, width: 0 },
-      contentRight: 1157,
+      expanded: true,
     });
-    expect(p.mode).toBe('default');
+    expect(p).toEqual({
+      mode: 'default',
+      right: StackLayout.DEFAULT_RIGHT,
+      width: StackLayout.EXPANDED_WIDTH,
+    });
   });
 
-  it('sits left of the rail, shrunk to the gap (debug-observed layout)', () => {
-    const p = computeStackPlacement({
-      viewportWidth: VW,
-      railRect: { left: 1412, width: 320 },
-      contentRight: 1157,
-    });
-    // right = 1745 - 1412 + 16; width = 1412 - 1157 - 32
-    expect(p).toEqual({ mode: 'beside-rail', right: 349, width: 223 });
+  it('puts the collapsed FAB in the gap, against the rail', () => {
+    const p = computeStackPlacement({ ...observed, expanded: false });
+    // right = 1745 - (1412 - 16)
+    expect(p).toEqual({ mode: 'in-gap', right: 349, width: StackLayout.COLLAPSED_WIDTH });
   });
 
-  it('caps the width at the default on wide gaps', () => {
+  it('puts the expanded card in the gap when it fits', () => {
     const p = computeStackPlacement({
       viewportWidth: 2560,
       railRect: { left: 2200, width: 320 },
       contentRight: 1500,
+      expanded: true,
     });
-    expect(p.width).toBe(StackLayout.DEFAULT_WIDTH);
+    expect(p).toEqual({ mode: 'in-gap', right: 376, width: StackLayout.EXPANDED_WIDTH });
   });
 
-  it('falls back to the default spot when the gap is too narrow', () => {
-    const p = computeStackPlacement({
-      viewportWidth: 1300,
-      railRect: { left: 980, width: 320 },
-      contentRight: 900,
-    });
-    expect(p.mode).toBe('overlay-fallback');
-    expect(p.right).toBe(StackLayout.DEFAULT_RIGHT);
+  it('extends the expanded card right over the rail, never left over posts', () => {
+    const p = computeStackPlacement({ ...observed, expanded: true });
+    // gap is 1173..1396 (223px) < 280 → card spans 1173..1453
+    expect(p).toEqual({ mode: 'extend-right', right: 292, width: StackLayout.EXPANDED_WIDTH });
+    const left = VW - p.right - p.width;
+    expect(left).toBe(1157 + StackLayout.GAP);
   });
 
-  it('uses the default width when the center column is not measurable yet', () => {
+  it('shrinks from the right edge only when the viewport runs out', () => {
     const p = computeStackPlacement({
-      viewportWidth: VW,
-      railRect: { left: 1412, width: 320 },
-      contentRight: null,
+      viewportWidth: 1000,
+      railRect: { left: 800, width: 200 },
+      contentRight: 780,
+      expanded: true,
     });
-    expect(p).toEqual({ mode: 'beside-rail', right: 349, width: StackLayout.DEFAULT_WIDTH });
+    expect(p.mode).toBe('extend-right');
+    expect(p.right).toBe(StackLayout.MIN_EDGE);
+    // left edge stays at the posts' edge + GAP
+    expect(1000 - p.right - p.width).toBe(780 + StackLayout.GAP);
+  });
+
+  it('trusts the gap when the center column is not measurable yet', () => {
+    const p = computeStackPlacement({ ...observed, contentRight: null, expanded: true });
+    expect(p).toEqual({ mode: 'in-gap', right: 349, width: StackLayout.EXPANDED_WIDTH });
   });
 });
 
@@ -110,14 +120,27 @@ describe('StackPlacement', () => {
     document.body.innerHTML = '';
   });
 
-  it('applies the beside-rail placement through CSS variables', () => {
+  it('applies the placement through CSS variables', () => {
     mountLayout();
     placement = new StackPlacement(stack);
     placement.init();
 
     expect(stack.style.getPropertyValue('--tb-stack-right')).toBe('349px');
-    expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('223px');
-    expect(placement.getState()).toMatchObject({ mode: 'beside-rail', railFound: true });
+    expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('56px');
+    expect(placement.getState()).toMatchObject({ mode: 'in-gap', railFound: true });
+  });
+
+  it('re-places immediately when block mode opens and closes', () => {
+    mountLayout();
+    placement = new StackPlacement(stack);
+    placement.init();
+
+    window.dispatchEvent(new CustomEvent('tb-blockmode-change', { detail: { active: true } }));
+    expect(placement.getState()).toMatchObject({ mode: 'extend-right', expanded: true });
+    expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('280px');
+
+    window.dispatchEvent(new CustomEvent('tb-blockmode-change', { detail: { active: false } }));
+    expect(placement.getState()).toMatchObject({ mode: 'in-gap', expanded: false });
   });
 
   it('ignores marked elements inside the rail when measuring the center column', () => {
@@ -138,7 +161,7 @@ describe('StackPlacement', () => {
     placement.init();
 
     expect(stack.style.getPropertyValue('--tb-stack-right')).toBe('24px');
-    expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('280px');
+    expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('56px');
     expect(placement.getState().railFound).toBe(false);
   });
 
@@ -151,7 +174,7 @@ describe('StackPlacement', () => {
     await Promise.resolve(); // flush MutationObserver microtask
     jest.advanceTimersByTime(StackLayout.UPDATE_THROTTLE_MS);
 
-    expect(placement.getState().mode).toBe('beside-rail');
+    expect(placement.getState().mode).toBe('in-gap');
   });
 
   it('re-places on window resize', () => {
@@ -163,7 +186,7 @@ describe('StackPlacement', () => {
     window.dispatchEvent(new Event('resize'));
     jest.advanceTimersByTime(StackLayout.UPDATE_THROTTLE_MS);
 
-    expect(placement.getState().mode).toBe('beside-rail');
+    expect(placement.getState().mode).toBe('in-gap');
   });
 
   it('throttles bursts into a single update', () => {

@@ -35,7 +35,6 @@ const idResolver = new IDResolver();
 const tokenProvider = new TokenProvider();
 const selectionManager = new SelectionManager();
 const inlineControls = new InlineControls(selectionManager, idResolver);
-const panel = new Panel();
 
 // Wrap API functions to use tokenProvider
 async function blockUserWithTokens(userId) {
@@ -96,8 +95,12 @@ domObserver.startObserving((newComments) => {
   }
 });
 
-// Initialize UI (all in Shadow DOM)
+// Initialize UI (all in Shadow DOM). The queue Panel lives inside the
+// block mode card; the collapsed FAB mirrors its progress as a badge.
 inlineControls.init();
+const panel = new Panel(inlineControls.getQueueSlot(), {
+  onSummary: (summary) => inlineControls.setQueueSummary(summary),
+});
 panel.init();
 
 // Keep the stack clear of the right context rail

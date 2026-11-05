@@ -3,8 +3,10 @@
  * context rail (threads.com 2026-11 layout).
  *
  * Rail present: the stack sits in the gap between the center column and the
- * rail, shrunk to fit. Gap too narrow, or no rail (narrow window collapses
- * it): the stack falls back to its default bottom-right spot.
+ * rail, against the rail. When it does not fit (the expanded card on a
+ * narrow window), it starts at the center column's right edge and extends
+ * RIGHT over the rail — never left over the posts. No rail (narrow windows
+ * collapse it): default bottom-right spot.
  *
  * Applied through CSS custom properties on the stack container, so the
  * stylesheet keeps the defaults and nothing is positioned when this module
@@ -16,8 +18,11 @@ import { COMMENT_ID_ATTR } from '../dom-observer.js';
 
 export const StackLayout = {
   DEFAULT_RIGHT: 24,
-  DEFAULT_WIDTH: 280,
-  MIN_WIDTH: 200,
+  // Block mode card (expanded) / FAB launcher (collapsed, see .tb-fab CSS)
+  EXPANDED_WIDTH: 280,
+  COLLAPSED_WIDTH: 56,
+  // Closest the stack may get to the viewport edge when extending right
+  MIN_EDGE: 8,
   GAP: 16,
   UPDATE_THROTTLE_MS: 250,
 };
@@ -30,21 +35,30 @@ export const StackLayout = {
  * @param {{left: number, width: number}|null} input.railRect
  * @param {number|null} input.contentRight - right edge of the center column,
  *   null when unknown (no marked post to measure)
- * @returns {{mode: string, right: number, width: number}}
+ * @param {boolean} input.expanded - block mode card open (vs. FAB only)
+ * @returns {{mode: 'default'|'in-gap'|'extend-right', right: number, width: number}}
  */
-export function computeStackPlacement({ viewportWidth, railRect, contentRight }) {
-  const { DEFAULT_RIGHT, DEFAULT_WIDTH, MIN_WIDTH, GAP } = StackLayout;
-  const fallback = (mode) => ({ mode, right: DEFAULT_RIGHT, width: DEFAULT_WIDTH });
+export function computeStackPlacement({ viewportWidth, railRect, contentRight, expanded }) {
+  const { DEFAULT_RIGHT, EXPANDED_WIDTH, COLLAPSED_WIDTH, MIN_EDGE, GAP } = StackLayout;
+  const width = expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
 
-  if (!railRect || railRect.width <= 0) return fallback('default');
+  if (!railRect || railRect.width <= 0) return { mode: 'default', right: DEFAULT_RIGHT, width };
 
-  const right = Math.round(viewportWidth - railRect.left + GAP);
-  // Without a measured center column, assume the full default width fits
-  const available =
-    contentRight == null ? DEFAULT_WIDTH : Math.floor(railRect.left - contentRight - 2 * GAP);
-  if (available < MIN_WIDTH) return fallback('overlay-fallback');
+  const gapRight = railRect.left - GAP;
+  // Unknown center column: trust the gap until a post can be measured
+  const gapLeft = contentRight == null ? -Infinity : contentRight + GAP;
 
-  return { mode: 'beside-rail', right, width: Math.min(DEFAULT_WIDTH, available) };
+  if (gapRight - gapLeft >= width) {
+    return { mode: 'in-gap', right: Math.round(viewportWidth - gapRight), width };
+  }
+
+  // Anchor at the posts' edge and grow right; only the right side may shrink
+  const right = Math.max(MIN_EDGE, Math.round(viewportWidth - (gapLeft + width)));
+  return {
+    mode: 'extend-right',
+    right,
+    width: Math.round(Math.min(width, viewportWidth - right - gapLeft)),
+  };
 }
 
 export class StackPlacement {
@@ -58,6 +72,12 @@ export class StackPlacement {
     this._resizeObserver = null;
     this._observedRail = null;
     this._onResize = () => this.scheduleUpdate();
+    this._onBlockModeChange = (e) => {
+      this._expanded = e.detail?.active === true;
+      // Immediate: the card must open in place, not jump after a throttle
+      this.update();
+    };
+    this._expanded = false;
     this._last = null;
   }
 
@@ -66,6 +86,7 @@ export class StackPlacement {
 
     window.addEventListener('resize', this._onResize);
     window.addEventListener('tb-route-change', this._onResize);
+    window.addEventListener('tb-blockmode-change', this._onBlockModeChange);
 
     // Rail mounts late and re-renders on navigation; only schedules here
     this._mutationObserver = new MutationObserver(() => this.scheduleUpdate());
@@ -81,6 +102,7 @@ export class StackPlacement {
   destroy() {
     window.removeEventListener('resize', this._onResize);
     window.removeEventListener('tb-route-change', this._onResize);
+    window.removeEventListener('tb-blockmode-change', this._onBlockModeChange);
     this._mutationObserver?.disconnect();
     this._resizeObserver?.disconnect();
     clearTimeout(this._timer);
@@ -106,6 +128,7 @@ export class StackPlacement {
       viewportWidth: window.innerWidth,
       railRect,
       contentRight,
+      expanded: this._expanded,
     });
 
     this._stack.style.setProperty('--tb-stack-right', `${placement.right}px`);
@@ -113,6 +136,7 @@ export class StackPlacement {
 
     this._last = {
       ...placement,
+      expanded: this._expanded,
       railFound: !!rail,
       railRect: railRect && { left: Math.round(railRect.left), width: Math.round(railRect.width) },
       contentRight,

@@ -47,7 +47,64 @@ describe('InlineControls', () => {
 
       const fab = container.querySelector('.tb-fab');
       expect(fab).not.toBeNull();
-      expect(fab.textContent).toContain('Block Mode');
+      expect(fab.querySelector('.tb-fab-label').textContent).toBe('Block');
+      expect(fab.getAttribute('aria-label')).toBe('Enter block mode');
+    });
+
+    test('provides a queue slot inside the block mode card', () => {
+      inlineControls.init();
+
+      const slot = inlineControls.getQueueSlot();
+      expect(slot).not.toBeNull();
+      expect(container.querySelector('.tb-card').contains(slot)).toBe(true);
+    });
+  });
+
+  describe('queue badge', () => {
+    test('is hidden while the queue is empty', () => {
+      inlineControls.init();
+      inlineControls.setQueueSummary({ done: 0, total: 0, failed: 0, paused: false });
+
+      expect(container.querySelector('.tb-fab-badge').hidden).toBe(true);
+    });
+
+    test('shows done/total and describes it for screen readers', () => {
+      inlineControls.init();
+      inlineControls.setQueueSummary({ done: 3, total: 10, failed: 0, paused: false });
+
+      const badge = container.querySelector('.tb-fab-badge');
+      expect(badge.hidden).toBe(false);
+      expect(badge.textContent).toBe('3/10');
+      expect(container.querySelector('.tb-fab').getAttribute('aria-label')).toBe(
+        'Enter block mode (3/10 blocked)'
+      );
+    });
+
+    test('flags failures over pause', () => {
+      inlineControls.init();
+      const badge = () => container.querySelector('.tb-fab-badge');
+
+      inlineControls.setQueueSummary({ done: 1, total: 4, failed: 0, paused: true });
+      expect(badge().classList.contains('tb-fab-badge--paused')).toBe(true);
+
+      inlineControls.setQueueSummary({ done: 1, total: 4, failed: 2, paused: true });
+      expect(badge().classList.contains('tb-fab-badge--failed')).toBe(true);
+      expect(badge().classList.contains('tb-fab-badge--paused')).toBe(false);
+    });
+  });
+
+  describe('block mode change event', () => {
+    test('fires on enter and exit so the stack can re-place', () => {
+      inlineControls.init();
+      const seen = [];
+      const listener = (e) => seen.push(e.detail.active);
+      window.addEventListener('tb-blockmode-change', listener);
+
+      container.querySelector('.tb-fab').click();
+      inlineControls._exitBlockMode();
+      window.removeEventListener('tb-blockmode-change', listener);
+
+      expect(seen).toEqual([true, false]);
     });
   });
 

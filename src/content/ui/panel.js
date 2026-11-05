@@ -1,6 +1,7 @@
 /**
  * Panel - queue progress display.
- * Lives in Shadow DOM, positioned bottom-right above FAB.
+ * Lives in Shadow DOM, inside the block mode card (InlineControls'
+ * queue slot); the collapsed FAB carries a done/total badge instead.
  */
 
 import { BlockState } from '../../shared/constants.js';
@@ -9,19 +10,34 @@ import { Icons } from './icons.js';
 import { getStackContainer } from './shadow-host.js';
 import { threadsSiteRule } from '../site-adapter.js';
 
+/**
+ * Queue counts for the FAB badge.
+ * @returns {{done: number, total: number, failed: number, paused: boolean}}
+ */
+export function summarizeQueue(items, status) {
+  return {
+    done: items.filter((i) => i.state === BlockState.BLOCKED).length,
+    total: items.length,
+    failed: items.filter((i) => i.state === BlockState.FAILED).length,
+    paused: (status?.paused ?? false) || !!status?.cooldownEnd,
+  };
+}
+
 export class Panel {
-  constructor(container = null) {
+  /**
+   * @param {Element|null} container
+   * @param {{onSummary?: (summary: ReturnType<typeof summarizeQueue>) => void}} [options]
+   */
+  constructor(container = null, { onSummary = null } = {}) {
     this._container = container;
+    this._onSummary = onSummary;
     this._el = null;
-    this._minimized = true;
     this._cooldownInterval = null;
     this._cooldownEnd = null;
     this._paused = false;
     this._routeHidden = false;
 
     // Element references
-    this._badge = null;
-    this._badgeText = null;
     this._progressFill = null;
     this._body = null;
     this._pauseBtn = null;
@@ -47,12 +63,6 @@ export class Panel {
     panel.setAttribute('role', 'region');
     panel.setAttribute('aria-label', 'Block progress');
 
-    // Minimized badge
-    const badge = document.createElement('button');
-    badge.className = 'tb-panel-badge';
-    badge.innerHTML = `${Icons.shield} <span class="tb-panel-badge-text">0/0</span>`;
-    badge.addEventListener('click', () => this._toggleMinimized());
-
     // Header
     const header = document.createElement('div');
     header.className = 'tb-panel-header';
@@ -61,14 +71,7 @@ export class Panel {
     title.className = 'tb-panel-title';
     title.textContent = 'Block Progress';
 
-    const minimizeBtn = document.createElement('button');
-    minimizeBtn.className = 'tb-panel-minimize-btn';
-    minimizeBtn.innerHTML = Icons.minus;
-    minimizeBtn.title = 'Minimize';
-    minimizeBtn.addEventListener('click', () => this._toggleMinimized());
-
     header.appendChild(title);
-    header.appendChild(minimizeBtn);
 
     // Progress bar
     const progressBar = document.createElement('div');
@@ -133,7 +136,6 @@ export class Panel {
     cooldownArea.className = 'tb-panel-cooldown-area';
 
     // Assemble
-    panel.appendChild(badge);
     panel.appendChild(header);
     panel.appendChild(progressBar);
     panel.appendChild(body);
@@ -145,16 +147,11 @@ export class Panel {
 
     // Store references
     this._el = panel;
-    this._badge = badge;
-    this._badgeText = badge.querySelector('.tb-panel-badge-text');
     this._progressFill = progressFill;
     this._body = body;
     this._pauseBtn = pauseBtn;
     this._retryAllBtn = retryAllBtn;
     this._cooldownArea = cooldownArea;
-
-    // Start minimized
-    this._applyMinimized();
 
     // Listen for route changes to hide on non-whitelisted pages
     window.addEventListener('tb-route-change', () => this._handleRouteChange());
@@ -177,8 +174,9 @@ export class Panel {
 
     this._paused = status?.paused ?? false;
 
-    const total = items.length;
-    const done = items.filter((i) => i.state === BlockState.BLOCKED).length;
+    const summary = summarizeQueue(items, status);
+    const { total, done } = summary;
+    this._onSummary?.(summary);
 
     // Show/hide panel
     if (total === 0) {
@@ -186,11 +184,6 @@ export class Panel {
       return;
     }
     this._el.classList.remove('tb-panel-hidden');
-
-    // Badge text
-    if (this._badgeText) {
-      this._badgeText.textContent = `${done}/${total}`;
-    }
 
     // Progress bar
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -307,16 +300,6 @@ export class Panel {
   }
 
   // Private methods
-
-  _toggleMinimized() {
-    this._minimized = !this._minimized;
-    this._applyMinimized();
-  }
-
-  _applyMinimized() {
-    if (!this._el) return;
-    this._el.classList.toggle('tb-panel-minimized', this._minimized);
-  }
 
   _togglePause() {
     const type = this._paused ? MessageType.RESUME_QUEUE : MessageType.PAUSE_QUEUE;
