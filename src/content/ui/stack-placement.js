@@ -2,11 +2,11 @@
  * Stack placement — keeps the FAB / card / panel stack out of the right
  * context rail (threads.com 2026-11 layout).
  *
- * Rail present: the stack sits in the gap between the center column and the
- * rail, against the rail. When it does not fit (the expanded card on a
- * narrow window), it starts at the center column's right edge and extends
- * RIGHT over the rail — never left over the posts. No rail (narrow windows
- * collapse it): default bottom-right spot.
+ * Rail present: the stack hugs the center column — its left edge sits just
+ * right of the posts, for the FAB and the card alike, so opening the card
+ * only grows it rightward (over the rail when the gap is narrow), never left
+ * over the posts. Before any post is laid out, it waits against the rail.
+ * No rail (narrow windows collapse it): default bottom-right spot.
  *
  * Applied through CSS custom properties on the stack container, so the
  * stylesheet keeps the defaults and nothing is positioned when this module
@@ -33,9 +33,9 @@ export const StackLayout = {
  * @param {number} input.viewportWidth
  * @param {{left: number, width: number}|null} input.railRect
  * @param {number|null} input.contentRight - right edge of the center column,
- *   null when unknown (no marked post to measure)
+ *   null when unknown (no post laid out yet)
  * @param {boolean} input.expanded - block mode card open (vs. FAB only)
- * @returns {{mode: 'default'|'in-gap'|'extend-right', right: number, width: number}}
+ * @returns {{mode: 'default'|'beside-content'|'beside-rail', right: number, width: number}}
  */
 export function computeStackPlacement({ viewportWidth, railRect, contentRight, expanded }) {
   const { DEFAULT_RIGHT, EXPANDED_WIDTH, COLLAPSED_WIDTH, MIN_EDGE, GAP } = StackLayout;
@@ -43,20 +43,18 @@ export function computeStackPlacement({ viewportWidth, railRect, contentRight, e
 
   if (!railRect || railRect.width <= 0) return { mode: 'default', right: DEFAULT_RIGHT, width };
 
-  const gapRight = railRect.left - GAP;
-  // Unknown center column: trust the gap until a post can be measured
-  const gapLeft = contentRight == null ? -Infinity : contentRight + GAP;
-
-  if (gapRight - gapLeft >= width) {
-    return { mode: 'in-gap', right: Math.round(viewportWidth - gapRight), width };
+  // Unknown center column: wait against the rail until a post is measured
+  if (contentRight == null) {
+    return { mode: 'beside-rail', right: Math.round(viewportWidth - railRect.left + GAP), width };
   }
 
   // Anchor at the posts' edge and grow right; only the right side may shrink
-  const right = Math.max(MIN_EDGE, Math.round(viewportWidth - (gapLeft + width)));
+  const left = contentRight + GAP;
+  const right = Math.max(MIN_EDGE, Math.round(viewportWidth - (left + width)));
   return {
-    mode: 'extend-right',
+    mode: 'beside-content',
     right,
-    width: Math.round(Math.min(width, viewportWidth - right - gapLeft)),
+    width: Math.round(Math.min(width, viewportWidth - right - left)),
   };
 }
 

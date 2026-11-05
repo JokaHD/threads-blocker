@@ -97,6 +97,8 @@ domObserver.startObserving((newComments) => {
   for (const comment of newComments) {
     processComment(comment);
   }
+  // Posts just laid out: the stack hugs their right edge
+  stackPlacement.update();
 });
 
 // Initialize UI (all in Shadow DOM). The queue Panel lives inside the

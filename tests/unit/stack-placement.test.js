@@ -60,26 +60,26 @@ describe('computeStackPlacement', () => {
     });
   });
 
-  it('puts the collapsed FAB in the gap, against the rail', () => {
+  it('puts the collapsed FAB right beside the posts', () => {
     const p = computeStackPlacement({ ...observed, expanded: false });
-    // right = 1745 - (1412 - 16)
-    expect(p).toEqual({ mode: 'in-gap', right: 349, width: StackLayout.COLLAPSED_WIDTH });
+    // left = 1157 + 16 = 1173; right = 1745 - (1173 + 56)
+    expect(p).toEqual({ mode: 'beside-content', right: 516, width: StackLayout.COLLAPSED_WIDTH });
   });
 
-  it('puts the expanded card in the gap when it fits', () => {
+  it('opens the card from the same left edge as the FAB, on wide gaps too', () => {
     const p = computeStackPlacement({
       viewportWidth: 2560,
       railRect: { left: 2200, width: 320 },
       contentRight: 1500,
       expanded: true,
     });
-    expect(p).toEqual({ mode: 'in-gap', right: 376, width: StackLayout.EXPANDED_WIDTH });
+    expect(p).toEqual({ mode: 'beside-content', right: 764, width: StackLayout.EXPANDED_WIDTH });
   });
 
   it('extends the expanded card right over the rail, never left over posts', () => {
     const p = computeStackPlacement({ ...observed, expanded: true });
     // gap is 1173..1396 (223px) < 280 → card spans 1173..1453
-    expect(p).toEqual({ mode: 'extend-right', right: 292, width: StackLayout.EXPANDED_WIDTH });
+    expect(p).toEqual({ mode: 'beside-content', right: 292, width: StackLayout.EXPANDED_WIDTH });
     const left = VW - p.right - p.width;
     expect(left).toBe(1157 + StackLayout.GAP);
   });
@@ -91,15 +91,15 @@ describe('computeStackPlacement', () => {
       contentRight: 780,
       expanded: true,
     });
-    expect(p.mode).toBe('extend-right');
+    expect(p.mode).toBe('beside-content');
     expect(p.right).toBe(StackLayout.MIN_EDGE);
     // left edge stays at the posts' edge + GAP
     expect(1000 - p.right - p.width).toBe(780 + StackLayout.GAP);
   });
 
-  it('trusts the gap when the center column is not measurable yet', () => {
+  it('waits against the rail when the center column is not measurable yet', () => {
     const p = computeStackPlacement({ ...observed, contentRight: null, expanded: true });
-    expect(p).toEqual({ mode: 'in-gap', right: 349, width: StackLayout.EXPANDED_WIDTH });
+    expect(p).toEqual({ mode: 'beside-rail', right: 349, width: StackLayout.EXPANDED_WIDTH });
   });
 });
 
@@ -135,10 +135,10 @@ describe('StackPlacement', () => {
     tracker.refresh();
     start();
 
-    expect(stack.style.getPropertyValue('--tb-stack-right')).toBe('349px');
+    expect(stack.style.getPropertyValue('--tb-stack-right')).toBe('516px');
     expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('56px');
     expect(placement.getState()).toMatchObject({
-      mode: 'in-gap',
+      mode: 'beside-content',
       railFound: true,
       contentRight: 1157,
     });
@@ -161,11 +161,13 @@ describe('StackPlacement', () => {
     start();
 
     blockMode(true);
-    expect(placement.getState()).toMatchObject({ mode: 'extend-right', expanded: true });
+    expect(placement.getState()).toMatchObject({ mode: 'beside-content', expanded: true });
+    expect(stack.style.getPropertyValue('--tb-stack-right')).toBe('292px');
     expect(stack.style.getPropertyValue('--tb-stack-width')).toBe('280px');
 
     blockMode(false);
-    expect(placement.getState()).toMatchObject({ mode: 'in-gap', expanded: false });
+    expect(placement.getState()).toMatchObject({ mode: 'beside-content', expanded: false });
+    expect(stack.style.getPropertyValue('--tb-stack-right')).toBe('516px');
   });
 
   it('writes the defaults when no rail is present', () => {
@@ -183,7 +185,7 @@ describe('StackPlacement', () => {
     mountLayout();
     tracker.refresh(); // emits tb-rail-change
 
-    expect(placement.getState().mode).toBe('in-gap');
+    expect(placement.getState().mode).toBe('beside-content');
   });
 
   it('re-places on window resize, once per frame', () => {
