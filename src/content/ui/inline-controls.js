@@ -304,8 +304,9 @@ export class InlineControls {
       })
       .catch((e) => console.error('[ThreadBlocker] Enqueue batch failed:', e.message));
 
+    // Stay in block mode: the card's queue section shows the progress, and
+    // the user keeps selecting or collapses via Exit when done
     this._selection.clearSelection();
-    this._exitBlockMode();
 
     this.resolveUsers(selected);
   }

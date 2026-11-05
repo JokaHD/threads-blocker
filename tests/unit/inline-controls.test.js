@@ -127,6 +127,25 @@ describe('InlineControls', () => {
     });
   });
 
+  describe('block action', () => {
+    test('keeps block mode open after enqueueing, clearing only the selection', () => {
+      global.chrome = { runtime: { sendMessage: jest.fn(async () => ({ ok: true })) } };
+      mockSelectionManager.getSelected.mockReturnValue(['alice']);
+      mockIdResolver.resolve.mockResolvedValue({ userId: '1' });
+      inlineControls.init();
+      container.querySelector('.tb-fab').click(); // enter block mode
+
+      container.querySelector('.tb-card-block-btn').click();
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: MessageType.ENQUEUE_BLOCK_BATCH })
+      );
+      expect(mockSelectionManager.clearSelection).toHaveBeenCalled();
+      expect(document.body.classList.contains('tb-blockmode')).toBe(true);
+      expect(container.querySelector('.tb-card').classList.contains('tb-card-visible')).toBe(true);
+    });
+  });
+
   describe('block mode change event', () => {
     test('fires on enter and exit so the stack can re-place', () => {
       inlineControls.init();

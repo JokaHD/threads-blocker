@@ -113,6 +113,10 @@ function getExtensionStyles() {
       --tb-primary: #2563EB;
       --tb-danger: #DC2626;
       --tb-danger-hover: #B91C1C;
+      /* Block action: the danger red desaturated (hsl 0 45% 50%), so the
+         primary button doesn't shout; white text stays >= 4.5:1 */
+      --tb-block-action: #B94646;
+      --tb-block-action-hover: #9F3C3C;
       --tb-success: #16A34A;
       --tb-warning: #F59E0B;
       --tb-bg: rgba(25, 25, 25, 0.95);
@@ -313,7 +317,7 @@ function getExtensionStyles() {
     .tb-card-block-btn {
       width: 100%;
       padding: 14px 20px;
-      background: var(--tb-danger);
+      background: var(--tb-block-action);
       color: #fff;
       border: none;
       border-radius: var(--tb-radius-sm);
@@ -324,7 +328,7 @@ function getExtensionStyles() {
     }
 
     .tb-card-block-btn:hover {
-      background: var(--tb-danger-hover);
+      background: var(--tb-block-action-hover);
     }
 
     .tb-card-block-btn:active {
