@@ -92,7 +92,11 @@
     };
   };
 
-  const marked = [...document.querySelectorAll(`[${ATTR}]`)];
+  const all = [...document.querySelectorAll(`[${ATTR}]`)];
+  // After SPA navigation Threads keeps the previous route's posts in the DOM,
+  // hidden; only rendered posts describe the current page
+  const isRendered = (el) => el.getClientRects().length > 0;
+  const marked = all.filter(isRendered);
   const topLevel = marked.filter((el) => !el.parentElement?.closest(`[${ATTR}]`));
   const nested = marked.filter((el) => el.parentElement?.closest(`[${ATTR}]`));
   const bodyLink = document.querySelector(
@@ -104,6 +108,7 @@
     at: new Date().toISOString(),
     path: location.pathname.replace(/@[^/]+/g, '@<user>'),
     markedCount: marked.length,
+    hiddenMarkedCount: all.length - marked.length,
     theme: {
       htmlBg: getComputedStyle(root).backgroundColor,
       bodyBg: getComputedStyle(document.body).backgroundColor,
