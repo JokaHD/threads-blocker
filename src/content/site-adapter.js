@@ -37,6 +37,7 @@ const PAGE_LAYOUT_ID = 'barcelona-page-layout';
 const RAIL_MIN_WIDTH = 200;
 const RAIL_MAX_WIDTH = 480;
 const CONTENT_SAMPLE_LIMIT = 20;
+const CONTENT_VISIT_LIMIT = 200;
 
 // Media lightbox view — UI is hidden even though path is under /@*
 const MEDIA_VIEW_PATTERN = /\/post\/[^/]+\/media/;
@@ -140,16 +141,20 @@ export const threadsSiteRule = {
    * Measured from post containers outside the rail and nav —
    * `[data-pressable-container]`, the same Meta attribute findContainer
    * trusts — bounded to the first CONTENT_SAMPLE_LIMIT laid-out ones (posts
-   * share one right edge; the max absorbs narrower quoted embeds).
+   * share one right edge; the max absorbs narrower quoted embeds), and to
+   * CONTENT_VISIT_LIMIT candidates overall.
    *
    * @param {Element|null} rail
+   * @param {{left: number}} [railRect] - the rail's rect, if already read
    * @returns {number|null} null when no post is laid out yet
    */
-  getContentRight(rail) {
-    const railLeft = rail?.getBoundingClientRect().left ?? Infinity;
+  getContentRight(rail, railRect = rail?.getBoundingClientRect()) {
+    const railLeft = railRect?.left ?? Infinity;
     let max = null;
     let sampled = 0;
+    let visited = 0;
     for (const el of document.querySelectorAll('[data-pressable-container]')) {
+      if (++visited > CONTENT_VISIT_LIMIT) break;
       if (rail?.contains(el) || this.isNavigationLink(el)) continue;
       const rect = el.getBoundingClientRect();
       if (rect.width <= 0 || rect.right > railLeft) continue;

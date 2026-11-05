@@ -49,6 +49,20 @@ describe('RailTracker', () => {
     expect(tracker.contains(rail.querySelector('.inside'))).toBe(false);
   });
 
+  it('current() reuses a connected rail and re-probes a detached one', () => {
+    tracker.init();
+    const probe = jest.fn(() => found);
+    tracker._siteRule = { findRightRail: probe };
+
+    expect(tracker.current()).toBe(rail);
+    expect(probe).not.toHaveBeenCalled();
+
+    rail.remove(); // React swapped the rail out
+    found = null;
+    expect(tracker.current()).toBeNull();
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
   it('re-probes on window resize (rail laid out without a mutation)', () => {
     found = null;
     tracker.init();

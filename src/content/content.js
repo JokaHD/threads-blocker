@@ -31,6 +31,10 @@ getShadowRoot();
 // Shared right-rail view (scan, block mode, stack placement)
 railTracker.init();
 
+// Keep the stack clear of the right context rail
+const stackPlacement = new StackPlacement(getStackContainer());
+stackPlacement.init();
+
 // Initialize modules
 const domObserver = new DOMObserver();
 domObserver.init();
@@ -89,6 +93,7 @@ function processExistingComments() {
   for (const comment of comments) {
     processComment(comment);
   }
+  stackPlacement.updateIfUnanchored();
 }
 
 // Start DOM observation
@@ -98,7 +103,7 @@ domObserver.startObserving((newComments) => {
     processComment(comment);
   }
   // Posts just laid out: the stack hugs their right edge
-  stackPlacement.update();
+  stackPlacement.updateIfUnanchored();
 });
 
 // Initialize UI (all in Shadow DOM). The queue Panel lives inside the
@@ -108,10 +113,6 @@ const panel = new Panel(inlineControls.getQueueSlot(), {
   onSummary: (summary) => inlineControls.setQueueSummary(summary),
 });
 panel.init();
-
-// Keep the stack clear of the right context rail
-const stackPlacement = new StackPlacement(getStackContainer());
-stackPlacement.init();
 
 // Install debug global
 installDebugGlobal({ stackPlacement });

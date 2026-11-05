@@ -6,31 +6,20 @@ import {
   StackLayout,
 } from '../../src/content/ui/stack-placement.js';
 import { RailTracker } from '../../src/content/rail-tracker.js';
+import { OBSERVED, setViewport, stubRect, mountThreadsLayout } from './helpers/rail-fixture.js';
 
-const VW = 1745;
-const VH = 828;
+const { VW, VH } = OBSERVED;
 
-function setViewport(width, height) {
-  Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
-  Object.defineProperty(window, 'innerHeight', { configurable: true, value: height });
-}
-
-function rectOf({ left, width, top = 0, height }) {
-  return () => ({ left, width, top, height, right: left + width, bottom: top + height });
-}
-
-/** Rail as observed 2026-11-05: sticky 320px child of #barcelona-page-layout. */
-function mountLayout({ railLeft = 1412, postRight = 1157 } = {}) {
-  document.body.innerHTML = `
-    <div id="barcelona-page-layout">
-      <div class="center"><div class="post"></div></div>
-      <div class="rail" style="position: sticky"><div class="rail-item"></div></div>
-    </div>`;
-  const rail = document.querySelector('.rail');
-  rail.getBoundingClientRect = rectOf({ left: railLeft, width: 320, height: VH });
-  const post = document.querySelector('.post');
-  post.setAttribute('data-pressable-container', 'true');
-  post.getBoundingClientRect = rectOf({ left: postRight - 638, width: 638, height: 300 });
+function mountLayout() {
+  const { rail, center } = mountThreadsLayout({
+    centerHtml: '<div class="post" data-pressable-container="true"></div>',
+    railHtml: '<div class="rail-item"></div>',
+  });
+  const post = stubRect(center.querySelector('.post'), {
+    left: OBSERVED.CONTENT_RIGHT - 638,
+    width: 638,
+    height: 300,
+  });
   return { rail, post };
 }
 
@@ -148,7 +137,7 @@ describe('StackPlacement', () => {
     const { rail } = mountLayout();
     const inRail = rail.querySelector('.rail-item');
     inRail.setAttribute('data-pressable-container', 'true');
-    inRail.getBoundingClientRect = rectOf({ left: 1430, width: 280, height: 60 });
+    stubRect(inRail, { left: 1430, width: 280, height: 60 });
     tracker.refresh();
     start();
 
@@ -186,6 +175,22 @@ describe('StackPlacement', () => {
     tracker.refresh(); // emits tb-rail-change
 
     expect(placement.getState().mode).toBe('beside-content');
+  });
+
+  it('re-measures after scans only until the post column is anchored', () => {
+    const { post } = mountLayout();
+    post.removeAttribute('data-pressable-container'); // posts not laid out yet
+    tracker.refresh();
+    start();
+    expect(placement.getState()).toMatchObject({ mode: 'beside-rail', contentRight: null });
+
+    post.setAttribute('data-pressable-container', 'true');
+    placement.updateIfUnanchored();
+    expect(placement.getState()).toMatchObject({ mode: 'beside-content', contentRight: 1157 });
+
+    const spy = jest.spyOn(placement, 'update');
+    placement.updateIfUnanchored();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('re-places on window resize, once per frame', () => {

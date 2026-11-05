@@ -97,9 +97,8 @@ export class InlineControls {
     this._hoverHandler = (e) => {
       if (!this._blockMode) return;
 
-      const comment = railTracker.contains(e.target)
-        ? null
-        : e.target.closest(`[${COMMENT_ID_ATTR}]`);
+      // Rail content is never marked (scan exclusion + unmark on rail change)
+      const comment = e.target.closest(`[${COMMENT_ID_ATTR}]`);
 
       // Remove hover from previous
       if (this._lastHovered && this._lastHovered !== comment) {

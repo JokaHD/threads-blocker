@@ -7,8 +7,6 @@
 import { BlockState } from '../../shared/constants.js';
 import { MessageType } from '../../shared/messages.js';
 import { Icons } from './icons.js';
-import { getStackContainer } from './shadow-host.js';
-import { threadsSiteRule } from '../site-adapter.js';
 
 /**
  * Queue counts for the FAB badge.
@@ -35,7 +33,6 @@ export class Panel {
     this._cooldownInterval = null;
     this._cooldownEnd = null;
     this._paused = false;
-    this._routeHidden = false;
 
     // Element references
     this._progressFill = null;
@@ -52,7 +49,7 @@ export class Panel {
    * Create panel in Shadow DOM.
    */
   init() {
-    const container = this._container ?? getStackContainer();
+    const container = this._container;
     if (!container) {
       console.error('[ThreadBlocker] Failed to get UI container');
       return;
@@ -154,16 +151,6 @@ export class Panel {
     this._cooldownArea = cooldownArea;
 
     // Listen for route changes to hide on non-whitelisted pages
-    window.addEventListener('tb-route-change', () => this._handleRouteChange());
-    this._handleRouteChange();
-  }
-
-  _handleRouteChange() {
-    const visible = threadsSiteRule.isUIVisibleOnUrl(window.location.href);
-    this._routeHidden = !visible;
-    if (this._el) {
-      this._el.classList.toggle('tb-panel-route-hidden', this._routeHidden);
-    }
   }
 
   /**

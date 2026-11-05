@@ -1,4 +1,5 @@
 import { threadsSiteRule, getSiteRule } from '../../src/content/site-adapter.js';
+import { OBSERVED, setViewport, stubRect, mountThreadsLayout } from './helpers/rail-fixture.js';
 
 describe('threadsSiteRule', () => {
   describe('match', () => {
@@ -577,36 +578,24 @@ describe('getSiteRule', () => {
 });
 
 describe('threadsSiteRule right context rail', () => {
-  const VW = 1745;
-  const VH = 828;
+  const { VW, VH } = OBSERVED;
 
-  beforeEach(() => {
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: VW });
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: VH });
-  });
+  beforeEach(() => setViewport());
 
   afterEach(() => {
     document.body.innerHTML = '';
   });
 
-  /** Shape observed 2026-11-05: sticky, 320 wide, full height, at x=1412. */
-  function railRect(el, { left = 1412, width = 320, height = VH } = {}) {
-    el.getBoundingClientRect = () => ({ left, width, height, top: 0, right: left + width });
-  }
+  const railRect = (el, opts = {}) =>
+    stubRect(el, { left: OBSERVED.RAIL_LEFT, width: OBSERVED.RAIL_WIDTH, ...opts });
 
-  function mountLayout(railStyle = 'position: sticky') {
-    document.body.innerHTML = `
-      <div id="barcelona-page-layout">
-        <div class="center"><a class="post-link" href="/@author">author</a></div>
-        <div class="rail" style="${railStyle}">
-          <a class="rail-link" href="/@suggested">suggested</a>
-          <div data-pressable-container="true"><span class="rail-text">x</span></div>
-        </div>
-      </div>`;
-    const rail = document.querySelector('.rail');
-    railRect(rail);
-    return rail;
-  }
+  const mountLayout = (railStyle) =>
+    mountThreadsLayout({
+      centerHtml: '<a class="post-link" href="/@author">author</a>',
+      railHtml: `<a class="rail-link" href="/@suggested">suggested</a>
+        <div data-pressable-container="true"><span class="rail-text">x</span></div>`,
+      railStyle,
+    }).rail;
 
   describe('findRightRail', () => {
     it('finds the sticky rail under #barcelona-page-layout', () => {
@@ -668,9 +657,8 @@ describe('threadsSiteRule right context rail', () => {
     function pressable(parent, { left, width }) {
       const el = document.createElement('div');
       el.setAttribute('data-pressable-container', 'true');
-      el.getBoundingClientRect = () => ({ left, width, right: left + width, top: 0, height: 100 });
       parent.appendChild(el);
-      return el;
+      return stubRect(el, { left, width, height: 100 });
     }
 
     it('takes the widest post right edge outside the rail and nav', () => {

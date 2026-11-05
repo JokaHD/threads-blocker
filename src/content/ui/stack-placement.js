@@ -15,6 +15,7 @@
 
 import { threadsSiteRule } from '../site-adapter.js';
 import { railTracker, RAIL_CHANGE_EVENT } from '../rail-tracker.js';
+import { rafThrottle } from '../../shared/utils.js';
 
 export const StackLayout = {
   DEFAULT_RIGHT: 24,
@@ -67,7 +68,6 @@ export class StackPlacement {
     this._stack = stackEl;
     this._tracker = tracker;
     this._expanded = false;
-    this._frame = null;
     this._last = null;
     this._onRailChange = () => this.update();
     this._onBlockModeChange = (e) => {
@@ -76,13 +76,8 @@ export class StackPlacement {
       this.update();
     };
     // Viewport width moves `right` even when the rail box stays put
-    this._onResize = () => {
-      if (this._frame !== null) return;
-      this._frame = requestAnimationFrame(() => {
-        this._frame = null;
-        this.update();
-      });
-    };
+    this._resize = rafThrottle(() => this.update());
+    this._onResize = () => this._resize.schedule();
   }
 
   init() {
@@ -97,15 +92,14 @@ export class StackPlacement {
     window.removeEventListener(RAIL_CHANGE_EVENT, this._onRailChange);
     window.removeEventListener('tb-blockmode-change', this._onBlockModeChange);
     window.removeEventListener('resize', this._onResize);
-    if (this._frame !== null) cancelAnimationFrame(this._frame);
-    this._frame = null;
+    this._resize.cancel();
   }
 
   update() {
     const rail = this._tracker.get();
     const railRect = rail?.getBoundingClientRect() ?? null;
     // Measured fresh on every open, so posts that loaded after the rail count
-    const contentRight = rail ? threadsSiteRule.getContentRight(rail) : null;
+    const contentRight = rail ? threadsSiteRule.getContentRight(rail, railRect) : null;
     const placement = computeStackPlacement({
       viewportWidth: window.innerWidth,
       railRect,
@@ -124,6 +118,15 @@ export class StackPlacement {
       contentRight,
     };
     return this._last;
+  }
+
+  /**
+   * Called after each scan that found posts: re-place only while the post
+   * column has not been measured yet. Once anchored, the column edge only
+   * moves with the viewport or rail, which resize / tb-rail-change cover.
+   */
+  updateIfUnanchored() {
+    if (this._last?.railFound && this._last.contentRight == null) this.update();
   }
 
   /** Last applied placement, for window.__TB_DEBUG__(). */

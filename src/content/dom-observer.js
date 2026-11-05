@@ -55,8 +55,8 @@ export class DOMObserver {
     const claimedContainers = new Set();
     const seenUsernames = new Set();
     // Right rail content (focused author, quotes, follow suggestions) is
-    // never a target; refreshed once per scan, read per link
-    const rail = railTracker.refresh();
+    // never a target; resolved once per scan, read per link
+    const rail = railTracker.current();
 
     for (const link of links) {
       const href = link.getAttribute('href');

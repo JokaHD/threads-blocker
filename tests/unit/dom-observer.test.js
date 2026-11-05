@@ -3,6 +3,7 @@
 import { DOMObserver, COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
 import { threadsSiteRule } from '../../src/content/site-adapter.js';
 import { railTracker } from '../../src/content/rail-tracker.js';
+import { mountThreadsLayout } from './helpers/rail-fixture.js';
 
 describe('DOMObserver', () => {
   let observer;
@@ -386,27 +387,12 @@ describe('DOMObserver', () => {
 describe('DOMObserver right context rail', () => {
   let observer;
 
-  /** Rail as observed 2026-11-05: sticky 320px child of #barcelona-page-layout. */
-  function mountLayout(railHtml) {
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1745 });
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 828 });
-    document.body.innerHTML = `
-      <div id="barcelona-page-layout">
-        <div class="center">
-          <div data-pressable-container="true"><a href="/@author">author</a><span></span><span></span></div>
-        </div>
-        <div class="rail" style="position: sticky">${railHtml}</div>
-      </div>`;
-    const rail = document.querySelector('.rail');
-    rail.getBoundingClientRect = () => ({
-      left: 1412,
-      width: 320,
-      height: 828,
-      top: 0,
-      right: 1732,
-    });
-    return rail;
-  }
+  const mountLayout = (railHtml) =>
+    mountThreadsLayout({
+      centerHtml:
+        '<div data-pressable-container="true"><a href="/@author">author</a><span></span><span></span></div>',
+      railHtml,
+    }).rail;
 
   beforeEach(() => {
     observer = new DOMObserver();

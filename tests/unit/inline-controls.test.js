@@ -6,6 +6,7 @@ import { InlineControls } from '../../src/content/ui/inline-controls.js';
 import { COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
 import { MessageType } from '../../src/shared/messages.js';
 import { railTracker } from '../../src/content/rail-tracker.js';
+import { mountThreadsLayout } from './helpers/rail-fixture.js';
 
 describe('InlineControls', () => {
   let inlineControls;
@@ -101,18 +102,9 @@ describe('InlineControls', () => {
     });
 
     function mountRail() {
-      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1745 });
-      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 828 });
-      const layout = document.createElement('div');
-      layout.id = 'barcelona-page-layout';
-      layout.innerHTML = `<div class="rail" style="position: sticky">
-          <div ${COMMENT_ID_ATTR}="suggested"><a class="rail-link" href="/@suggested">s</a></div>
-        </div>`;
-      document.body.appendChild(layout);
-      layout.querySelector('.rail').getBoundingClientRect = () => ({
-        left: 1412,
-        width: 320,
-        height: 828,
+      const { layout } = mountThreadsLayout({
+        railHtml: `<div ${COMMENT_ID_ATTR}="suggested"><a class="rail-link" href="/@suggested">s</a></div>`,
+        append: true, // keep the test's UI container in the body
       });
       railTracker.refresh();
 

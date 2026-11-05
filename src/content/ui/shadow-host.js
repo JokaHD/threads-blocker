@@ -418,8 +418,7 @@ function getExtensionStyles() {
       overflow: hidden;
     }
 
-    .tb-panel-hidden,
-    .tb-panel-route-hidden {
+    .tb-panel-hidden {
       display: none;
     }
 

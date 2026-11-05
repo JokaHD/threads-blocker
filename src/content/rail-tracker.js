@@ -4,13 +4,15 @@
  * handling and stack placement, so the layout probe runs once per refresh
  * instead of once per caller.
  *
- * Refreshed by DOMObserver at the start of every scan (riding its mutation
- * stream — no extra body observer), on window resize, and when the rail
- * element itself resizes (a narrow window widened without any mutation).
+ * Resolved by DOMObserver on every scan (riding its mutation stream — no
+ * extra body observer; re-probed only while unknown or detached), and
+ * refreshed on window resize and when the rail element itself resizes (a
+ * narrow window widened without any mutation).
  * Emits `tb-rail-change` when the rail element or its box changes.
  */
 
 import { threadsSiteRule } from './site-adapter.js';
+import { rafThrottle } from '../shared/utils.js';
 
 export const RAIL_CHANGE_EVENT = 'tb-rail-change';
 
@@ -20,14 +22,8 @@ export class RailTracker {
     this._rail = null;
     this._box = null;
     this._resizeObserver = null;
-    this._frame = null;
-    this._onResize = () => {
-      if (this._frame !== null) return;
-      this._frame = requestAnimationFrame(() => {
-        this._frame = null;
-        this.refresh();
-      });
-    };
+    this._resize = rafThrottle(() => this.refresh());
+    this._onResize = () => this._resize.schedule();
   }
 
   init() {
@@ -40,8 +36,7 @@ export class RailTracker {
 
   destroy() {
     window.removeEventListener('resize', this._onResize);
-    if (this._frame !== null) cancelAnimationFrame(this._frame);
-    this._frame = null;
+    this._resize.cancel();
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
   }
@@ -49,6 +44,17 @@ export class RailTracker {
   /** Cached rail element, or null. */
   get() {
     return this._rail;
+  }
+
+  /**
+   * Cached rail while it is still in the DOM; otherwise re-probe (rail not
+   * laid out yet, or React swapped the element). Box changes of a cached
+   * rail are caught by the resize listener and ResizeObserver instead, so
+   * per-scan callers skip the full probe once the rail is known.
+   * @returns {Element|null}
+   */
+  current() {
+    return this._rail?.isConnected ? this._rail : this.refresh();
   }
 
   /** Is `el` inside the rail? Cheap: reads the cache only. */
