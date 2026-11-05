@@ -100,7 +100,7 @@ describe('InlineControls', () => {
       railTracker.refresh(); // back to "no rail"
     });
 
-    test('rail clicks pass through block mode, even on a stale mark', () => {
+    function mountRail() {
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1745 });
       Object.defineProperty(window, 'innerHeight', { configurable: true, value: 828 });
       const layout = document.createElement('div');
@@ -119,10 +119,25 @@ describe('InlineControls', () => {
       inlineControls.init();
       container.querySelector('.tb-fab').click(); // enter block mode
 
-      const click = new MouseEvent('click', { bubbles: true, cancelable: true });
-      layout.querySelector('.rail-link').dispatchEvent(click);
+      return () => {
+        const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+        layout.querySelector('.rail-link').dispatchEvent(click);
+        return click;
+      };
+    }
 
-      expect(click.defaultPrevented).toBe(false);
+    test('rail clicks pass through block mode, even on a stale mark', () => {
+      const clickRailLink = mountRail();
+
+      expect(clickRailLink().defaultPrevented).toBe(false);
+      expect(mockSelectionManager.toggle).not.toHaveBeenCalled();
+    });
+
+    test('rail navigation is swallowed while something is selected', () => {
+      const clickRailLink = mountRail();
+      mockSelectionManager.count.mockReturnValue(2);
+
+      expect(clickRailLink().defaultPrevented).toBe(true);
       expect(mockSelectionManager.toggle).not.toHaveBeenCalled();
     });
   });
