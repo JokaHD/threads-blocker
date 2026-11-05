@@ -41,6 +41,7 @@ export default [
         chrome: 'readonly',
         // Node/Web APIs
         URLSearchParams: 'readonly',
+        crypto: 'readonly',
         // Jest globals
         jest: 'readonly',
         describe: 'readonly',

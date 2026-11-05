@@ -708,9 +708,7 @@ describe('Service Worker', () => {
       );
 
       await mockCommands._trigger('toggle-keyword-highlight');
-      expect((await mockStorage.get('keywordHighlightEnabled')).keywordHighlightEnabled).toBe(
-        true
-      );
+      expect((await mockStorage.get('keywordHighlightEnabled')).keywordHighlightEnabled).toBe(true);
     });
 
     test('other commands are ignored', async () => {

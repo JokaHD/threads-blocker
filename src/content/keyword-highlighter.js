@@ -210,7 +210,8 @@ export class KeywordHighlighter {
   _queue(postKey, username, keywordIds) {
     const pending = this._pending.get(postKey);
     if (pending) {
-      for (const id of keywordIds) if (!pending.keywordIds.includes(id)) pending.keywordIds.push(id);
+      for (const id of keywordIds)
+        if (!pending.keywordIds.includes(id)) pending.keywordIds.push(id);
     } else {
       this._pending.set(postKey, { postKey, username, keywordIds: [...keywordIds] });
     }

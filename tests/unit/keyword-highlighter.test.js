@@ -104,7 +104,10 @@ describe('KeywordHighlighter', () => {
 
   test('paints every occurrence of enabled keywords, across text nodes', async () => {
     await start({ keywords: [KW('k1', '詐騙')] });
-    const el = addPost('fake_user', '<span class="meta">詐騙</span><p>這是詐騙，詐<b>騙</b>集團</p>');
+    const el = addPost(
+      'fake_user',
+      '<span class="meta">詐騙</span><p>這是詐騙，詐<b>騙</b>集團</p>'
+    );
 
     highlighter.process(el, 'fake_user');
 

@@ -95,7 +95,9 @@
   const marked = [...document.querySelectorAll(`[${ATTR}]`)];
   const topLevel = marked.filter((el) => !el.parentElement?.closest(`[${ATTR}]`));
   const nested = marked.filter((el) => el.parentElement?.closest(`[${ATTR}]`));
-  const bodyLink = document.querySelector(`[${ATTR}] a[href^="/search"], [${ATTR}] a[href^="http"]`);
+  const bodyLink = document.querySelector(
+    `[${ATTR}] a[href^="/search"], [${ATTR}] a[href^="http"]`
+  );
 
   const root = document.documentElement;
   const report = {
@@ -115,7 +117,10 @@
       firstPostBackground: topLevel[0] ? opaqueBg(topLevel[0]) : null,
     },
     linkSample: bodyLink
-      ? { color: getComputedStyle(bodyLink).color, href: bodyLink.getAttribute('href').slice(0, 20) }
+      ? {
+          color: getComputedStyle(bodyLink).color,
+          href: bodyLink.getAttribute('href').slice(0, 20),
+        }
       : null,
     posts: topLevel.slice(0, MAX_POSTS).map(describePost),
     nestedPosts: nested.slice(0, MAX_NESTED).map(describePost),

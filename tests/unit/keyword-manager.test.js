@@ -41,7 +41,11 @@ const KEYWORDS = [
 ];
 const STATS = {
   since: new Date('2026-11-06T00:00:00').getTime(),
-  perKeyword: { k1: { hits: 143, blocked: 38 }, k2: { hits: 96, blocked: 51 }, k3: { hits: 6, blocked: 2 } },
+  perKeyword: {
+    k1: { hits: 143, blocked: 38 },
+    k2: { hits: 96, blocked: 51 },
+    k3: { hits: 6, blocked: 2 },
+  },
   posts: {},
 };
 
@@ -198,7 +202,10 @@ describe('KeywordManager', () => {
     await mount({ keywords: KEYWORDS, keywordStats: STATS });
 
     await chrome.storage.local.set({
-      keywordStats: { ...STATS, perKeyword: { ...STATS.perKeyword, k3: { hits: 500, blocked: 100 } } },
+      keywordStats: {
+        ...STATS,
+        perKeyword: { ...STATS.perKeyword, k3: { hits: 500, blocked: 100 } },
+      },
     });
 
     expect(cells(rows()[0])).toEqual(['', 'line', '500', '100', '20%', '✕']);
