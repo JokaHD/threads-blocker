@@ -107,3 +107,22 @@ body.tb-blockmode [data-tb-comment-id] [data-tb-comment-id] {
   background: linear-gradient(rgba(220, 38, 38, 0.15), rgba(220, 38, 38, 0.15))
     var(--tb-host-bg, transparent) !important;
 }
+
+/* ============================================================
+   Keyword highlight — CSS Custom Highlight API (no DOM changes).
+   Option B: thick underline + slightly tinted text. Colors are a
+   starting point, calibrated against the debug probe in Task 11.
+   data-tb-theme is set on <html> by KeywordHighlighter from Threads'
+   own background, not the OS preference.
+   ============================================================ */
+
+::highlight(tb-keyword) {
+  color: #f0d2d2;
+  text-decoration: underline 2px rgba(201, 128, 128, 0.85);
+  text-underline-offset: 3px;
+}
+
+html[data-tb-theme='light'] ::highlight(tb-keyword) {
+  color: #6b2a2a;
+  text-decoration-color: rgba(170, 80, 80, 0.85);
+}

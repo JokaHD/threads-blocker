@@ -311,6 +311,27 @@ describe('DOMObserver', () => {
     });
   });
 
+  describe('scan tick hook', () => {
+    afterEach(() => jest.useRealTimers());
+
+    test('calls onScan after every scan, even without new comments', async () => {
+      jest.useFakeTimers();
+      const observer = new DOMObserver();
+      observer.init();
+      const onNewComments = jest.fn();
+      const onScan = jest.fn();
+      observer.startObserving(onNewComments, onScan);
+
+      document.body.appendChild(document.createElement('div'));
+      await Promise.resolve(); // MutationObserver callbacks are microtasks
+      jest.advanceTimersByTime(100);
+
+      expect(onScan).toHaveBeenCalledTimes(1);
+      expect(onNewComments).not.toHaveBeenCalled();
+      observer.stopObserving();
+    });
+  });
+
   // ── findComments:dialog user list rows(按讚名單等,row 沒有 <a>) ──────────
 
   describe('findComments – dialog user list rows', () => {

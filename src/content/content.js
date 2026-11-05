@@ -22,6 +22,8 @@ import { MessageType } from '../shared/messages.js';
 import { BlockState } from '../shared/constants.js';
 import { installDebugGlobal } from './debug.js';
 import { blockUser, unblockUser } from './threads-api.js';
+import { KeywordHighlighter } from './keyword-highlighter.js';
+import { threadsSiteRule } from './site-adapter.js';
 
 console.log('[ThreadBlocker] Content script loaded on', window.location.href);
 
@@ -43,6 +45,13 @@ const idResolver = new IDResolver();
 const tokenProvider = new TokenProvider();
 const selectionManager = new SelectionManager();
 const inlineControls = new InlineControls(selectionManager, idResolver);
+
+// Keyword highlight: paints matches via CSS.highlights, reports hits to the SW
+const keywordHighlighter = new KeywordHighlighter({ siteRule: threadsSiteRule });
+keywordHighlighter.onEnabledChange((on) => inlineControls.setKeywordHighlightState(on));
+keywordHighlighter
+  .init()
+  .catch((e) => console.warn('[ThreadBlocker] Keyword highlighter init failed:', e));
 
 // Wrap API functions to use tokenProvider
 async function blockUserWithTokens(userId) {
@@ -85,6 +94,7 @@ function processComment(comment) {
   domObserver.markProcessed(comment.container, comment.username);
   inlineControls.inject(comment);
   selectionManager.recordSeen(comment.username);
+  keywordHighlighter.process(comment.container, comment.username);
 }
 
 function processExistingComments() {
@@ -97,14 +107,17 @@ function processExistingComments() {
 }
 
 // Start DOM observation
-domObserver.startObserving((newComments) => {
-  console.log('[ThreadBlocker] MutationObserver found', newComments.length, 'new comments');
-  for (const comment of newComments) {
-    processComment(comment);
-  }
-  // Posts just laid out: the stack hugs their right edge
-  stackPlacement.updateIfUnanchored();
-});
+domObserver.startObserving(
+  (newComments) => {
+    console.log('[ThreadBlocker] MutationObserver found', newComments.length, 'new comments');
+    for (const comment of newComments) {
+      processComment(comment);
+    }
+    // Posts just laid out: the stack hugs their right edge
+    stackPlacement.updateIfUnanchored();
+  },
+  () => keywordHighlighter.refresh()
+);
 
 // Initialize UI (all in Shadow DOM). The queue Panel lives inside the
 // block mode card; the collapsed FAB mirrors its progress as a badge.
@@ -115,7 +128,7 @@ const panel = new Panel(inlineControls.getQueueSlot(), {
 panel.init();
 
 // Install debug global
-installDebugGlobal({ stackPlacement });
+installDebugGlobal({ stackPlacement, keywordHighlighter });
 
 // Process existing comments after DOM is ready
 if (document.readyState === 'loading') {
