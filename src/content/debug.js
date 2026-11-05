@@ -46,7 +46,6 @@ export function getDebugState() {
 
   // Check UI elements in shadow
   const fab = shadowRoot?.querySelector('.tb-fab');
-  const toolbar = shadowRoot?.querySelector('.tb-toolbar');
   const panel = shadowRoot?.querySelector('.tb-panel');
 
   return {
@@ -80,9 +79,6 @@ export function getDebugState() {
     // UI elements
     ui: {
       fab: !!fab,
-      fabActive: fab?.classList.contains('tb-fab-active') || false,
-      toolbar: !!toolbar,
-      toolbarVisible: toolbar?.classList.contains('tb-toolbar-visible') || false,
       panel: !!panel,
     },
 

@@ -9,7 +9,7 @@ let shadowRoot = null;
 
 /**
  * Get or create the shadow host and return its shadow root.
- * The shadow root contains all extension UI (FAB, toolbar, panel).
+ * The shadow root contains all extension UI (FAB, block mode card, panel).
  */
 export function getShadowRoot() {
   if (shadowRoot) return shadowRoot;

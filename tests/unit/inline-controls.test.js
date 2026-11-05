@@ -546,17 +546,6 @@ describe('InlineControls', () => {
     });
   });
 
-  describe('tb-exit-block-mode event', () => {
-    test('exits block mode on event', () => {
-      inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
-
-      window.dispatchEvent(new CustomEvent('tb-exit-block-mode'));
-
-      expect(inlineControls.multiSelectMode).toBe(false);
-    });
-  });
-
   describe('media view hiding', () => {
     test('_isMediaView returns true for media URLs', () => {
       // Test the regex pattern directly

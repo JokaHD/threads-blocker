@@ -115,9 +115,6 @@ export class InlineControls {
     document.addEventListener('click', this._clickHandler, true);
     document.addEventListener('mouseover', this._hoverHandler, true);
 
-    // Listen for exit block mode event (from toolbar after blocking)
-    window.addEventListener('tb-exit-block-mode', () => this._exitBlockMode());
-
     // Listen for route changes to hide UI on media view
     window.addEventListener('tb-route-change', () => this._handleRouteChange());
 
