@@ -15,4 +15,5 @@ export const Icons = {
   pause: `<svg ${attrs}><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>`,
   info: `<svg ${attrs}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`,
   play: `<svg ${attrs}><polygon points="6 3 20 12 6 21 6 3"/></svg>`,
+  sliders: `<svg ${attrs}><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>`,
 };

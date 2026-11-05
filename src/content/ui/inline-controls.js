@@ -5,6 +5,7 @@
  */
 
 import { MessageType } from '../../shared/messages.js';
+import { KeywordStorageKey } from '../../shared/keywords.js';
 import { Icons } from './icons.js';
 import { getUIContainer, getStackContainer } from './shadow-host.js';
 import { COMMENT_ID_ATTR } from '../dom-observer.js';
@@ -29,6 +30,10 @@ export class InlineControls {
     // Queue pause mirrored from the SW's queueNotify broadcast (content.js)
     this._queuePaused = false;
     this._resumeWaiters = [];
+    // Keyword highlight switch, mirrored from storage by content.js
+    this._keywordHighlightOn = true;
+    this._keywordRow = null;
+    this._keywordToggle = null;
   }
 
   init() {
@@ -222,6 +227,7 @@ export class InlineControls {
     card.appendChild(countArea);
     card.appendChild(actions);
     card.appendChild(exitOnly);
+    card.appendChild(this._createKeywordRow());
     card.appendChild(queueSlot);
 
     container.appendChild(card);
@@ -231,6 +237,72 @@ export class InlineControls {
     this._cardActions = actions;
     this._cardExitOnly = exitOnly;
     this._queueSlot = queueSlot;
+  }
+
+  /**
+   * Keyword highlight row: label + a switch and manage button sharing one
+   * pill. Sits after the block actions, above the queue section.
+   */
+  _createKeywordRow() {
+    const row = document.createElement('div');
+    row.className = 'tb-card-keywords';
+
+    const label = document.createElement('span');
+    label.className = 'tb-card-keywords-label';
+    label.id = 'tb-card-keywords-label';
+    label.textContent = '標示關鍵字';
+
+    const group = document.createElement('div');
+    group.className = 'tb-kw-group';
+
+    const toggle = document.createElement('button');
+    toggle.className = 'tb-kw-switch';
+    toggle.setAttribute('role', 'switch');
+    toggle.setAttribute('aria-labelledby', label.id);
+    toggle.addEventListener('click', () => {
+      const next = !this._keywordHighlightOn;
+      this.setKeywordHighlightState(next);
+      chrome.storage.local
+        .set({ [KeywordStorageKey.ENABLED]: next })
+        .catch((e) => console.warn('[ThreadBlocker] Keyword highlight toggle failed:', e.message));
+    });
+
+    const manage = document.createElement('button');
+    manage.className = 'tb-kw-manage';
+    manage.innerHTML = Icons.sliders;
+    manage.title = '管理關鍵字';
+    manage.setAttribute('aria-label', '管理關鍵字');
+    manage.addEventListener('click', () => {
+      chrome.runtime
+        .sendMessage({ type: MessageType.OPEN_OPTIONS })
+        .catch((e) => console.warn('[ThreadBlocker] Open options failed:', e.message));
+    });
+
+    group.appendChild(toggle);
+    group.appendChild(manage);
+    row.appendChild(label);
+    row.appendChild(group);
+
+    this._keywordRow = row;
+    this._keywordToggle = toggle;
+    this._renderKeywordState();
+    return row;
+  }
+
+  /**
+   * Reflect the global keyword highlight switch (storage is the source of
+   * truth; content.js forwards every change here).
+   * @param {boolean} on
+   */
+  setKeywordHighlightState(on) {
+    this._keywordHighlightOn = on;
+    this._renderKeywordState();
+  }
+
+  _renderKeywordState() {
+    if (!this._keywordToggle) return;
+    this._keywordToggle.setAttribute('aria-checked', String(this._keywordHighlightOn));
+    this._keywordRow.classList.toggle('tb-card-keywords--off', !this._keywordHighlightOn);
   }
 
   /**

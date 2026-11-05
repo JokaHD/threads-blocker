@@ -7,6 +7,7 @@ import { COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
 import { MessageType } from '../../src/shared/messages.js';
 import { railTracker } from '../../src/content/rail-tracker.js';
 import { mountThreadsLayout } from './helpers/rail-fixture.js';
+import { KeywordStorageKey } from '../../src/shared/keywords.js';
 
 describe('InlineControls', () => {
   let inlineControls;
@@ -59,6 +60,67 @@ describe('InlineControls', () => {
       const slot = inlineControls.getQueueSlot();
       expect(slot).not.toBeNull();
       expect(container.querySelector('.tb-card').contains(slot)).toBe(true);
+    });
+  });
+
+  describe('keyword highlight row', () => {
+    beforeEach(() => {
+      global.chrome = {
+        runtime: { sendMessage: jest.fn(async () => ({ ok: true })) },
+        storage: { local: { set: jest.fn(async () => {}) } },
+      };
+    });
+
+    afterEach(() => {
+      delete global.chrome;
+    });
+
+    const row = () => container.querySelector('.tb-card-keywords');
+    const toggle = () => container.querySelector('.tb-kw-switch');
+
+    test('sits between the block actions and the queue slot', () => {
+      inlineControls.init();
+
+      expect(row().querySelector('.tb-card-keywords-label').textContent).toBe('標示關鍵字');
+      expect(row().nextElementSibling).toBe(inlineControls.getQueueSlot());
+      expect(row().previousElementSibling.classList.contains('tb-card-exit-only')).toBe(true);
+    });
+
+    test('starts on and mirrors the stored state', () => {
+      inlineControls.init();
+      expect(toggle().getAttribute('aria-checked')).toBe('true');
+
+      inlineControls.setKeywordHighlightState(false);
+
+      expect(toggle().getAttribute('aria-checked')).toBe('false');
+      expect(row().classList.contains('tb-card-keywords--off')).toBe(true);
+    });
+
+    test('keeps a state set before init', () => {
+      inlineControls.setKeywordHighlightState(false);
+      inlineControls.init();
+      expect(toggle().getAttribute('aria-checked')).toBe('false');
+    });
+
+    test('the switch writes the global setting', () => {
+      inlineControls.init();
+
+      toggle().click();
+
+      expect(chrome.storage.local.set).toHaveBeenCalledWith({
+        [KeywordStorageKey.ENABLED]: false,
+      });
+      expect(toggle().getAttribute('aria-checked')).toBe('false');
+    });
+
+    test('the manage button opens the options page', () => {
+      inlineControls.init();
+
+      container.querySelector('.tb-kw-manage').click();
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: MessageType.OPEN_OPTIONS,
+      });
     });
   });
 

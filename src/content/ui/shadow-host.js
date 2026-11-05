@@ -127,6 +127,7 @@ function getExtensionStyles() {
       --tb-radius-sm: 8px;
       --tb-radius-md: 12px;
       --tb-transition: 150ms ease;
+      --tb-switch-on: #5a6478;
     }
 
     /* Light theme */
@@ -381,6 +382,107 @@ function getExtensionStyles() {
 
     .tb-card-exit-only:hover {
       color: var(--tb-text);
+    }
+
+    /* Keyword highlight row — after the block actions, above the queue */
+    .tb-card-keywords {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 16px -20px 0;
+      padding: 10px 14px 10px 18px;
+      border-top: 1px solid var(--tb-border);
+      font-size: 13px;
+      color: var(--tb-text);
+    }
+
+    /* Last row of the card when the queue section is hidden */
+    .tb-card-keywords:has(+ .tb-card-queue:empty),
+    .tb-card-keywords:has(+ .tb-card-queue > .tb-panel-hidden) {
+      margin-bottom: -20px;
+    }
+
+    .tb-card-keywords + .tb-card-queue {
+      margin-top: 0;
+    }
+
+    .tb-card-keywords--off .tb-card-keywords-label {
+      color: var(--tb-text-muted);
+    }
+
+    /* Switch + manage button share one pill */
+    .tb-kw-group {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--tb-border);
+      border-radius: 999px;
+    }
+
+    .tb-kw-switch {
+      position: relative;
+      width: 28px;
+      height: 16px;
+      margin: 5px 8px 5px 9px;
+      padding: 0;
+      border: none;
+      border-radius: 8px;
+      background: var(--tb-switch-on);
+      cursor: pointer;
+    }
+
+    .tb-kw-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 14px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #e8e8e8;
+      transition: left var(--tb-transition);
+    }
+
+    .tb-kw-switch[aria-checked='false'] {
+      background: var(--tb-border);
+    }
+
+    .tb-kw-switch[aria-checked='false']::after {
+      left: 2px;
+      background: var(--tb-text-muted);
+    }
+
+    .tb-kw-manage {
+      display: flex;
+      padding: 5px 9px 5px 8px;
+      border: none;
+      border-left: 1px solid var(--tb-border);
+      border-radius: 0 999px 999px 0;
+      background: none;
+      color: var(--tb-text-muted);
+      cursor: pointer;
+      transition: color var(--tb-transition);
+    }
+
+    .tb-kw-manage:hover {
+      color: var(--tb-text);
+    }
+
+    .tb-kw-manage svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    .tb-kw-switch:focus-visible,
+    .tb-kw-manage:focus-visible {
+      outline: 2px solid var(--tb-primary);
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .tb-kw-switch::after {
+        transition: none;
+      }
     }
 
     /* ============================================================
