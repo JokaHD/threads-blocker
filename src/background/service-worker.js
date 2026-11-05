@@ -9,11 +9,14 @@ import {
 } from './persistence.js';
 import { MessageType } from '../shared/messages.js';
 import { ErrorType, BlockState, Timing } from '../shared/constants.js';
+import { KeywordStats } from './keyword-stats.js';
+import { KeywordStorageKey, TOGGLE_COMMAND } from '../shared/keywords.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
 const queue = new QueueManager({ dispatchIntervalMs: Timing.BLOCK_INTERVAL });
 const rateLimitHandler = new RateLimitHandler();
+const keywordStats = new KeywordStats();
 
 // ── Queue persistence & notification ─────────────────────────────────────────
 
@@ -139,6 +142,7 @@ async function handleMessage(message, sender) {
           queue.onUnblockComplete(userId, true);
         } else {
           queue.onTaskComplete(userId, true);
+          await keywordStats.onBlocked(item.username);
         }
         return { ok: true };
       }
@@ -243,6 +247,17 @@ async function handleMessage(message, sender) {
       return { ok: true };
     }
 
+    case MessageType.KEYWORD_HITS: {
+      await keywordStats.recordHits(message.hits ?? []);
+      return { ok: true };
+    }
+
+    case MessageType.OPEN_OPTIONS: {
+      // Content scripts can't open the options page themselves
+      await chrome.runtime.openOptionsPage();
+      return { ok: true };
+    }
+
     default:
       return { error: `Unknown message type: ${type}` };
   }
@@ -260,4 +275,23 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       queueNotify: { ts: Date.now(), items: queue.getAll(), status: buildStatus() },
     });
   }
+});
+
+// ── Keyword highlight ─────────────────────────────────────────────────────────
+
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== TOGGLE_COMMAND) return;
+  const key = KeywordStorageKey.ENABLED;
+  const result = await chrome.storage.local.get(key);
+  // Unset means on (the default), so the first press turns it off
+  await chrome.storage.local.set({ [key]: result[key] === false });
+});
+
+// Keywords are edited on the options page; deleted ones take their stats along
+chrome.storage.onChanged.addListener((changes, area) => {
+  const change = changes[KeywordStorageKey.KEYWORDS];
+  if (area !== 'local' || !change) return;
+  const remaining = new Set((change.newValue ?? []).map((k) => k.id));
+  const removed = (change.oldValue ?? []).map((k) => k.id).filter((id) => !remaining.has(id));
+  if (removed.length > 0) keywordStats.removeKeywords(removed);
 });

@@ -17,6 +17,8 @@ export const MessageType = {
   GET_QUEUE_STATUS: 'getQueueStatus',
   CLEAR_QUEUE: 'clearQueue',
   CLEAR_COMPLETED: 'clearCompleted',
+  KEYWORD_HITS: 'keywordHits',
+  OPEN_OPTIONS: 'openOptions',
 
   // Service Worker → Content Script (via storage change)
   QUEUE_UPDATED: 'queueUpdated',

@@ -10,6 +10,8 @@ import {
   mockStorage,
   mockAlarms,
   mockRuntime,
+  mockCommands,
+  mockStorageOnChanged,
 } from '../setup.js';
 import { RateLimitHandler } from '../../src/background/rate-limit-handler.js';
 import { MessageType } from '../../src/shared/messages.js';
@@ -643,6 +645,96 @@ describe('Service Worker', () => {
       status = await sendMessage({ type: MessageType.GET_QUEUE_STATUS });
       expect(status.status.cooldownEnd).toBeNull();
       expect(status.status.paused).toBe(false);
+    });
+  });
+
+  describe('keyword highlight', () => {
+    // Listener work that isn't awaited by the event (storage.onChanged)
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+    const readStats = async () => (await mockStorage.get('keywordStats')).keywordStats;
+
+    test('KEYWORD_HITS records stats', async () => {
+      const response = await sendMessage({
+        type: MessageType.KEYWORD_HITS,
+        hits: [{ postKey: '/@fake_user/post/1', username: 'fake_user', keywordIds: ['k1'] }],
+      });
+
+      expect(response).toEqual({ ok: true });
+      expect((await readStats()).perKeyword.k1).toEqual({ hits: 1, blocked: 0 });
+    });
+
+    test("a successful block is attributed to that user's hit posts", async () => {
+      await sendMessage({
+        type: MessageType.KEYWORD_HITS,
+        hits: [{ postKey: '/@fake_user/post/1', username: 'fake_user', keywordIds: ['k1'] }],
+      });
+      await sendMessage({ type: MessageType.ENQUEUE_BLOCK, userId: 'u1', username: 'fake_user' });
+      await dispatchNext();
+
+      await sendMessage({ type: MessageType.TASK_RESULT, userId: 'u1', success: true });
+
+      expect((await readStats()).perKeyword.k1).toEqual({ hits: 1, blocked: 1 });
+    });
+
+    test('a failed block is not attributed', async () => {
+      await sendMessage({
+        type: MessageType.KEYWORD_HITS,
+        hits: [{ postKey: '/@fake_user/post/1', username: 'fake_user', keywordIds: ['k1'] }],
+      });
+      await sendMessage({ type: MessageType.ENQUEUE_BLOCK, userId: 'u1', username: 'fake_user' });
+      await dispatchNext();
+
+      await sendMessage({
+        type: MessageType.TASK_RESULT,
+        userId: 'u1',
+        success: false,
+        error: { status: 400, message: 'permanent' },
+      });
+
+      expect((await readStats()).perKeyword.k1.blocked).toBe(0);
+    });
+
+    test('OPEN_OPTIONS opens the options page', async () => {
+      const response = await sendMessage({ type: MessageType.OPEN_OPTIONS });
+
+      expect(response).toEqual({ ok: true });
+      expect(mockRuntime.openOptionsPage).toHaveBeenCalledTimes(1);
+    });
+
+    test('the toggle command flips the global switch, defaulting to on', async () => {
+      await mockCommands._trigger('toggle-keyword-highlight');
+      expect((await mockStorage.get('keywordHighlightEnabled')).keywordHighlightEnabled).toBe(
+        false
+      );
+
+      await mockCommands._trigger('toggle-keyword-highlight');
+      expect((await mockStorage.get('keywordHighlightEnabled')).keywordHighlightEnabled).toBe(
+        true
+      );
+    });
+
+    test('other commands are ignored', async () => {
+      // beforeEach's CLEAR_QUEUE dispatch leaves its own async onChange
+      // writes (blockQueue/queueNotify) in the mock's call history by the
+      // time this test body runs; clear those first so the assertion below
+      // only reflects what the command trigger itself does.
+      mockStorage.set.mockClear();
+      await mockCommands._trigger('something-else');
+      expect(mockStorage.set).not.toHaveBeenCalled();
+    });
+
+    test('deleting a keyword clears its stats', async () => {
+      await sendMessage({
+        type: MessageType.KEYWORD_HITS,
+        hits: [{ postKey: 'p1', username: 'fake_user', keywordIds: ['k1', 'k2'] }],
+      });
+
+      mockStorageOnChanged._fire({
+        keywords: { oldValue: [{ id: 'k1' }, { id: 'k2' }], newValue: [{ id: 'k2' }] },
+      });
+      await settle();
+
+      expect((await readStats()).perKeyword).toEqual({ k2: { hits: 1, blocked: 0 } });
     });
   });
 });
