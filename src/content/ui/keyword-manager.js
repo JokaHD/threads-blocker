@@ -1,24 +1,21 @@
 /**
- * Keyword manager (options page): add, toggle and delete keywords, the
- * global switch, and per-keyword stats.
+ * Keyword manager (in-page overlay, see keyword-overlay.js): add, toggle and
+ * delete keywords, the global switch, and per-keyword stats.
  *
  * Reads and writes `keywords` / `keywordHighlightEnabled` directly; stats are
  * read-only here (the service worker owns `keywordStats`). Every change made
- * elsewhere (another tab, the card switch, the shortcut) arrives through
- * storage.onChanged.
+ * elsewhere (another tab, the card switch) arrives through storage.onChanged.
  */
 
 import {
   KeywordStorageKey,
   KeywordLimits,
-  TOGGLE_COMMAND,
   normalizeKeyword,
   isDuplicate,
   formatBlockRate,
-} from '../shared/keywords.js';
+} from '../../shared/keywords.js';
 
 const DELETE_CONFIRM_MS = 3000;
-const SHORTCUTS_URL = 'chrome://extensions/shortcuts';
 
 export class KeywordManager {
   /**
@@ -34,6 +31,7 @@ export class KeywordManager {
     // Keywords added while this page is open stay on top until reload
     this._pinned = new Set();
     this._pendingDelete = null; // { id, timer }
+    this._destroyed = false;
     this._onStorageChange = (changes, area) => this._handleStorageChange(changes, area);
   }
 
@@ -47,12 +45,14 @@ export class KeywordManager {
     this._enabled = data[KeywordStorageKey.ENABLED] !== false;
     this._keywords = data[KeywordStorageKey.KEYWORDS] ?? [];
     this._stats = data[KeywordStorageKey.STATS] ?? null;
+    // Closed while storage was still answering: don't leave a listener behind
+    if (this._destroyed) return;
     chrome.storage.onChanged.addListener(this._onStorageChange);
     this._render();
-    await this._renderShortcut();
   }
 
   destroy() {
+    this._destroyed = true;
     chrome.storage.onChanged.removeListener(this._onStorageChange);
     clearTimeout(this._pendingDelete?.timer);
     this._pendingDelete = null;
@@ -61,14 +61,13 @@ export class KeywordManager {
   _build() {
     this._root.innerHTML = `
       <header class="km-head">
-        <h1 class="km-title">關鍵字</h1>
+        <h2 class="km-title" id="km-title">關鍵字</h2>
         <div class="km-global">
           <span id="km-global-label">標示關鍵字</span>
-          <button type="button" class="km-switch" id="km-global-switch" role="switch"
-            aria-labelledby="km-global-label"></button>
+          <button type="button" class="km-switch km-switch--lg" id="km-global-switch"
+            role="switch" aria-labelledby="km-global-label"></button>
         </div>
       </header>
-      <p class="km-hint" id="km-shortcut"></p>
       <form class="km-add" id="km-add-form">
         <input class="km-input" id="km-input" type="text" autocomplete="off"
           placeholder="新增關鍵字" aria-label="新增關鍵字" />
@@ -93,7 +92,6 @@ export class KeywordManager {
     `;
 
     this._globalSwitch = this._root.querySelector('#km-global-switch');
-    this._shortcutEl = this._root.querySelector('#km-shortcut');
     this._input = this._root.querySelector('#km-input');
     this._errorEl = this._root.querySelector('#km-error');
     this._rowsEl = this._root.querySelector('#km-rows');
@@ -252,19 +250,6 @@ export class KeywordManager {
       cell(del, 'km-num')
     );
     return row;
-  }
-
-  async _renderShortcut() {
-    let shortcut = '';
-    try {
-      const commands = await chrome.commands.getAll();
-      shortcut = commands.find((c) => c.name === TOGGLE_COMMAND)?.shortcut ?? '';
-    } catch {
-      // Leave it unset: the hint below still says where to configure it
-    }
-    this._shortcutEl.textContent = shortcut
-      ? `快捷鍵 ${shortcut} · 可在 ${SHORTCUTS_URL} 修改`
-      : `快捷鍵未設定 · 可在 ${SHORTCUTS_URL} 設定`;
   }
 }
 

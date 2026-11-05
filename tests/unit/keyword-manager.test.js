@@ -2,9 +2,9 @@
  * @jest-environment jsdom
  */
 
-import { KeywordManager } from '../../src/options/keyword-manager.js';
+import { KeywordManager } from '../../src/content/ui/keyword-manager.js';
 
-function installChrome(initial = {}, shortcut = 'Alt+Shift+H') {
+function installChrome(initial = {}) {
   const data = { ...initial };
   const listeners = [];
   global.chrome = {
@@ -26,9 +26,6 @@ function installChrome(initial = {}, shortcut = 'Alt+Shift+H') {
         addListener: jest.fn((cb) => listeners.push(cb)),
         removeListener: jest.fn((cb) => listeners.splice(listeners.indexOf(cb), 1)),
       },
-    },
-    commands: {
-      getAll: jest.fn(async () => [{ name: 'toggle-keyword-highlight', shortcut }]),
     },
   };
   return data;
@@ -184,18 +181,17 @@ describe('KeywordManager', () => {
     expect(sw.getAttribute('aria-checked')).toBe('false');
   });
 
-  test('shows the configured shortcut, or that none is set', async () => {
-    await mount({});
-    expect(root.querySelector('#km-shortcut').textContent).toContain('Alt+Shift+H');
-
-    manager.destroy();
-    root.remove();
-    installChrome({}, '');
+  test('a destroy before storage answers leaves no listener behind', async () => {
+    installChrome({});
     root = document.createElement('main');
     document.body.appendChild(root);
     manager = new KeywordManager(root);
-    await manager.init();
-    expect(root.querySelector('#km-shortcut').textContent).toContain('快捷鍵未設定');
+
+    const pending = manager.init();
+    manager.destroy();
+    await pending;
+
+    expect(chrome.storage.onChanged.addListener).not.toHaveBeenCalled();
   });
 
   test('re-renders on changes made elsewhere', async () => {

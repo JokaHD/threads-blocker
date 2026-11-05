@@ -44,25 +44,12 @@ const swBuild = {
   target: 'chrome120',
 };
 
-// Bundle options page (IIFE, loaded by a plain <script> in options.html)
-const optionsBuild = {
-  entryPoints: ['src/options/options.js'],
-  bundle: true,
-  outfile: `${outDir}/options.js`,
-  format: 'iife',
-  define,
-  minifySyntax,
-  target: 'chrome120',
-};
-
 // Copy static assets into dist/
 cpSync('styles/content.css', `${outDir}/content.css`);
 cpSync('manifest.json', `${outDir}/manifest.json`);
 cpSync('icons', `${outDir}/icons`, { recursive: true });
-cpSync('src/options/options.html', `${outDir}/options.html`);
-cpSync('src/options/options.css', `${outDir}/options.css`);
 
-const builds = [contentBuild, swBuild, optionsBuild];
+const builds = [contentBuild, swBuild];
 
 if (isWatch) {
   for (const options of builds) {

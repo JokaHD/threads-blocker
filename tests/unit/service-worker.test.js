@@ -10,7 +10,6 @@ import {
   mockStorage,
   mockAlarms,
   mockRuntime,
-  mockCommands,
   mockStorageOnChanged,
 } from '../setup.js';
 import { RateLimitHandler } from '../../src/background/rate-limit-handler.js';
@@ -710,33 +709,6 @@ describe('Service Worker', () => {
       });
 
       expect((await readStats()).perKeyword.k1.blocked).toBe(0);
-    });
-
-    test('OPEN_OPTIONS opens the options page', async () => {
-      const response = await sendMessage({ type: MessageType.OPEN_OPTIONS });
-
-      expect(response).toEqual({ ok: true });
-      expect(mockRuntime.openOptionsPage).toHaveBeenCalledTimes(1);
-    });
-
-    test('the toggle command flips the global switch, defaulting to on', async () => {
-      await mockCommands._trigger('toggle-keyword-highlight');
-      expect((await mockStorage.get('keywordHighlightEnabled')).keywordHighlightEnabled).toBe(
-        false
-      );
-
-      await mockCommands._trigger('toggle-keyword-highlight');
-      expect((await mockStorage.get('keywordHighlightEnabled')).keywordHighlightEnabled).toBe(true);
-    });
-
-    test('other commands are ignored', async () => {
-      // beforeEach's CLEAR_QUEUE dispatch leaves its own async onChange
-      // writes (blockQueue/queueNotify) in the mock's call history by the
-      // time this test body runs; clear those first so the assertion below
-      // only reflects what the command trigger itself does.
-      mockStorage.set.mockClear();
-      await mockCommands._trigger('something-else');
-      expect(mockStorage.set).not.toHaveBeenCalled();
     });
 
     test('deleting a keyword clears its stats', async () => {

@@ -10,7 +10,7 @@ import {
 import { MessageType } from '../shared/messages.js';
 import { ErrorType, BlockState, Timing } from '../shared/constants.js';
 import { KeywordStats } from './keyword-stats.js';
-import { KeywordStorageKey, TOGGLE_COMMAND } from '../shared/keywords.js';
+import { KeywordStorageKey } from '../shared/keywords.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -252,12 +252,6 @@ async function handleMessage(message, sender) {
       return { ok: true };
     }
 
-    case MessageType.OPEN_OPTIONS: {
-      // Content scripts can't open the options page themselves
-      await chrome.runtime.openOptionsPage();
-      return { ok: true };
-    }
-
     default:
       return { error: `Unknown message type: ${type}` };
   }
@@ -279,15 +273,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 // ── Keyword highlight ─────────────────────────────────────────────────────────
 
-chrome.commands.onCommand.addListener(async (command) => {
-  if (command !== TOGGLE_COMMAND) return;
-  const key = KeywordStorageKey.ENABLED;
-  const result = await chrome.storage.local.get(key);
-  // Unset means on (the default), so the first press turns it off
-  await chrome.storage.local.set({ [key]: result[key] === false });
-});
-
-// Keywords are edited on the options page; deleted ones take their stats along
+// Keywords are edited in the in-page manager; deleted ones take their stats along
 chrome.storage.onChanged.addListener((changes, area) => {
   const change = changes[KeywordStorageKey.KEYWORDS];
   if (area !== 'local' || !change) return;

@@ -30,6 +30,7 @@ export default [
         NodeFilter: 'readonly',
         CustomEvent: 'readonly',
         MouseEvent: 'readonly',
+        KeyboardEvent: 'readonly',
         CSS: 'readonly',
         location: 'readonly',
         getComputedStyle: 'readonly',

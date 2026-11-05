@@ -8,6 +8,7 @@ import { MessageType } from '../../shared/messages.js';
 import { KeywordStorageKey } from '../../shared/keywords.js';
 import { Icons } from './icons.js';
 import { getUIContainer, getStackContainer } from './shadow-host.js';
+import { KeywordOverlay } from './keyword-overlay.js';
 import { COMMENT_ID_ATTR } from '../../shared/constants.js';
 import { threadsSiteRule } from '../site-adapter.js';
 import { railTracker } from '../rail-tracker.js';
@@ -34,6 +35,7 @@ export class InlineControls {
     this._keywordHighlightOn = true;
     this._keywordRow = null;
     this._keywordToggle = null;
+    this._keywordOverlay = null;
   }
 
   init() {
@@ -131,6 +133,7 @@ export class InlineControls {
 
     // Create confirmation dialog (in UI container, not stack)
     this._createConfirmDialog(uiContainer);
+    this._keywordOverlay = new KeywordOverlay(uiContainer);
 
     // Check initial URL
     this._handleRouteChange();
@@ -240,25 +243,31 @@ export class InlineControls {
   }
 
   /**
-   * Keyword highlight row: label + a switch and manage button sharing one
-   * pill. Sits after the block actions, above the queue section.
+   * Keyword highlight row: one pill holding the switch (its label is part of
+   * the button, so clicking the text toggles too) and the manage button.
+   * Sits after the block actions, above the queue section.
    */
   _createKeywordRow() {
     const row = document.createElement('div');
     row.className = 'tb-card-keywords';
 
-    const label = document.createElement('span');
-    label.className = 'tb-card-keywords-label';
-    label.id = 'tb-card-keywords-label';
-    label.textContent = '標示關鍵字';
-
     const group = document.createElement('div');
     group.className = 'tb-kw-group';
 
+    const label = document.createElement('span');
+    label.className = 'tb-kw-label';
+    label.textContent = '標示關鍵字';
+
+    const track = document.createElement('span');
+    track.className = 'tb-kw-track';
+    track.setAttribute('aria-hidden', 'true');
+
     const toggle = document.createElement('button');
+    toggle.type = 'button';
     toggle.className = 'tb-kw-switch';
     toggle.setAttribute('role', 'switch');
-    toggle.setAttribute('aria-labelledby', label.id);
+    toggle.appendChild(label);
+    toggle.appendChild(track);
     toggle.addEventListener('click', () => {
       const next = !this._keywordHighlightOn;
       this.setKeywordHighlightState(next);
@@ -268,19 +277,15 @@ export class InlineControls {
     });
 
     const manage = document.createElement('button');
+    manage.type = 'button';
     manage.className = 'tb-kw-manage';
     manage.innerHTML = Icons.sliders;
     manage.title = '管理關鍵字';
     manage.setAttribute('aria-label', '管理關鍵字');
-    manage.addEventListener('click', () => {
-      chrome.runtime
-        .sendMessage({ type: MessageType.OPEN_OPTIONS })
-        .catch((e) => console.warn('[ThreadBlocker] Open options failed:', e.message));
-    });
+    manage.addEventListener('click', () => this._keywordOverlay?.open({ returnFocusTo: manage }));
 
     group.appendChild(toggle);
     group.appendChild(manage);
-    row.appendChild(label);
     row.appendChild(group);
 
     this._keywordRow = row;
@@ -630,6 +635,10 @@ export class InlineControls {
     if (this._confirmDialog) {
       this._confirmDialog.remove();
       this._confirmDialog = null;
+    }
+    if (this._keywordOverlay) {
+      this._keywordOverlay.destroy();
+      this._keywordOverlay = null;
     }
     this._exitBlockMode();
   }

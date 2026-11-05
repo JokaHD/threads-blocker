@@ -1,12 +1,12 @@
 /**
  * Keyword highlight — shared model: storage keys, limits and matching.
- * Pure functions, used by the content script, service worker and options page.
+ * Pure functions, used by the content script and the service worker.
  */
 
 export const KeywordStorageKey = {
   // Global display switch; separate key so toggling never rewrites the list
   ENABLED: 'keywordHighlightEnabled',
-  // Array<{ id, text, enabled, createdAt }>, written by the options page
+  // Array<{ id, text, enabled, createdAt }>, written by the keyword manager
   KEYWORDS: 'keywords',
   // { since, perKeyword, posts }, written only by the service worker
   STATS: 'keywordStats',
@@ -23,9 +23,6 @@ export const KeywordLimits = {
 
 // Name in the CSS.highlights registry, styled by ::highlight(tb-keyword)
 export const KEYWORD_HIGHLIGHT_NAME = 'tb-keyword';
-
-// chrome.commands name, see manifest.json
-export const TOGGLE_COMMAND = 'toggle-keyword-highlight';
 
 /**
  * @returns {string|null} the trimmed keyword, or null when empty or too long

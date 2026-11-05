@@ -61,7 +61,7 @@ export class KeywordStats {
     });
   }
 
-  /** Keywords deleted on the options page take their stats with them */
+  /** Keywords deleted in the keyword manager take their stats with them */
   removeKeywords(ids) {
     const gone = new Set(ids);
     return this._update((stats) => {

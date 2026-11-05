@@ -36,16 +36,6 @@ export const mockStorageOnChanged = {
   _fire: (changes, area = 'local') => storageChangeListeners.forEach((cb) => cb(changes, area)),
 };
 
-// Mock chrome.commands
-const commandListeners = [];
-export const mockCommands = {
-  getAll: jest.fn(() => Promise.resolve([])),
-  onCommand: {
-    addListener: jest.fn((cb) => commandListeners.push(cb)),
-  },
-  _trigger: (command) => Promise.all(commandListeners.map((cb) => cb(command))),
-};
-
 // Mock chrome.alarms
 const alarmCallbacks = [];
 export const mockAlarms = {
@@ -67,7 +57,6 @@ export const mockRuntime = {
   onMessage: {
     addListener: jest.fn((cb) => messageListeners.push(cb)),
   },
-  openOptionsPage: jest.fn(() => Promise.resolve()),
   _deliver: (msg, sender) => {
     const sendResponse = jest.fn();
     messageListeners.forEach((cb) => cb(msg, sender, sendResponse));
@@ -81,7 +70,6 @@ export function setupChromeMocks() {
     storage: { local: mockStorage, onChanged: mockStorageOnChanged },
     alarms: mockAlarms,
     runtime: mockRuntime,
-    commands: mockCommands,
   };
 }
 
