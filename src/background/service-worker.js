@@ -248,16 +248,7 @@ async function handleMessage(message, sender) {
     }
 
     case MessageType.KEYWORD_HITS: {
-      // A tab may still send hits for a keyword deleted meanwhile; recording
-      // them would bring its stats back after removeKeywords cleared them
-      const key = KeywordStorageKey.KEYWORDS;
-      const { [key]: keywords = [] } = await chrome.storage.local.get(key);
-      const live = new Set(keywords.map((k) => k.id));
-      const hits = (message.hits ?? []).map((hit) => ({
-        ...hit,
-        keywordIds: (hit.keywordIds ?? []).filter((id) => live.has(id)),
-      }));
-      await keywordStats.recordHits(hits);
+      await keywordStats.recordHits(message.hits ?? []);
       return { ok: true };
     }
 

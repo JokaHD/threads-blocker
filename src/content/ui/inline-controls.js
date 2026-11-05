@@ -8,7 +8,7 @@ import { MessageType } from '../../shared/messages.js';
 import { KeywordStorageKey } from '../../shared/keywords.js';
 import { Icons } from './icons.js';
 import { getUIContainer, getStackContainer } from './shadow-host.js';
-import { COMMENT_ID_ATTR } from '../dom-observer.js';
+import { COMMENT_ID_ATTR } from '../../shared/constants.js';
 import { threadsSiteRule } from '../site-adapter.js';
 import { railTracker } from '../rail-tracker.js';
 

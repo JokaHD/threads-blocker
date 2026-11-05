@@ -11,10 +11,19 @@ describe('KeywordStats', () => {
   let stats;
   let now;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     resetChromeMocks();
+    await chrome.storage.local.set({ keywords: [{ id: 'k1' }, { id: 'k2' }] });
     now = 1000;
     stats = new KeywordStats({ now: () => now });
+  });
+
+  test('ignores hits for keywords no longer in the list', async () => {
+    await stats.recordHits([hit('p1', 'a', 'k1', 'gone'), hit('p2', 'a', 'gone')]);
+
+    const s = await read();
+    expect(s.perKeyword).toEqual({ k1: { hits: 1, blocked: 0 } });
+    expect(Object.keys(s.posts)).toEqual(['p1']);
   });
 
   test('counts a post once per keyword', async () => {

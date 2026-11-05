@@ -252,6 +252,3 @@ export class DOMObserver {
     }));
   }
 }
-
-// Export attribute name for other modules
-export { COMMENT_ID_ATTR };

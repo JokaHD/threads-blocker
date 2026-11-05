@@ -39,7 +39,7 @@ export class KeywordHighlighter {
 
     this._keywords = [];
     this._enabled = true;
-    // container -> { username, postKey, text, segments, matches }
+    // container -> { username, postKey (set once), body: { text, segments, matches } | null }
     this._entries = new Map();
     // postKey -> Set<keywordId> already queued for the service worker
     this._reported = new Map();
@@ -48,7 +48,6 @@ export class KeywordHighlighter {
     this._enabledListeners = [];
     this._flushTimer = null;
     this._stopped = false;
-    this._rangeCount = 0;
     this._noBodySeen = new WeakSet();
     this._counters = { noBodyText: 0, fallbackKeys: 0 };
 
@@ -96,24 +95,23 @@ export class KeywordHighlighter {
   }
 
   /**
-   * A newly detected post (content.js processComments).
+   * A newly detected post (content.js). Only registered: the scan tick's
+   * refresh() reads it, once every post in the batch is marked (so a quoted
+   * post's text stays out of the outer body), and paints once.
    * @param {Element} container
    * @param {string} username
    */
   process(container, username) {
-    // Tracked even while the body is empty: it may render later, and only
-    // refresh() can see that
-    const entry = this._analyze(container, username) ?? emptyEntry(username);
-    this._entries.set(container, entry);
-    this._report(entry);
-    this._paint();
+    if (this._entries.get(container)?.username === username) return;
+    this._entries.set(container, { username, postKey: null, body: null });
   }
 
   /**
    * After every DOM scan tick: drop posts that left the page or lost their
-   * mark (route change), and re-read bodies React re-rendered in place
-   * (e.g. "more" expanded) — a marked container is never reported again by
-   * the DOM observer, so this is the only place that sees those changes.
+   * mark (route change), and read bodies that are new or React re-rendered
+   * in place (e.g. "more" expanded, or rendered after the post was found) —
+   * a marked container is never reported again by the DOM observer, so this
+   * is the only place that sees those changes.
    */
   refresh() {
     let changed = false;
@@ -123,18 +121,18 @@ export class KeywordHighlighter {
         changed = true;
         continue;
       }
-      const next = this._analyze(container, entry.username) ?? emptyEntry(entry.username);
-      // Same container, same post: keep its first key so a fallback hash
-      // key doesn't change (and count the post twice) when "more" expands
-      if (entry.postKey) next.postKey = entry.postKey;
-      if (!sameBody(entry, next)) {
-        this._entries.set(container, next);
-        this._report(next);
-        changed = true;
-      }
+      const body = this._readBody(container);
+      if (sameBody(entry.body, body)) continue;
+      changed = true;
+      entry.body = body;
+      if (!body) continue;
+      // Set once per container: a fallback hash key must not change (and
+      // count the post twice) when "more" expands
+      entry.postKey ??= this._siteRule.getPostKey(container, entry.username, body.text);
+      body.matches = findMatches(body.text, this._keywords);
+      this._report(entry);
     }
     if (changed) this._paint();
-    this._applyTheme();
   }
 
   /** Send queued hits to the service worker */
@@ -161,13 +159,14 @@ export class KeywordHighlighter {
       enabled: this._enabled,
       keywords: this._keywords.length,
       posts: this._entries.size,
-      ranges: this._rangeCount,
+      ranges: this._highlights?.get(KEYWORD_HIGHLIGHT_NAME)?.size ?? 0,
       pendingHits: this._pending.size,
       ...this._counters,
     };
   }
 
-  _analyze(container, username) {
+  /** @returns {{text: string, segments: object[]}|null} null when no body text */
+  _readBody(container) {
     const nodes = this._siteRule.getBodyTextNodes(container);
     if (nodes.length === 0) {
       if (!this._noBodySeen.has(container)) {
@@ -182,17 +181,11 @@ export class KeywordHighlighter {
       segments.push({ node, start: text.length, length: node.data.length });
       text += node.data;
     }
-    return {
-      username,
-      postKey: this._siteRule.getPostKey(container, username, text),
-      text,
-      segments,
-      matches: findMatches(text, this._keywords),
-    };
+    return { text, segments, matches: [] };
   }
 
   _report(entry) {
-    const ids = [...new Set(entry.matches.map((m) => m.keywordId))];
+    const ids = [...new Set(entry.body.matches.map((m) => m.keywordId))];
     if (ids.length === 0) return;
     const isNewPost = !this._reported.has(entry.postKey);
     const reported = this._reported.get(entry.postKey) ?? new Set();
@@ -219,20 +212,22 @@ export class KeywordHighlighter {
     if (!this._highlights) return;
     if (!this._enabled) {
       this._highlights.delete(KEYWORD_HIGHLIGHT_NAME);
-      this._rangeCount = 0;
       return;
     }
+    // Re-read here rather than every scan tick: painting only happens when
+    // posts changed, which includes route changes
+    this._applyTheme();
     const active = new Set(this._keywords.filter((k) => k.enabled).map((k) => k.id));
     const highlight = new this._HighlightClass();
-    for (const entry of this._entries.values()) {
-      for (const match of entry.matches) {
+    for (const { body } of this._entries.values()) {
+      if (!body) continue;
+      for (const match of body.matches) {
         if (!active.has(match.keywordId)) continue;
-        const range = toRange(entry.segments, match.start, match.end);
+        const range = toRange(body.segments, match.start, match.end);
         if (range) highlight.add(range);
       }
     }
     this._highlights.set(KEYWORD_HIGHLIGHT_NAME, highlight);
-    this._rangeCount = highlight.size;
   }
 
   _handleStorageChange(changes, area) {
@@ -254,7 +249,8 @@ export class KeywordHighlighter {
 
   _reanalyzeAll() {
     for (const entry of this._entries.values()) {
-      entry.matches = findMatches(entry.text, this._keywords);
+      if (!entry.body) continue;
+      entry.body.matches = findMatches(entry.body.text, this._keywords);
       this._report(entry);
     }
     this._paint();
@@ -266,12 +262,8 @@ export class KeywordHighlighter {
   }
 }
 
-/** A tracked post whose body hasn't rendered (or is mid re-render) */
-function emptyEntry(username) {
-  return { username, postKey: null, text: '', segments: [], matches: [] };
-}
-
 function sameBody(a, b) {
+  if (!a || !b) return a === b;
   return (
     a.text === b.text &&
     a.segments.length === b.segments.length &&

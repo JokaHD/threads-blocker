@@ -89,12 +89,10 @@ function handleStorageChange(changes, area) {
 }
 chrome.storage.onChanged.addListener(handleStorageChange);
 
-// Process discovered comments. The whole batch is marked first: a quoted
-// post comes after the post that contains it, and the outer body must already
-// see the inner mark to leave the quoted text out.
+// Process discovered comments
 function processComments(comments) {
-  for (const comment of comments) domObserver.markProcessed(comment.container, comment.username);
   for (const comment of comments) {
+    domObserver.markProcessed(comment.container, comment.username);
     inlineControls.inject(comment);
     selectionManager.recordSeen(comment.username);
     keywordHighlighter.process(comment.container, comment.username);
@@ -105,6 +103,8 @@ function processExistingComments() {
   const comments = domObserver.findComments(document.body);
   console.log('[ThreadBlocker] Found', comments.length, 'comments on page');
   processComments(comments);
+  // Observer scan ticks do this after their batch; the first pass has no tick
+  keywordHighlighter.refresh();
   stackPlacement.updateIfUnanchored();
 }
 

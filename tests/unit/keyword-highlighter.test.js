@@ -23,6 +23,7 @@ function makeRegistry() {
     map,
     set: jest.fn((name, h) => map.set(name, h)),
     delete: jest.fn((name) => map.delete(name)),
+    get: (name) => map.get(name),
   };
 }
 
@@ -79,6 +80,11 @@ describe('KeywordHighlighter', () => {
     return el;
   }
 
+  const track = (el, username) => {
+    highlighter.process(el, username);
+    highlighter.refresh();
+  };
+
   const painted = () => registry.map.get('tb-keyword')?.ranges.map((r) => r.toString()) ?? null;
 
   async function start(stored, options = {}) {
@@ -109,16 +115,30 @@ describe('KeywordHighlighter', () => {
       '<span class="meta">詐騙</span><p>這是詐騙，詐<b>騙</b>集團</p>'
     );
 
-    highlighter.process(el, 'fake_user');
+    track(el, 'fake_user');
 
     expect(painted()).toEqual(['詐騙', '詐騙']);
+  });
+
+  test('a batch of new posts is read and painted once, on refresh', async () => {
+    await start({ keywords: [KW('k1', '詐騙')] });
+    registry.set.mockClear();
+    for (const key of ['p1', 'p2', 'p3']) {
+      highlighter.process(addPost('fake_user', '<p>詐騙</p>', key), 'fake_user');
+    }
+    expect(registry.set).not.toHaveBeenCalled();
+
+    highlighter.refresh();
+
+    expect(registry.set).toHaveBeenCalledTimes(1);
+    expect(painted()).toEqual(['詐騙', '詐騙', '詐騙']);
   });
 
   test('a disabled keyword is reported but not painted', async () => {
     await start({ keywords: [KW('k1', '詐騙', false)] });
     const el = addPost('fake_user', '<p>這是詐騙</p>', '/@fake_user/post/1');
 
-    highlighter.process(el, 'fake_user');
+    track(el, 'fake_user');
     await highlighter.flush();
 
     expect(painted()).toEqual([]);
@@ -132,7 +152,7 @@ describe('KeywordHighlighter', () => {
     await start({ keywords: [KW('k1', '詐騙')] });
     const listener = jest.fn();
     highlighter.onEnabledChange(listener);
-    highlighter.process(addPost('fake_user', '<p>詐騙</p>'), 'fake_user');
+    track(addPost('fake_user', '<p>詐騙</p>'), 'fake_user');
 
     fireStorage({ keywordHighlightEnabled: { newValue: false } });
     expect(registry.map.has('tb-keyword')).toBe(false);
@@ -145,7 +165,7 @@ describe('KeywordHighlighter', () => {
 
   test('starts off when stored off, but still reports hits', async () => {
     await start({ keywordHighlightEnabled: false, keywords: [KW('k1', '詐騙')] });
-    highlighter.process(addPost('fake_user', '<p>詐騙</p>'), 'fake_user');
+    track(addPost('fake_user', '<p>詐騙</p>'), 'fake_user');
     await highlighter.flush();
 
     expect(registry.map.has('tb-keyword')).toBe(false);
@@ -156,9 +176,9 @@ describe('KeywordHighlighter', () => {
     await start({ keywords: [KW('k1', '詐騙')] });
     const el = addPost('fake_user', '<p>詐騙</p>', 'p1');
 
-    highlighter.process(el, 'fake_user');
+    track(el, 'fake_user');
     await highlighter.flush();
-    highlighter.process(el, 'fake_user');
+    track(el, 'fake_user');
     await highlighter.flush();
 
     expect(send).toHaveBeenCalledTimes(1);
@@ -166,7 +186,7 @@ describe('KeywordHighlighter', () => {
 
   test('a keyword added later is matched against posts already on the page', async () => {
     await start({ keywords: [KW('k1', '詐騙')] });
-    highlighter.process(addPost('fake_user', '<p>加賴詐騙</p>', 'p1'), 'fake_user');
+    track(addPost('fake_user', '<p>加賴詐騙</p>', 'p1'), 'fake_user');
     await highlighter.flush();
 
     fireStorage({ keywords: { newValue: [KW('k1', '詐騙'), KW('k2', '加賴')] } });
@@ -182,7 +202,7 @@ describe('KeywordHighlighter', () => {
   test('refresh drops posts that left the page', async () => {
     await start({ keywords: [KW('k1', '詐騙')] });
     const el = addPost('fake_user', '<p>詐騙</p>');
-    highlighter.process(el, 'fake_user');
+    track(el, 'fake_user');
 
     el.remove();
     highlighter.refresh();
@@ -193,7 +213,7 @@ describe('KeywordHighlighter', () => {
   test('refresh drops posts that lost their mark (route change)', async () => {
     await start({ keywords: [KW('k1', '詐騙')] });
     const el = addPost('fake_user', '<p>詐騙</p>');
-    highlighter.process(el, 'fake_user');
+    track(el, 'fake_user');
 
     el.removeAttribute('data-tb-comment-id');
     highlighter.refresh();
@@ -204,7 +224,7 @@ describe('KeywordHighlighter', () => {
   test('refresh re-reads a re-rendered body', async () => {
     await start({ keywords: [KW('k1', '詐騙')] });
     const el = addPost('fake_user', '<p>沒有</p>', 'p1');
-    highlighter.process(el, 'fake_user');
+    track(el, 'fake_user');
     expect(painted()).toEqual([]);
 
     el.querySelector('p').textContent = '展開後：詐騙';
@@ -218,7 +238,7 @@ describe('KeywordHighlighter', () => {
   test('a body that renders after detection is still analyzed', async () => {
     await start({ keywords: [KW('k1', '詐騙')] });
     const el = addPost('fake_user', '<span class="meta">fake_user</span>', 'p1');
-    highlighter.process(el, 'fake_user');
+    track(el, 'fake_user');
     expect(painted()).toEqual([]);
 
     el.insertAdjacentHTML('beforeend', '<p>詐騙</p>');
@@ -232,7 +252,7 @@ describe('KeywordHighlighter', () => {
   test('a body briefly empty during a re-render is picked up again', async () => {
     await start({ keywords: [KW('k1', '詐騙')] });
     const el = addPost('fake_user', '<p>詐騙</p>', 'p1');
-    highlighter.process(el, 'fake_user');
+    track(el, 'fake_user');
 
     el.innerHTML = '';
     highlighter.refresh();
@@ -257,7 +277,7 @@ describe('KeywordHighlighter', () => {
     });
     await highlighter.init();
     const el = addPost('fake_user', '<p>詐騙…</p>');
-    highlighter.process(el, 'fake_user');
+    track(el, 'fake_user');
 
     el.querySelector('p').textContent = '詐騙，展開後的全文';
     highlighter.refresh();
@@ -273,8 +293,8 @@ describe('KeywordHighlighter', () => {
     await start({ keywords: [KW('k1', '詐騙')] });
     const el = addPost('fake_user', '<span class="meta">詐騙</span>');
 
-    highlighter.process(el, 'fake_user');
-    highlighter.process(el, 'fake_user');
+    track(el, 'fake_user');
+    track(el, 'fake_user');
 
     expect(painted()).toEqual([]);
     expect(highlighter.getDebugState().noBodyText).toBe(1);
@@ -282,7 +302,7 @@ describe('KeywordHighlighter', () => {
 
   test('counts fallback post keys', async () => {
     await start({ keywords: [KW('k1', '詐騙')] });
-    highlighter.process(addPost('fake_user', '<p>詐騙</p>'), 'fake_user');
+    track(addPost('fake_user', '<p>詐騙</p>'), 'fake_user');
     expect(highlighter.getDebugState().fallbackKeys).toBe(1);
   });
 
@@ -290,7 +310,7 @@ describe('KeywordHighlighter', () => {
     await start({ keywords: [KW('k1', '詐騙')] });
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     send.mockRejectedValueOnce(new Error('Receiving end does not exist'));
-    highlighter.process(addPost('fake_user', '<p>詐騙</p>', 'p1'), 'fake_user');
+    track(addPost('fake_user', '<p>詐騙</p>', 'p1'), 'fake_user');
 
     await highlighter.flush();
     await highlighter.flush();
@@ -305,11 +325,11 @@ describe('KeywordHighlighter', () => {
   test('stops sending once the extension context is gone', async () => {
     await start({ keywords: [KW('k1', '詐騙')] });
     send.mockRejectedValue(new Error('Extension context invalidated.'));
-    highlighter.process(addPost('fake_user', '<p>詐騙</p>', 'p1'), 'fake_user');
+    track(addPost('fake_user', '<p>詐騙</p>', 'p1'), 'fake_user');
     delete chrome.runtime.id;
 
     await highlighter.flush();
-    highlighter.process(addPost('fake_user', '<p>詐騙 2</p>', 'p2'), 'fake_user');
+    track(addPost('fake_user', '<p>詐騙 2</p>', 'p2'), 'fake_user');
     await highlighter.flush();
 
     expect(send).toHaveBeenCalledTimes(1);
@@ -318,7 +338,7 @@ describe('KeywordHighlighter', () => {
   test('works without the Highlight API: no painting, hits still reported', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     await start({ keywords: [KW('k1', '詐騙')] }, { highlights: undefined });
-    highlighter.process(addPost('fake_user', '<p>詐騙</p>'), 'fake_user');
+    track(addPost('fake_user', '<p>詐騙</p>'), 'fake_user');
     await highlighter.flush();
 
     expect(send).toHaveBeenCalledTimes(1);

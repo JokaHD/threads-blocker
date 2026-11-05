@@ -3,7 +3,7 @@
  */
 
 import { InlineControls } from '../../src/content/ui/inline-controls.js';
-import { COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
+import { COMMENT_ID_ATTR } from '../../src/shared/constants.js';
 import { MessageType } from '../../src/shared/messages.js';
 import { railTracker } from '../../src/content/rail-tracker.js';
 import { mountThreadsLayout } from './helpers/rail-fixture.js';

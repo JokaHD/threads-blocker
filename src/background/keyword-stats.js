@@ -24,9 +24,12 @@ export class KeywordStats {
    * @param {Array<{postKey: string, username: string, keywordIds: string[]}>} hits
    */
   recordHits(hits) {
-    return this._update((stats) => {
+    return this._update((stats, liveIds) => {
       let changed = false;
-      for (const { postKey, username, keywordIds } of hits) {
+      for (const { postKey, username, keywordIds: sent } of hits) {
+        // A tab may still send hits for a keyword deleted meanwhile; recording
+        // them would bring back stats removeKeywords already cleared
+        const keywordIds = sent?.filter((id) => liveIds.has(id));
         if (!postKey || !username || !keywordIds?.length) continue;
         stats.posts[postKey] ??= { username, keywordIds: [], ts: this._now(), blocked: false };
         const post = stats.posts[postKey];
@@ -84,14 +87,16 @@ export class KeywordStats {
    * worker can't drop each other's update. Never rejects: a failed write is
    * logged and the next update starts from storage again.
    *
-   * @param {(stats: object) => boolean} mutate - returns whether to save
+   * @param {(stats: object, liveIds: Set<string>) => boolean} mutate - gets the
+   *   ids currently in the keyword list; returns whether to save
    */
   _update(mutate) {
     this._chain = this._chain
       .then(async () => {
-        const result = await chrome.storage.local.get(KEY);
+        const result = await chrome.storage.local.get([KEY, KeywordStorageKey.KEYWORDS]);
         const stats = result[KEY] ?? { since: this._now(), perKeyword: {}, posts: {} };
-        if (mutate(stats)) await chrome.storage.local.set({ [KEY]: stats });
+        const liveIds = new Set((result[KeywordStorageKey.KEYWORDS] ?? []).map((k) => k.id));
+        if (mutate(stats, liveIds)) await chrome.storage.local.set({ [KEY]: stats });
       })
       .catch((err) => console.error('[ThreadBlocker] Keyword stats update failed:', err));
     return this._chain;
