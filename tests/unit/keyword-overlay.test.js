@@ -38,7 +38,7 @@ describe('KeywordOverlay', () => {
   });
 
   afterEach(() => {
-    overlay.destroy();
+    overlay.close();
     container.remove();
     delete global.chrome;
   });
@@ -81,16 +81,20 @@ describe('KeywordOverlay', () => {
     expect(chrome.storage.onChanged.removeListener).toHaveBeenCalledTimes(1);
   });
 
-  test('Escape closes, wherever focus is', async () => {
+  test('Escape closes from anywhere inside the overlay', async () => {
     overlay.open();
     await settle();
     pressEscape(container.querySelector('#km-input'));
     expect(backdrop()).toBeNull();
 
     overlay.open();
-    document.activeElement.blur();
-    pressEscape();
+    pressEscape(container.querySelector('.tb-kw-modal'));
     expect(backdrop()).toBeNull();
+  });
+
+  test('the modal itself can hold focus, so clicks on plain areas keep it inside', () => {
+    overlay.open();
+    expect(container.querySelector('.tb-kw-modal').tabIndex).toBe(-1);
   });
 
   test('a backdrop click closes, a click inside the modal does not', async () => {

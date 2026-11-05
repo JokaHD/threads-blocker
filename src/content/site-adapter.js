@@ -78,17 +78,24 @@ const bodyTierCounts = { measured: 0, semantic: 0, measuredEmpty: 0 };
 
 /** Tier 1: the text node is a body text run (see BODY_SPAN_SELECTOR) */
 function isInBodySpan(node, container) {
-  const span = node.parentElement.closest(BODY_SPAN_SELECTOR);
-  if (!span || !container.contains(span)) return false;
-  // Body runs are always wrapped once more (span[dir=auto] > span); text set
-  // straight on span[dir=auto] is a label, e.g. the "作者" badge on replies
-  if (node.parentElement === span) return false;
-  const link = span.closest('a');
-  if (link && container.contains(link)) return false;
-  for (let el = node.parentElement; el !== span; el = el.parentElement) {
-    if (el.tagName === 'DIV') return false;
+  // One walk up to the container: no <div> below the nearest span[dir=auto],
+  // no link above it (hot path: every body node of every post, each tick)
+  let span = null;
+  for (let el = node.parentElement; el && el !== container; el = el.parentElement) {
+    if (!span) {
+      if (el.matches(BODY_SPAN_SELECTOR)) {
+        // Body runs are always wrapped once more (span[dir=auto] > span);
+        // text set straight on it is a label, e.g. the "作者" reply badge
+        if (el === node.parentElement) return false;
+        span = el;
+      } else if (el.tagName === 'DIV') {
+        return false;
+      }
+    } else if (el.tagName === 'A') {
+      return false;
+    }
   }
-  return true;
+  return !!span;
 }
 
 /** Tier 2: text nodes of the container's own post, minus the non-body ones */
@@ -574,6 +581,13 @@ export const threadsSiteRule = {
    */
   getBodyTextNodes(container) {
     const nodes = semanticBodyTextNodes(container);
+    const body = nodes.filter((node) => isInBodySpan(node, container));
+    if (body.length > 0) {
+      bodyTierCounts.measured += 1;
+      return body;
+    }
+    // Nothing measured: the tier still applies if the post has its own
+    // span[dir=auto] (checked only here, off the common path)
     const ownSpan = [...container.querySelectorAll(BODY_SPAN_SELECTOR)].some(
       (span) => span.closest(`[${COMMENT_ID_ATTR}]`) === container
     );
@@ -582,11 +596,10 @@ export const threadsSiteRule = {
       return nodes;
     }
     bodyTierCounts.measured += 1;
-    const body = nodes.filter((node) => isInBodySpan(node, container));
     // Not a fallback: most of these are image-only posts whose topic tags or
     // counter the semantic tier would wrongly take as body. A rising share
     // of them is the drift signal (the body changed, the header didn't)
-    if (body.length === 0 && nodes.length > 0) bodyTierCounts.measuredEmpty += 1;
+    if (nodes.length > 0) bodyTierCounts.measuredEmpty += 1;
     return body;
   },
 

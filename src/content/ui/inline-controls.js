@@ -637,7 +637,7 @@ export class InlineControls {
       this._confirmDialog = null;
     }
     if (this._keywordOverlay) {
-      this._keywordOverlay.destroy();
+      this._keywordOverlay.close();
       this._keywordOverlay = null;
     }
     this._exitBlockMode();

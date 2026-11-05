@@ -68,8 +68,9 @@ export class KeywordManager {
         <h2 class="km-title" id="km-title">關鍵字</h2>
         <div class="km-global">
           <span id="km-global-label">標示關鍵字</span>
-          <button type="button" class="km-switch km-switch--lg" id="km-global-switch"
-            role="switch" aria-labelledby="km-global-label"></button>
+          <button type="button" class="km-global-switch" id="km-global-switch"
+            role="switch" aria-labelledby="km-global-label"
+            ><span class="tb-kw-track" aria-hidden="true"></span></button>
         </div>
       </header>
       <form class="km-add" id="km-add-form">
@@ -206,7 +207,18 @@ export class KeywordManager {
 
   _render() {
     this._globalSwitch.setAttribute('aria-checked', String(this._enabled));
+    // Rows are rebuilt, so a focused row button would drop focus to <body>
+    // (keys would then leak past the overlay to Threads): put it back
+    const active = this._root.getRootNode().activeElement;
+    const focused = this._rowsEl.contains(active)
+      ? { id: active.closest('tr')?.dataset.id, action: active.dataset.action }
+      : null;
     this._rowsEl.replaceChildren(...this._sorted().map((k) => this._renderRow(k)));
+    if (focused) {
+      const row = [...this._rowsEl.children].find((tr) => tr.dataset.id === focused.id);
+      const again = row?.querySelector(`[data-action="${focused.action}"]`);
+      (again ?? this._input).focus();
+    }
     this._emptyEl.hidden = this._keywords.length > 0;
 
     const since = this._stats?.since

@@ -183,6 +183,26 @@ describe('KeywordManager', () => {
     expect(root.querySelector('tr[data-id="k2"]')).toBeNull();
   });
 
+  test('keeps focus on the row button across re-renders', async () => {
+    await mount({ keywords: KEYWORDS });
+    const button = (id, action) =>
+      root.querySelector(`tr[data-id="${id}"] [data-action="${action}"]`);
+
+    button('k1', 'toggle').focus();
+    button('k1', 'toggle').click();
+    await settle();
+    expect(document.activeElement).toBe(button('k1', 'toggle'));
+
+    // Two-step delete works from the keyboard: the confirm button has focus
+    button('k2', 'delete').focus();
+    button('k2', 'delete').click();
+    expect(document.activeElement).toBe(button('k2', 'delete'));
+    button('k2', 'delete').click();
+    await settle();
+    // Its row is gone: focus falls back to the input, not <body>
+    expect(document.activeElement).toBe(root.querySelector('#km-input'));
+  });
+
   test('the delete confirmation reverts after 3 seconds', async () => {
     await mount({ keywords: KEYWORDS });
     jest.useFakeTimers();

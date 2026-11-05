@@ -472,11 +472,12 @@ function getExtensionStyles() {
       transition: left var(--tb-transition);
     }
 
-    .tb-kw-switch[aria-checked='false'] .tb-kw-track {
+    /* Shared by the card switch and the manager's global switch */
+    [role='switch'][aria-checked='false'] > .tb-kw-track {
       background: var(--tb-border);
     }
 
-    .tb-kw-switch[aria-checked='false'] .tb-kw-track::after {
+    [role='switch'][aria-checked='false'] > .tb-kw-track::after {
       left: 2px;
       background: var(--tb-text-muted);
     }
@@ -737,17 +738,14 @@ function getExtensionStyles() {
       background: var(--tb-text-muted);
     }
 
-    /* Global switch: same size as the card's */
-    .km-switch--lg {
-      width: 36px;
-      height: 20px;
+    /* Global switch: the card's track (.tb-kw-track) in a bare button */
+    .km-global-switch {
+      display: flex;
+      padding: 0;
+      border: none;
       border-radius: 10px;
-    }
-
-    .km-switch--lg::after {
-      left: 18px;
-      width: 16px;
-      height: 16px;
+      background: none;
+      cursor: pointer;
     }
 
     .km-del {

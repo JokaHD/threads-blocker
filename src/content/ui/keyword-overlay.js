@@ -14,13 +14,6 @@ export class KeywordOverlay {
     this._backdrop = null;
     this._manager = null;
     this._returnFocusTo = null;
-    // Capture on document: catches Esc even when focus fell back to <body>
-    this._onDocumentKeydown = (e) => {
-      if (e.key !== 'Escape') return;
-      e.preventDefault();
-      e.stopPropagation();
-      this.close();
-    };
   }
 
   get isOpen() {
@@ -40,6 +33,9 @@ export class KeywordOverlay {
 
     const modal = document.createElement('div');
     modal.className = 'tb-kw-modal';
+    // A click on plain modal area keeps focus here instead of <body>, so
+    // keys keep going through the backdrop's listeners below
+    modal.tabIndex = -1;
 
     const close = document.createElement('button');
     close.type = 'button';
@@ -59,14 +55,21 @@ export class KeywordOverlay {
       if (e.target === backdrop) this.close();
     });
     // Typing in the manager must not reach Threads' own key handlers: past
-    // the shadow boundary the target is our host, not an input
+    // the shadow boundary the target is our host, not an input. Focus stays
+    // inside (the manager restores it across re-renders), so Esc is caught
+    // here too
     for (const type of ['keydown', 'keyup', 'keypress']) {
-      backdrop.addEventListener(type, (e) => e.stopPropagation());
+      backdrop.addEventListener(type, (e) => {
+        e.stopPropagation();
+        if (type === 'keydown' && e.key === 'Escape') {
+          e.preventDefault();
+          this.close();
+        }
+      });
     }
 
     this._container.appendChild(backdrop);
     this._backdrop = backdrop;
-    document.addEventListener('keydown', this._onDocumentKeydown, true);
 
     this._manager = new KeywordManager(root);
     this._manager
@@ -77,16 +80,11 @@ export class KeywordOverlay {
 
   close() {
     if (!this.isOpen) return;
-    document.removeEventListener('keydown', this._onDocumentKeydown, true);
     this._manager.destroy();
     this._manager = null;
     this._backdrop.remove();
     this._backdrop = null;
     this._returnFocusTo?.focus();
     this._returnFocusTo = null;
-  }
-
-  destroy() {
-    this.close();
   }
 }
