@@ -153,6 +153,18 @@ describe('InlineControls', () => {
     });
   });
 
+  describe('destroy', () => {
+    test('detaches the route-change listener', () => {
+      inlineControls.init();
+      inlineControls.destroy();
+      mockSelectionManager.clearSelection.mockClear();
+
+      window.dispatchEvent(new CustomEvent('tb-route-change', { detail: { url: location.href } }));
+
+      expect(mockSelectionManager.clearSelection).not.toHaveBeenCalled();
+    });
+  });
+
   describe('block mode change event', () => {
     test('fires on enter and exit so the stack can re-place', () => {
       inlineControls.init();
@@ -328,26 +340,6 @@ describe('InlineControls', () => {
     });
   });
 
-  describe('multiSelectMode property', () => {
-    test('returns false initially', () => {
-      inlineControls.init();
-      expect(inlineControls.multiSelectMode).toBe(false);
-    });
-
-    test('returns true after entering block mode', () => {
-      inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
-      expect(inlineControls.multiSelectMode).toBe(true);
-    });
-
-    test('setMultiSelectMode(false) exits block mode', () => {
-      inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
-      inlineControls.setMultiSelectMode(false);
-      expect(inlineControls.multiSelectMode).toBe(false);
-    });
-  });
-
   describe('comment click handling', () => {
     let comment;
 
@@ -371,7 +363,7 @@ describe('InlineControls', () => {
 
     test('toggles selection when comment clicked in block mode', () => {
       inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
+      inlineControls._enterBlockMode();
 
       comment.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
@@ -381,7 +373,7 @@ describe('InlineControls', () => {
 
     test('uses shift-click for range selection', () => {
       inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
+      inlineControls._enterBlockMode();
 
       comment.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }));
 
@@ -390,7 +382,7 @@ describe('InlineControls', () => {
 
     test('prevents default on comment click in block mode', () => {
       inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
+      inlineControls._enterBlockMode();
 
       const event = new MouseEvent('click', { bubbles: true, cancelable: true });
       comment.dispatchEvent(event);
@@ -428,7 +420,7 @@ describe('InlineControls', () => {
 
     test('swallows clicks on an unmarked pressable container', () => {
       inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
+      inlineControls._enterBlockMode();
 
       expect(click('inner').defaultPrevented).toBe(true);
       expect(mockSelectionManager.toggle).not.toHaveBeenCalled();
@@ -436,14 +428,14 @@ describe('InlineControls', () => {
 
     test('swallows clicks on an unmarked /@ link', () => {
       inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
+      inlineControls._enterBlockMode();
 
       expect(click('permalink').defaultPrevented).toBe(true);
     });
 
     test('lets sidebar navigation, tabs and non-user links through', () => {
       inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
+      inlineControls._enterBlockMode();
 
       expect(click('nav-link').defaultPrevented).toBe(false);
       expect(click('tab').defaultPrevented).toBe(false);
@@ -481,7 +473,7 @@ describe('InlineControls', () => {
 
     test('adds hover class in block mode', () => {
       inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
+      inlineControls._enterBlockMode();
 
       comment.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
 
@@ -490,7 +482,7 @@ describe('InlineControls', () => {
 
     test('removes hover class from previous element', () => {
       inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
+      inlineControls._enterBlockMode();
 
       const comment2 = document.createElement('div');
       comment2.setAttribute(COMMENT_ID_ATTR, 'user2');
@@ -531,7 +523,7 @@ describe('InlineControls', () => {
   describe('updateCheckboxes', () => {
     test('updates selection highlights', () => {
       inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
+      inlineControls._enterBlockMode();
 
       const comment = document.createElement('div');
       comment.setAttribute(COMMENT_ID_ATTR, 'testuser');
@@ -543,17 +535,6 @@ describe('InlineControls', () => {
       expect(comment.classList.contains('tb-selected')).toBe(true);
 
       comment.remove();
-    });
-  });
-
-  describe('tb-exit-block-mode event', () => {
-    test('exits block mode on event', () => {
-      inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
-
-      window.dispatchEvent(new CustomEvent('tb-exit-block-mode'));
-
-      expect(inlineControls.multiSelectMode).toBe(false);
     });
   });
 
@@ -602,7 +583,7 @@ describe('InlineControls', () => {
 
     test('removes event listeners', () => {
       inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
+      inlineControls._enterBlockMode();
       inlineControls.destroy();
 
       // Create comment after destroy
@@ -620,7 +601,7 @@ describe('InlineControls', () => {
   describe('selection lifecycle', () => {
     test('inject re-applies highlight for an already-selected username in block mode', () => {
       inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
+      inlineControls._enterBlockMode();
       mockSelectionManager.isSelected.mockImplementation((u) => u === 'alice');
 
       // 模擬 virtual scroll 回收後重新標記的容器
@@ -636,7 +617,7 @@ describe('InlineControls', () => {
 
     test('inject does not highlight unselected usernames', () => {
       inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
+      inlineControls._enterBlockMode();
 
       const el = document.createElement('div');
       el.setAttribute(COMMENT_ID_ATTR, 'bob');
@@ -650,14 +631,14 @@ describe('InlineControls', () => {
 
     test('route change while in block mode exits block mode and clears selection', () => {
       inlineControls.init();
-      inlineControls.setMultiSelectMode(true);
+      inlineControls._enterBlockMode();
       mockSelectionManager.clearSelection.mockClear();
 
       window.dispatchEvent(
         new CustomEvent('tb-route-change', { detail: { url: 'https://www.threads.com/@x/post/1' } })
       );
 
-      expect(inlineControls.multiSelectMode).toBe(false);
+      expect(document.body.classList.contains('tb-blockmode')).toBe(false);
       expect(mockSelectionManager.clearSelection).toHaveBeenCalled();
     });
   });

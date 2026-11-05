@@ -9,7 +9,7 @@ let shadowRoot = null;
 
 /**
  * Get or create the shadow host and return its shadow root.
- * The shadow root contains all extension UI (FAB, toolbar, panel).
+ * The shadow root contains all extension UI (FAB, block mode card, panel).
  */
 export function getShadowRoot() {
   if (shadowRoot) return shadowRoot;
@@ -660,26 +660,6 @@ function getExtensionStyles() {
 
     .tb-panel-cooldown-retry-btn:hover {
       background: #D97706;
-    }
-
-    /* ============================================================
-       Overlay — full-screen click interceptor for block mode
-       ============================================================ */
-    .tb-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 2147483646;
-      cursor: crosshair;
-      pointer-events: auto;
-      /* Transparent - user sees page underneath */
-      background: transparent;
-    }
-
-    .tb-overlay-hidden {
-      display: none;
     }
 
     /* ============================================================
