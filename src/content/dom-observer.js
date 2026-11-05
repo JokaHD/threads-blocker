@@ -5,8 +5,7 @@
 
 import { getSiteRule } from './site-adapter.js';
 import { railTracker, RAIL_CHANGE_EVENT } from './rail-tracker.js';
-
-const COMMENT_ID_ATTR = 'data-tb-comment-id';
+import { COMMENT_ID_ATTR } from '../shared/constants.js';
 
 export class DOMObserver {
   constructor() {

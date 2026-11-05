@@ -1,3 +1,6 @@
+// Marks a detected post / comment container with its author's username
+export const COMMENT_ID_ATTR = 'data-tb-comment-id';
+
 // Queue item states (managed by Service Worker)
 export const BlockState = {
   IDLE: 'idle',

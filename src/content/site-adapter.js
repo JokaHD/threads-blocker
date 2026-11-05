@@ -4,6 +4,8 @@
  */
 
 import { escapeRegex } from '../shared/utils.js';
+import { COMMENT_ID_ATTR } from '../shared/constants.js';
+import { hashText } from '../shared/keywords.js';
 
 const USERNAME_PATTERN = /^\/@([a-zA-Z0-9_.]+)$/;
 
@@ -41,6 +43,19 @@ const CONTENT_VISIT_LIMIT = 200;
 
 // Media lightbox view — UI is hidden even though path is under /@*
 const MEDIA_VIEW_PATTERN = /\/post\/[^/]+\/media/;
+
+// Text that is never post body (semantic tier — no Threads class names):
+// profile / permalink anchors (author, timestamp, @mentions), timestamps,
+// action buttons (like / reply / translate) and their counts.
+const NON_BODY_TEXT_SELECTOR = [
+  'a[href^="/@"]',
+  'time',
+  'button',
+  '[role="button"]',
+  'svg',
+  'script',
+  'style',
+].join(', ');
 
 export const threadsSiteRule = {
   id: 'threads',
@@ -494,6 +509,52 @@ export const threadsSiteRule = {
       if (bg && bg !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(bg)) return bg;
     }
     return null;
+  },
+
+  /**
+   * Post body text nodes of a marked container, in document order. A nested
+   * marked post (quoted post) is its own unit and is skipped here.
+   *
+   * Semantic tier only for now: excludes NON_BODY_TEXT_SELECTOR. Threads-
+   * specific body selectors are added once the debug probe has measured the
+   * real DOM (scripts/debug-keyword-dom.js).
+   *
+   * @param {Element} container - a [data-tb-comment-id] element
+   * @returns {Text[]}
+   */
+  getBodyTextNodes(container) {
+    const nodes = [];
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const parent = node.parentElement;
+        if (!parent || !node.data.trim()) return NodeFilter.FILTER_REJECT;
+        if (parent.closest(`[${COMMENT_ID_ATTR}]`) !== container) return NodeFilter.FILTER_REJECT;
+        const excluded = parent.closest(NON_BODY_TEXT_SELECTOR);
+        if (excluded && container.contains(excluded)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node);
+    return nodes;
+  },
+
+  /**
+   * Stable key for a post: its own permalink (/@user/post/x), or
+   * "username:hash(body text)" when none is found.
+   *
+   * @param {Element} container
+   * @param {string} username - the container's author
+   * @param {string} bodyText - concatenated body text, for the fallback
+   * @returns {string}
+   */
+  getPostKey(container, username, bodyText) {
+    for (const link of container.querySelectorAll('a[href*="/post/"]')) {
+      // A quoted post's permalink belongs to the nested container
+      if (link.closest(`[${COMMENT_ID_ATTR}]`) !== container) continue;
+      const href = link.getAttribute('href');
+      if (href?.match(POST_PERMALINK_PATTERN)?.[1] === username) return href;
+    }
+    return `${username}:${hashText(bodyText)}`;
   },
 
   /**

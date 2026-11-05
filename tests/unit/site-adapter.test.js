@@ -1,4 +1,5 @@
 import { threadsSiteRule, getSiteRule } from '../../src/content/site-adapter.js';
+import { hashText } from '../../src/shared/keywords.js';
 import { OBSERVED, setViewport, stubRect, mountThreadsLayout } from './helpers/rail-fixture.js';
 
 describe('threadsSiteRule', () => {
@@ -27,6 +28,57 @@ describe('threadsSiteRule', () => {
       expect(threadsSiteRule.extractUsername('/@')).toBeNull();
       expect(threadsSiteRule.extractUsername(null)).toBeNull();
       expect(threadsSiteRule.extractUsername('/post/123')).toBeNull();
+    });
+  });
+
+  describe('post body', () => {
+    let root;
+
+    beforeEach(() => {
+      root = document.createElement('div');
+      root.innerHTML = `
+        <div data-tb-comment-id="fake_user" id="post">
+          <a href="/@fake_user">fake_user</a>
+          <a href="/@fake_user/post/ABC"><time datetime="2026-11-06">2小時</time></a>
+          <div><span>這是詐騙</span> <a href="/@other_user">@other_user</a>
+            <a href="/search?q=%23stock">#飆股</a></div>
+          <div role="button"><span>讚</span> 12</div>
+          <button>翻譯</button>
+          <div data-tb-comment-id="quoted_user">
+            <a href="/@quoted_user/post/QQQ">1天</a>
+            <span>被引用的內文</span>
+          </div>
+        </div>`;
+      document.body.appendChild(root);
+    });
+
+    afterEach(() => root.remove());
+
+    const post = () => root.querySelector('#post');
+    const quoted = () => root.querySelector('[data-tb-comment-id="quoted_user"]');
+
+    test('getBodyTextNodes keeps body text only', () => {
+      const texts = threadsSiteRule.getBodyTextNodes(post()).map((n) => n.data.trim());
+      expect(texts).toEqual(['這是詐騙', '#飆股']);
+    });
+
+    test('getBodyTextNodes treats a nested post as its own unit', () => {
+      const texts = threadsSiteRule.getBodyTextNodes(quoted()).map((n) => n.data.trim());
+      expect(texts).toEqual(['被引用的內文']);
+    });
+
+    test("getPostKey uses the post's own permalink", () => {
+      expect(threadsSiteRule.getPostKey(post(), 'fake_user', 'x')).toBe('/@fake_user/post/ABC');
+      expect(threadsSiteRule.getPostKey(quoted(), 'quoted_user', 'x')).toBe(
+        '/@quoted_user/post/QQQ'
+      );
+    });
+
+    test('getPostKey falls back to username + text hash', () => {
+      post().querySelector('a[href="/@fake_user/post/ABC"]').remove();
+      expect(threadsSiteRule.getPostKey(post(), 'fake_user', '這是詐騙')).toBe(
+        `fake_user:${hashText('這是詐騙')}`
+      );
     });
   });
 
