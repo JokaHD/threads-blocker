@@ -110,24 +110,23 @@ body.tb-blockmode [data-tb-comment-id] [data-tb-comment-id] {
 
 /* ============================================================
    Keyword highlight — CSS Custom Highlight API (no DOM changes).
-   Option B: thick underline + slightly tinted text. Dark colors checked
-   against the debug probe (2026-11-06): body text rgb(243 245 247) on
-   rgb(16 16 16), links and tags the same color in bold — the pink tint
-   keeps ~14:1 contrast and stays apart from both. No light-theme sample
-   yet; those colors are unmeasured.
-   ::highlight() only takes color, background and text-decoration
-   longhands, so text-underline-offset would be ignored; the 2px
-   thickness carries the weight instead.
+   A muted amber background, like a highlighter pen; the text keeps its
+   own color (links and tags stay distinguishable). Blended contrast:
+   - dark: rgba(214 168 72 / 0.30) on rgb(16 16 16) = rgb(75 62 33);
+     body text rgb(243 245 247) on it is ~9.6:1 (probe, 2026-11-06)
+   - light: rgba(240 196 90 / 0.45) on white = rgb(248 228 181);
+     black text ~16.8:1, #333 ~10.1:1. No light-theme probe sample yet,
+     so the text color there is assumed, not measured.
+   The keyword manager's preview (--tb-kw-mark in shadow-host.js) uses
+   the same colors.
    data-tb-theme is set on <html> by KeywordHighlighter from Threads'
    own background, not the OS preference.
    ============================================================ */
 
 ::highlight(tb-keyword) {
-  color: #f0d2d2;
-  text-decoration: underline 2px rgba(201, 128, 128, 0.85);
+  background-color: rgba(214, 168, 72, 0.3);
 }
 
 html[data-tb-theme='light'] ::highlight(tb-keyword) {
-  color: #6b2a2a;
-  text-decoration-color: rgba(170, 80, 80, 0.85);
+  background-color: rgba(240, 196, 90, 0.45);
 }
