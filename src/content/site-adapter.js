@@ -46,16 +46,63 @@ const MEDIA_VIEW_PATTERN = /\/post\/[^/]+\/media/;
 
 // Text that is never post body (semantic tier — no Threads class names):
 // profile / permalink anchors (author, timestamp, @mentions), timestamps,
-// action buttons (like / reply / translate) and their counts.
+// action buttons (like / reply / translate) and their counts, and the
+// post page's inline reply box (its placeholder sits in [role="none"]).
 const NON_BODY_TEXT_SELECTOR = [
   'a[href^="/@"]',
   'time',
   'button',
   '[role="button"]',
+  '[role="none"]',
   'svg',
   'script',
   'style',
 ].join(', ');
+
+// Post body tier, measured with scripts/debug-keyword-dom.js (home feed and
+// post page, 2026-11-06): body text sits in span[dir="auto"] > span, with no
+// block element in between. Candidates, in fallback order:
+//   1. span[dir="auto"] outside any link, no <div> between it and the text
+//      (chosen; risk medium: an i18n attribute React keeps on every text run,
+//      breaks only if Threads drops it). Leaves out topic chips and tags
+//      (span inside a block link) and the "1 / 5" counter (divs inside).
+//   2. Semantic tier only (NON_BODY_TEXT_SELECTOR), used when a post has no
+//      span[dir="auto"] at all, i.e. the structure changed (risk: lets topic
+//      chips, tags and the counter in).
+//   3. Obfuscated class names (rejected: they change with every deploy).
+const BODY_SPAN_SELECTOR = 'span[dir="auto"]';
+
+// Which tier getBodyTextNodes used, per call (window.__TB_DEBUG__())
+const bodyTierCounts = { measured: 0, semantic: 0 };
+
+/** Tier 1: the text node is a body text run (see BODY_SPAN_SELECTOR) */
+function isInBodySpan(node, container) {
+  const span = node.parentElement.closest(BODY_SPAN_SELECTOR);
+  if (!span || !container.contains(span)) return false;
+  const link = span.closest('a');
+  if (link && container.contains(link)) return false;
+  for (let el = node.parentElement; el !== span; el = el.parentElement) {
+    if (el.tagName === 'DIV') return false;
+  }
+  return true;
+}
+
+/** Tier 2: text nodes of the container's own post, minus the non-body ones */
+function semanticBodyTextNodes(container) {
+  const nodes = [];
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = node.parentElement;
+      if (!parent || !node.data.trim()) return NodeFilter.FILTER_REJECT;
+      if (parent.closest(`[${COMMENT_ID_ATTR}]`) !== container) return NodeFilter.FILTER_REJECT;
+      const excluded = parent.closest(NON_BODY_TEXT_SELECTOR);
+      if (excluded && container.contains(excluded)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node);
+  return nodes;
+}
 
 export const threadsSiteRule = {
   id: 'threads',
@@ -515,27 +562,25 @@ export const threadsSiteRule = {
    * Post body text nodes of a marked container, in document order. A nested
    * marked post (quoted post) is its own unit and is skipped here.
    *
-   * Semantic tier only for now: excludes NON_BODY_TEXT_SELECTOR. Threads-
-   * specific body selectors are added once the debug probe has measured the
-   * real DOM (scripts/debug-keyword-dom.js).
+   * Measured tier (isInBodySpan) on top of the semantic exclusions; the
+   * semantic tier alone only when the post has no span[dir="auto"] at all.
    *
    * @param {Element} container - a [data-tb-comment-id] element
    * @returns {Text[]}
    */
   getBodyTextNodes(container) {
-    const nodes = [];
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
-      acceptNode(node) {
-        const parent = node.parentElement;
-        if (!parent || !node.data.trim()) return NodeFilter.FILTER_REJECT;
-        if (parent.closest(`[${COMMENT_ID_ATTR}]`) !== container) return NodeFilter.FILTER_REJECT;
-        const excluded = parent.closest(NON_BODY_TEXT_SELECTOR);
-        if (excluded && container.contains(excluded)) return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
-      },
-    });
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node);
+    const nodes = semanticBodyTextNodes(container);
+    if (container.querySelector(BODY_SPAN_SELECTOR)) {
+      bodyTierCounts.measured += 1;
+      return nodes.filter((node) => isInBodySpan(node, container));
+    }
+    bodyTierCounts.semantic += 1;
     return nodes;
+  },
+
+  /** @returns {{measured: number, semantic: number}} getBodyTextNodes calls per tier */
+  getBodyTierCounts() {
+    return { ...bodyTierCounts };
   },
 
   /**

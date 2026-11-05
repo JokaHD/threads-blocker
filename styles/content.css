@@ -110,8 +110,14 @@ body.tb-blockmode [data-tb-comment-id] [data-tb-comment-id] {
 
 /* ============================================================
    Keyword highlight — CSS Custom Highlight API (no DOM changes).
-   Option B: thick underline + slightly tinted text. Colors are a
-   starting point, calibrated against the debug probe in Task 11.
+   Option B: thick underline + slightly tinted text. Dark colors checked
+   against the debug probe (2026-11-06): body text rgb(243 245 247) on
+   rgb(16 16 16), links and tags the same color in bold — the pink tint
+   keeps ~14:1 contrast and stays apart from both. No light-theme sample
+   yet; those colors are unmeasured.
+   ::highlight() only takes color, background and text-decoration
+   longhands, so text-underline-offset would be ignored; the 2px
+   thickness carries the weight instead.
    data-tb-theme is set on <html> by KeywordHighlighter from Threads'
    own background, not the OS preference.
    ============================================================ */
@@ -119,7 +125,6 @@ body.tb-blockmode [data-tb-comment-id] [data-tb-comment-id] {
 ::highlight(tb-keyword) {
   color: #f0d2d2;
   text-decoration: underline 2px rgba(201, 128, 128, 0.85);
-  text-underline-offset: 3px;
 }
 
 html[data-tb-theme='light'] ::highlight(tb-keyword) {
