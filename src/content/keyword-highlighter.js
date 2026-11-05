@@ -96,18 +96,16 @@ export class KeywordHighlighter {
   }
 
   /**
-   * A newly detected post (content.js processComment).
+   * A newly detected post (content.js processComments).
    * @param {Element} container
    * @param {string} username
    */
   process(container, username) {
-    const entry = this._analyze(container, username);
-    if (entry) {
-      this._entries.set(container, entry);
-      this._report(entry);
-    } else {
-      this._entries.delete(container);
-    }
+    // Tracked even while the body is empty: it may render later, and only
+    // refresh() can see that
+    const entry = this._analyze(container, username) ?? emptyEntry(username);
+    this._entries.set(container, entry);
+    this._report(entry);
     this._paint();
   }
 
@@ -125,11 +123,11 @@ export class KeywordHighlighter {
         changed = true;
         continue;
       }
-      const next = this._analyze(container, entry.username);
-      if (!next) {
-        this._entries.delete(container);
-        changed = true;
-      } else if (!sameBody(entry, next)) {
+      const next = this._analyze(container, entry.username) ?? emptyEntry(entry.username);
+      // Same container, same post: keep its first key so a fallback hash
+      // key doesn't change (and count the post twice) when "more" expands
+      if (entry.postKey) next.postKey = entry.postKey;
+      if (!sameBody(entry, next)) {
         this._entries.set(container, next);
         this._report(next);
         changed = true;
@@ -266,6 +264,11 @@ export class KeywordHighlighter {
     const theme = this._siteRule.getTheme?.();
     if (theme) document.documentElement.dataset.tbTheme = theme;
   }
+}
+
+/** A tracked post whose body hasn't rendered (or is mid re-render) */
+function emptyEntry(username) {
+  return { username, postKey: null, text: '', segments: [], matches: [] };
 }
 
 function sameBody(a, b) {

@@ -215,6 +215,60 @@ describe('KeywordHighlighter', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  test('a body that renders after detection is still analyzed', async () => {
+    await start({ keywords: [KW('k1', '詐騙')] });
+    const el = addPost('fake_user', '<span class="meta">fake_user</span>', 'p1');
+    highlighter.process(el, 'fake_user');
+    expect(painted()).toEqual([]);
+
+    el.insertAdjacentHTML('beforeend', '<p>詐騙</p>');
+    highlighter.refresh();
+    await highlighter.flush();
+
+    expect(painted()).toEqual(['詐騙']);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  test('a body briefly empty during a re-render is picked up again', async () => {
+    await start({ keywords: [KW('k1', '詐騙')] });
+    const el = addPost('fake_user', '<p>詐騙</p>', 'p1');
+    highlighter.process(el, 'fake_user');
+
+    el.innerHTML = '';
+    highlighter.refresh();
+    expect(painted()).toEqual([]);
+
+    el.innerHTML = '<p>詐騙</p>';
+    highlighter.refresh();
+    expect(painted()).toEqual(['詐騙']);
+  });
+
+  test('a fallback-keyed post keeps its key when the body changes', async () => {
+    await start({ keywords: [KW('k1', '詐騙')] });
+    let n = 0;
+    const getPostKey = jest.fn(() => `fake_user:hash${n++}`);
+    highlighter.destroy();
+    highlighter = new KeywordHighlighter({
+      siteRule: { ...siteRule, getPostKey },
+      highlights: registry,
+      HighlightClass: FakeHighlight,
+      sendMessage: send,
+      flushIntervalMs: 60_000,
+    });
+    await highlighter.init();
+    const el = addPost('fake_user', '<p>詐騙…</p>');
+    highlighter.process(el, 'fake_user');
+
+    el.querySelector('p').textContent = '詐騙，展開後的全文';
+    highlighter.refresh();
+    await highlighter.flush();
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0].hits).toEqual([
+      { postKey: 'fake_user:hash0', username: 'fake_user', keywordIds: ['k1'] },
+    ]);
+  });
+
   test('skips posts without body text and counts them', async () => {
     await start({ keywords: [KW('k1', '詐騙')] });
     const el = addPost('fake_user', '<span class="meta">詐騙</span>');

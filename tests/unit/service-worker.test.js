@@ -653,6 +653,24 @@ describe('Service Worker', () => {
     const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
     const readStats = async () => (await mockStorage.get('keywordStats')).keywordStats;
 
+    beforeEach(async () => {
+      await mockStorage.set({ keywords: [{ id: 'k1' }, { id: 'k2' }] });
+    });
+
+    test('hits for a keyword no longer in the list are dropped', async () => {
+      await sendMessage({
+        type: MessageType.KEYWORD_HITS,
+        hits: [
+          { postKey: 'p1', username: 'fake_user', keywordIds: ['k1', 'gone'] },
+          { postKey: 'p2', username: 'fake_user', keywordIds: ['gone'] },
+        ],
+      });
+
+      const stats = await readStats();
+      expect(stats.perKeyword).toEqual({ k1: { hits: 1, blocked: 0 } });
+      expect(Object.keys(stats.posts)).toEqual(['p1']);
+    });
+
     test('KEYWORD_HITS records stats', async () => {
       const response = await sendMessage({
         type: MessageType.KEYWORD_HITS,
