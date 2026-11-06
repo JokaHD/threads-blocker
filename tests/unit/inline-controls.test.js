@@ -3,10 +3,11 @@
  */
 
 import { InlineControls } from '../../src/content/ui/inline-controls.js';
-import { COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
+import { COMMENT_ID_ATTR } from '../../src/shared/constants.js';
 import { MessageType } from '../../src/shared/messages.js';
 import { railTracker } from '../../src/content/rail-tracker.js';
 import { mountThreadsLayout } from './helpers/rail-fixture.js';
+import { KeywordStorageKey } from '../../src/shared/keywords.js';
 
 describe('InlineControls', () => {
   let inlineControls;
@@ -59,6 +60,103 @@ describe('InlineControls', () => {
       const slot = inlineControls.getQueueSlot();
       expect(slot).not.toBeNull();
       expect(container.querySelector('.tb-card').contains(slot)).toBe(true);
+    });
+  });
+
+  describe('keyword highlight row', () => {
+    beforeEach(() => {
+      global.chrome = {
+        runtime: { sendMessage: jest.fn(async () => ({ ok: true })) },
+        storage: {
+          local: { get: jest.fn(async () => ({})), set: jest.fn(async () => {}) },
+          onChanged: { addListener: jest.fn(), removeListener: jest.fn() },
+        },
+      };
+    });
+
+    afterEach(() => {
+      // Before chrome goes away: an open manager unsubscribes on destroy
+      inlineControls.destroy();
+      delete global.chrome;
+    });
+
+    const row = () => container.querySelector('.tb-card-keywords');
+    const toggle = () => container.querySelector('.tb-kw-switch');
+    const overlays = () => container.querySelectorAll('.tb-kw-overlay');
+
+    test('sits between the block actions and the queue slot', () => {
+      inlineControls.init();
+
+      expect(row().nextElementSibling).toBe(inlineControls.getQueueSlot());
+      expect(row().previousElementSibling.classList.contains('tb-card-exit-only')).toBe(true);
+    });
+
+    test('the label is part of the switch, inside the pill with the manage button', () => {
+      inlineControls.init();
+
+      const group = row().querySelector('.tb-kw-group');
+      expect([...group.children]).toEqual([toggle(), container.querySelector('.tb-kw-manage')]);
+      expect(toggle().textContent).toBe('標示關鍵字');
+      expect(toggle().querySelector('.tb-kw-track')).not.toBeNull();
+    });
+
+    test('starts on and mirrors the stored state', () => {
+      inlineControls.init();
+      expect(toggle().getAttribute('aria-checked')).toBe('true');
+
+      inlineControls.setKeywordHighlightState(false);
+
+      expect(toggle().getAttribute('aria-checked')).toBe('false');
+      expect(row().classList.contains('tb-card-keywords--off')).toBe(true);
+    });
+
+    test('keeps a state set before init', () => {
+      inlineControls.setKeywordHighlightState(false);
+      inlineControls.init();
+      expect(toggle().getAttribute('aria-checked')).toBe('false');
+    });
+
+    test('clicking the label writes the global setting', () => {
+      inlineControls.init();
+
+      toggle().querySelector('.tb-kw-label').click();
+
+      expect(chrome.storage.local.set).toHaveBeenCalledWith({
+        [KeywordStorageKey.ENABLED]: false,
+      });
+      expect(toggle().getAttribute('aria-checked')).toBe('false');
+    });
+
+    test('the manage button opens the keyword manager in the page, once', () => {
+      inlineControls.init();
+      const manage = container.querySelector('.tb-kw-manage');
+
+      manage.click();
+      manage.click();
+
+      expect(overlays()).toHaveLength(1);
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
+    test('destroy removes an open keyword manager', () => {
+      inlineControls.init();
+      container.querySelector('.tb-kw-manage').click();
+
+      inlineControls.destroy();
+
+      expect(overlays()).toHaveLength(0);
+      expect(chrome.storage.onChanged.removeListener).toHaveBeenCalled();
+    });
+
+    test('opening the manager keeps block mode and the card open', () => {
+      inlineControls.init();
+      container.querySelector('.tb-fab').click();
+
+      container.querySelector('.tb-kw-manage').click();
+      container.querySelector('.tb-kw-modal-close').click();
+
+      expect(document.body.classList.contains('tb-blockmode')).toBe(true);
+      expect(container.querySelector('.tb-card').classList.contains('tb-card-visible')).toBe(true);
     });
   });
 

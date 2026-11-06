@@ -25,6 +25,17 @@ export const mockStorage = {
   },
 };
 
+// Mock chrome.storage.onChanged
+const storageChangeListeners = [];
+export const mockStorageOnChanged = {
+  addListener: jest.fn((cb) => storageChangeListeners.push(cb)),
+  removeListener: jest.fn((cb) => {
+    const i = storageChangeListeners.indexOf(cb);
+    if (i !== -1) storageChangeListeners.splice(i, 1);
+  }),
+  _fire: (changes, area = 'local') => storageChangeListeners.forEach((cb) => cb(changes, area)),
+};
+
 // Mock chrome.alarms
 const alarmCallbacks = [];
 export const mockAlarms = {
@@ -56,7 +67,7 @@ export const mockRuntime = {
 // Attach to global
 export function setupChromeMocks() {
   global.chrome = {
-    storage: { local: mockStorage },
+    storage: { local: mockStorage, onChanged: mockStorageOnChanged },
     alarms: mockAlarms,
     runtime: mockRuntime,
   };

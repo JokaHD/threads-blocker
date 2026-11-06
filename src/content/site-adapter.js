@@ -4,6 +4,8 @@
  */
 
 import { escapeRegex } from '../shared/utils.js';
+import { COMMENT_ID_ATTR } from '../shared/constants.js';
+import { hashText } from '../shared/keywords.js';
 
 const USERNAME_PATTERN = /^\/@([a-zA-Z0-9_.]+)$/;
 
@@ -41,6 +43,77 @@ const CONTENT_VISIT_LIMIT = 200;
 
 // Media lightbox view — UI is hidden even though path is under /@*
 const MEDIA_VIEW_PATTERN = /\/post\/[^/]+\/media/;
+
+// Text that is never post body (semantic tier — no Threads class names):
+// profile / permalink anchors (author, timestamp, @mentions), timestamps,
+// action buttons (like / reply / translate) and their counts, and the
+// post page's inline reply box (its placeholder sits in [role="none"]).
+const NON_BODY_TEXT_SELECTOR = [
+  'a[href^="/@"]',
+  'time',
+  'button',
+  '[role="button"]',
+  '[role="none"]',
+  'svg',
+  'script',
+  'style',
+].join(', ');
+
+// Post body tier, measured with scripts/debug-keyword-dom.js (home feed and
+// post page, 2026-11-06): body text sits in span[dir="auto"] > span, with no
+// block element in between. Candidates, in fallback order:
+//   1. span[dir="auto"] outside any link, no <div> between it and the text
+//      (chosen; risk medium: an i18n attribute React keeps on every text run,
+//      breaks only if Threads drops it). Leaves out topic chips and tags
+//      (span inside a block link) and the "1 / 5" counter (divs inside).
+//   2. Semantic tier only (NON_BODY_TEXT_SELECTOR), used when a post has no own
+//      span[dir="auto"] at all, i.e. the structure changed (risk: lets topic
+//      chips, tags and the counter in).
+//   3. Obfuscated class names (rejected: they change with every deploy).
+const BODY_SPAN_SELECTOR = 'span[dir="auto"]';
+
+// Which tier getBodyTextNodes used, per call (window.__TB_DEBUG__()).
+// measuredEmpty: measured tier found no body where the semantic tier saw text
+const bodyTierCounts = { measured: 0, semantic: 0, measuredEmpty: 0 };
+
+/** Tier 1: the text node is a body text run (see BODY_SPAN_SELECTOR) */
+function isInBodySpan(node, container) {
+  // One walk up to the container: no <div> below the nearest span[dir=auto],
+  // no link above it (hot path: every body node of every post, each tick)
+  let span = null;
+  for (let el = node.parentElement; el && el !== container; el = el.parentElement) {
+    if (!span) {
+      if (el.matches(BODY_SPAN_SELECTOR)) {
+        // Body runs are always wrapped once more (span[dir=auto] > span);
+        // text set straight on it is a label, e.g. the "作者" reply badge
+        if (el === node.parentElement) return false;
+        span = el;
+      } else if (el.tagName === 'DIV') {
+        return false;
+      }
+    } else if (el.tagName === 'A') {
+      return false;
+    }
+  }
+  return !!span;
+}
+
+/** Tier 2: text nodes of the container's own post, minus the non-body ones */
+function semanticBodyTextNodes(container) {
+  const nodes = [];
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = node.parentElement;
+      if (!parent || !node.data.trim()) return NodeFilter.FILTER_REJECT;
+      if (parent.closest(`[${COMMENT_ID_ATTR}]`) !== container) return NodeFilter.FILTER_REJECT;
+      const excluded = parent.closest(NON_BODY_TEXT_SELECTOR);
+      if (excluded && container.contains(excluded)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node);
+  return nodes;
+}
 
 export const threadsSiteRule = {
   id: 'threads',
@@ -494,6 +567,64 @@ export const threadsSiteRule = {
       if (bg && bg !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(bg)) return bg;
     }
     return null;
+  },
+
+  /**
+   * Post body text nodes of a marked container, in document order. A nested
+   * marked post (quoted post) is its own unit and is skipped here.
+   *
+   * Measured tier (isInBodySpan) on top of the semantic exclusions; the
+   * semantic tier alone only when the post has no span[dir="auto"] at all.
+   *
+   * @param {Element} container - a [data-tb-comment-id] element
+   * @returns {Text[]}
+   */
+  getBodyTextNodes(container) {
+    const nodes = semanticBodyTextNodes(container);
+    const body = nodes.filter((node) => isInBodySpan(node, container));
+    if (body.length > 0) {
+      bodyTierCounts.measured += 1;
+      return body;
+    }
+    // Nothing measured: the tier still applies if the post has its own
+    // span[dir=auto] (checked only here, off the common path)
+    const ownSpan = [...container.querySelectorAll(BODY_SPAN_SELECTOR)].some(
+      (span) => span.closest(`[${COMMENT_ID_ATTR}]`) === container
+    );
+    if (!ownSpan) {
+      bodyTierCounts.semantic += 1;
+      return nodes;
+    }
+    bodyTierCounts.measured += 1;
+    // Not a fallback: most of these are image-only posts whose topic tags or
+    // counter the semantic tier would wrongly take as body. A rising share
+    // of them is the drift signal (the body changed, the header didn't)
+    if (nodes.length > 0) bodyTierCounts.measuredEmpty += 1;
+    return body;
+  },
+
+  /** @returns {{measured: number, semantic: number, measuredEmpty: number}} calls per tier */
+  getBodyTierCounts() {
+    return { ...bodyTierCounts };
+  },
+
+  /**
+   * Stable key for a post: its own permalink (/@user/post/x), or
+   * "username:hash(body text)" when none is found.
+   *
+   * @param {Element} container
+   * @param {string} username - the container's author
+   * @param {string} bodyText - concatenated body text, for the fallback
+   * @returns {string}
+   */
+  getPostKey(container, username, bodyText) {
+    for (const link of container.querySelectorAll('a[href*="/post/"]')) {
+      // A quoted post's permalink belongs to the nested container
+      if (link.closest(`[${COMMENT_ID_ATTR}]`) !== container) continue;
+      const href = link.getAttribute('href');
+      if (href?.match(POST_PERMALINK_PATTERN)?.[1] === username) return href;
+    }
+    return `${username}:${hashText(bodyText)}`;
   },
 
   /**

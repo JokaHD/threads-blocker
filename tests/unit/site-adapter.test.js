@@ -1,4 +1,5 @@
 import { threadsSiteRule, getSiteRule } from '../../src/content/site-adapter.js';
+import { hashText } from '../../src/shared/keywords.js';
 import { OBSERVED, setViewport, stubRect, mountThreadsLayout } from './helpers/rail-fixture.js';
 
 describe('threadsSiteRule', () => {
@@ -27,6 +28,149 @@ describe('threadsSiteRule', () => {
       expect(threadsSiteRule.extractUsername('/@')).toBeNull();
       expect(threadsSiteRule.extractUsername(null)).toBeNull();
       expect(threadsSiteRule.extractUsername('/post/123')).toBeNull();
+    });
+  });
+
+  describe('post body', () => {
+    let root;
+
+    beforeEach(() => {
+      root = document.createElement('div');
+      root.innerHTML = `
+        <div data-tb-comment-id="fake_user" id="post">
+          <a href="/@fake_user">fake_user</a>
+          <a href="/@fake_user/post/ABC"><time datetime="2026-11-06">2小時</time></a>
+          <div><span>這是詐騙</span> <a href="/@other_user">@other_user</a>
+            <a href="/search?q=%23stock">#飆股</a></div>
+          <div role="button"><span>讚</span> 12</div>
+          <button>翻譯</button>
+          <div data-tb-comment-id="quoted_user">
+            <a href="/@quoted_user/post/QQQ">1天</a>
+            <span>被引用的內文</span>
+          </div>
+        </div>`;
+      document.body.appendChild(root);
+    });
+
+    afterEach(() => root.remove());
+
+    const post = () => root.querySelector('#post');
+    const quoted = () => root.querySelector('[data-tb-comment-id="quoted_user"]');
+
+    test('getBodyTextNodes keeps body text only', () => {
+      const texts = threadsSiteRule.getBodyTextNodes(post()).map((n) => n.data.trim());
+      expect(texts).toEqual(['這是詐騙', '#飆股']);
+    });
+
+    test('getBodyTextNodes treats a nested post as its own unit', () => {
+      const texts = threadsSiteRule.getBodyTextNodes(quoted()).map((n) => n.data.trim());
+      expect(texts).toEqual(['被引用的內文']);
+    });
+
+    test("getPostKey uses the post's own permalink", () => {
+      expect(threadsSiteRule.getPostKey(post(), 'fake_user', 'x')).toBe('/@fake_user/post/ABC');
+      expect(threadsSiteRule.getPostKey(quoted(), 'quoted_user', 'x')).toBe(
+        '/@quoted_user/post/QQQ'
+      );
+    });
+
+    test('getPostKey falls back to username + text hash', () => {
+      post().querySelector('a[href="/@fake_user/post/ABC"]').remove();
+      expect(threadsSiteRule.getPostKey(post(), 'fake_user', '這是詐騙')).toBe(
+        `fake_user:${hashText('這是詐騙')}`
+      );
+    });
+  });
+
+  // Structure rebuilt from the debug probe reports (home feed + post page,
+  // 2026-11-06); obfuscated classes dropped, handles faked
+  describe('post body (measured Threads structure)', () => {
+    let root;
+
+    beforeEach(() => {
+      root = document.createElement('div');
+      root.innerHTML = `
+        <div data-tb-comment-id="fake_user" id="post">
+          <div><a role="link" href="/search?q=a&amp;serp_type=timely_topics"><div><div>
+            <span><svg><title>精選</title></svg></span>
+            <div><span dir="auto">超夯：<span>股市</span></span></div>
+          </div></div></a></div>
+          <div><span><div><a role="link" href="/@fake_user"><span dir="auto"><span>fake_user</span></span></a></div></span></div>
+          <div><a role="link" href="/search?q=b&amp;serp_type=tags"><div><span dir="auto"><span>某話題</span></span></div></a></div>
+          <div><span dir="auto"><a role="link" href="/@fake_user/post/ABC"><time><span><abbr><span>2小時</span></abbr></span></time></a></span></div>
+          <div><div role="button"><svg><title>更多</title></svg></div></div>
+          <div><div><div><span dir="auto">作者</span></div></div></div>
+          <div><div><span dir="auto"><span>明天股市會大跌</span></span></div></div>
+          <div><div><span dir="auto"><span>第二段</span></span></div></div>
+          <div><span dir="auto"><div><div><span>1</span><div><span>/</span></div><span>5</span></div></div></span></div>
+          <div role="button"><span dir="auto">翻譯</span></div>
+          <div role="button"><div><span dir="auto"><div><span>98</span></div></span></div></div>
+          <div role="none"><div><span dir="auto"><span>回覆 fake_user……</span></span></div></div>
+          <div data-tb-comment-id="quoted_user" id="quoted">
+            <div><a role="link" href="/@quoted_user"><span dir="auto"><span>quoted_user</span></span></a></div>
+            <div><span dir="auto"><span>被引用的內文</span></span></div>
+          </div>
+        </div>
+        <div data-tb-comment-id="fake_user" id="image-only">
+          <div><a role="link" href="/@fake_user"><span dir="auto"><span>fake_user</span></span></a></div>
+          <div><a role="link" href="/search?q=c&amp;serp_type=tags"><div><span dir="auto"><span>某話題</span></span></div></a></div>
+          <div><span dir="auto"><div><div><span>1</span><div><span>/</span></div><span>3</span></div></div></span></div>
+        </div>`;
+      document.body.appendChild(root);
+    });
+
+    afterEach(() => root.remove());
+
+    const texts = (id) =>
+      threadsSiteRule.getBodyTextNodes(root.querySelector(`#${id}`)).map((n) => n.data.trim());
+
+    test('keeps only the body: no topic chips, tags, header, counter or reply box', () => {
+      expect(texts('post')).toEqual(['明天股市會大跌', '第二段']);
+    });
+
+    test('a quoted post keeps its own body', () => {
+      expect(texts('quoted')).toEqual(['被引用的內文']);
+    });
+
+    test('a post without body text has no body, even with tags and a counter', () => {
+      expect(texts('image-only')).toEqual([]);
+    });
+
+    test('counts which tier read each body', () => {
+      const before = threadsSiteRule.getBodyTierCounts();
+      texts('post');
+      const plain = document.createElement('div');
+      plain.setAttribute('data-tb-comment-id', 'fake_user');
+      plain.innerHTML = '<span>沒有 dir 屬性的結構</span>';
+      threadsSiteRule.getBodyTextNodes(plain);
+
+      const after = threadsSiteRule.getBodyTierCounts();
+      expect(after.measured - before.measured).toBe(1);
+      expect(after.semantic - before.semantic).toBe(1);
+    });
+
+    test('counts posts where the measured tier finds nothing the semantic tier would', () => {
+      // Drift: the body lost its span[dir=auto] wrapper, the header kept it
+      const drifted = document.createElement('div');
+      drifted.setAttribute('data-tb-comment-id', 'fake_user');
+      drifted.innerHTML = `
+        <div><a role="link" href="/@fake_user"><span dir="auto"><span>fake_user</span></span></a></div>
+        <div><p>改版後的內文</p></div>`;
+      const before = threadsSiteRule.getBodyTierCounts();
+
+      expect(threadsSiteRule.getBodyTextNodes(drifted)).toEqual([]);
+      expect(threadsSiteRule.getBodyTierCounts().measuredEmpty - before.measuredEmpty).toBe(1);
+    });
+
+    test("a quoted post's structure doesn't pick the outer post's tier", () => {
+      const outer = document.createElement('div');
+      outer.setAttribute('data-tb-comment-id', 'fake_user');
+      outer.innerHTML = `
+        <p>外層的內文</p>
+        <div data-tb-comment-id="quoted_user"><span dir="auto"><span>被引用</span></span></div>`;
+      expect(threadsSiteRule.getBodyTextNodes(outer).map((n) => n.data.trim())).toEqual([
+        '外層的內文',
+      ]);
     });
   });
 

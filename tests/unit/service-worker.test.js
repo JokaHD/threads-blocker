@@ -10,6 +10,7 @@ import {
   mockStorage,
   mockAlarms,
   mockRuntime,
+  mockStorageOnChanged,
 } from '../setup.js';
 import { RateLimitHandler } from '../../src/background/rate-limit-handler.js';
 import { MessageType } from '../../src/shared/messages.js';
@@ -643,6 +644,85 @@ describe('Service Worker', () => {
       status = await sendMessage({ type: MessageType.GET_QUEUE_STATUS });
       expect(status.status.cooldownEnd).toBeNull();
       expect(status.status.paused).toBe(false);
+    });
+  });
+
+  describe('keyword highlight', () => {
+    // Listener work that isn't awaited by the event (storage.onChanged)
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+    const readStats = async () => (await mockStorage.get('keywordStats')).keywordStats;
+
+    beforeEach(async () => {
+      await mockStorage.set({ keywords: [{ id: 'k1' }, { id: 'k2' }] });
+    });
+
+    test('hits for a keyword no longer in the list are dropped', async () => {
+      await sendMessage({
+        type: MessageType.KEYWORD_HITS,
+        hits: [
+          { postKey: 'p1', username: 'fake_user', keywordIds: ['k1', 'gone'] },
+          { postKey: 'p2', username: 'fake_user', keywordIds: ['gone'] },
+        ],
+      });
+
+      const stats = await readStats();
+      expect(stats.perKeyword).toEqual({ k1: { hits: 1, blocked: 0 } });
+      expect(Object.keys(stats.posts)).toEqual(['p1']);
+    });
+
+    test('KEYWORD_HITS records stats', async () => {
+      const response = await sendMessage({
+        type: MessageType.KEYWORD_HITS,
+        hits: [{ postKey: '/@fake_user/post/1', username: 'fake_user', keywordIds: ['k1'] }],
+      });
+
+      expect(response).toEqual({ ok: true });
+      expect((await readStats()).perKeyword.k1).toEqual({ hits: 1, blocked: 0 });
+    });
+
+    test("a successful block is attributed to that user's hit posts", async () => {
+      await sendMessage({
+        type: MessageType.KEYWORD_HITS,
+        hits: [{ postKey: '/@fake_user/post/1', username: 'fake_user', keywordIds: ['k1'] }],
+      });
+      await sendMessage({ type: MessageType.ENQUEUE_BLOCK, userId: 'u1', username: 'fake_user' });
+      await dispatchNext();
+
+      await sendMessage({ type: MessageType.TASK_RESULT, userId: 'u1', success: true });
+
+      expect((await readStats()).perKeyword.k1).toEqual({ hits: 1, blocked: 1 });
+    });
+
+    test('a failed block is not attributed', async () => {
+      await sendMessage({
+        type: MessageType.KEYWORD_HITS,
+        hits: [{ postKey: '/@fake_user/post/1', username: 'fake_user', keywordIds: ['k1'] }],
+      });
+      await sendMessage({ type: MessageType.ENQUEUE_BLOCK, userId: 'u1', username: 'fake_user' });
+      await dispatchNext();
+
+      await sendMessage({
+        type: MessageType.TASK_RESULT,
+        userId: 'u1',
+        success: false,
+        error: { status: 400, message: 'permanent' },
+      });
+
+      expect((await readStats()).perKeyword.k1.blocked).toBe(0);
+    });
+
+    test('deleting a keyword clears its stats', async () => {
+      await sendMessage({
+        type: MessageType.KEYWORD_HITS,
+        hits: [{ postKey: 'p1', username: 'fake_user', keywordIds: ['k1', 'k2'] }],
+      });
+
+      mockStorageOnChanged._fire({
+        keywords: { oldValue: [{ id: 'k1' }, { id: 'k2' }], newValue: [{ id: 'k2' }] },
+      });
+      await settle();
+
+      expect((await readStats()).perKeyword).toEqual({ k2: { hits: 1, blocked: 0 } });
     });
   });
 });

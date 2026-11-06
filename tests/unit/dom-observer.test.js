@@ -1,6 +1,7 @@
 /** @jest-environment jsdom */
 
-import { DOMObserver, COMMENT_ID_ATTR } from '../../src/content/dom-observer.js';
+import { DOMObserver } from '../../src/content/dom-observer.js';
+import { COMMENT_ID_ATTR } from '../../src/shared/constants.js';
 import { threadsSiteRule } from '../../src/content/site-adapter.js';
 import { railTracker } from '../../src/content/rail-tracker.js';
 import { mountThreadsLayout } from './helpers/rail-fixture.js';
@@ -308,6 +309,27 @@ describe('DOMObserver', () => {
 
       await new Promise((r) => setTimeout(r, 150));
       expect(received).toHaveLength(0);
+    });
+  });
+
+  describe('scan tick hook', () => {
+    afterEach(() => jest.useRealTimers());
+
+    test('calls onScan after every scan, even without new comments', async () => {
+      jest.useFakeTimers();
+      const observer = new DOMObserver();
+      observer.init();
+      const onNewComments = jest.fn();
+      const onScan = jest.fn();
+      observer.startObserving(onNewComments, onScan);
+
+      document.body.appendChild(document.createElement('div'));
+      await Promise.resolve(); // MutationObserver callbacks are microtasks
+      jest.advanceTimersByTime(100);
+
+      expect(onScan).toHaveBeenCalledTimes(1);
+      expect(onNewComments).not.toHaveBeenCalled();
+      observer.stopObserving();
     });
   });
 

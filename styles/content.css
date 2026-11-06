@@ -107,3 +107,26 @@ body.tb-blockmode [data-tb-comment-id] [data-tb-comment-id] {
   background: linear-gradient(rgba(220, 38, 38, 0.15), rgba(220, 38, 38, 0.15))
     var(--tb-host-bg, transparent) !important;
 }
+
+/* ============================================================
+   Keyword highlight — CSS Custom Highlight API (no DOM changes).
+   A muted amber background, like a highlighter pen; the text keeps its
+   own color (links and tags stay distinguishable). Blended contrast:
+   - dark: rgba(230 170 40 / 0.38) on rgb(16 16 16) = rgb(97 75 25);
+     body text rgb(243 245 247) on it is ~7.6:1 (probe, 2026-11-06)
+   - light: rgba(245 190 50 / 0.5) on white = rgb(250 223 153);
+     #333 ~9.7:1. No light-theme probe sample yet, so the text color
+     there is assumed, not measured.
+   Saturation raised once after testing on a dense feed (0.30 read too
+   faint); keep it muted, not neon.
+   data-tb-theme is set on <html> by KeywordHighlighter from Threads'
+   own background, not the OS preference.
+   ============================================================ */
+
+::highlight(tb-keyword) {
+  background-color: rgba(230, 170, 40, 0.38);
+}
+
+html[data-tb-theme='light'] ::highlight(tb-keyword) {
+  background-color: rgba(245, 190, 50, 0.5);
+}

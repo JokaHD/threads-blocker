@@ -30,6 +30,7 @@ export default [
         NodeFilter: 'readonly',
         CustomEvent: 'readonly',
         MouseEvent: 'readonly',
+        KeyboardEvent: 'readonly',
         CSS: 'readonly',
         location: 'readonly',
         getComputedStyle: 'readonly',
@@ -41,6 +42,7 @@ export default [
         chrome: 'readonly',
         // Node/Web APIs
         URLSearchParams: 'readonly',
+        crypto: 'readonly',
         // Jest globals
         jest: 'readonly',
         describe: 'readonly',

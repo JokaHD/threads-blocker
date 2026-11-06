@@ -5,14 +5,14 @@
 
 import { getSiteRule } from './site-adapter.js';
 import { railTracker, RAIL_CHANGE_EVENT } from './rail-tracker.js';
-
-const COMMENT_ID_ATTR = 'data-tb-comment-id';
+import { COMMENT_ID_ATTR } from '../shared/constants.js';
 
 export class DOMObserver {
   constructor() {
     this._observer = null;
     this._urlObserver = null;
     this._onNewComments = null;
+    this._onScan = null;
     this._debounceTimer = null;
     this._lastUrl = location.href;
     this._siteRule = null;
@@ -162,13 +162,16 @@ export class DOMObserver {
   /**
    * Start observing DOM for new comments.
    * @param {function} onNewComments - Callback with array of new comments
+   * @param {function} [onScan] - Called after every scan tick, new comments
+   *   or not (re-rendered content inside already-marked posts)
    */
-  startObserving(onNewComments) {
+  startObserving(onNewComments, onScan = null) {
     if (!this._siteRule) {
       this.init();
     }
 
     this._onNewComments = onNewComments;
+    this._onScan = onScan;
     window.addEventListener(RAIL_CHANGE_EVENT, this._onRailChange);
 
     // Main DOM observer with debounce
@@ -217,6 +220,7 @@ export class DOMObserver {
     if (comments.length > 0 && this._onNewComments) {
       this._onNewComments(comments);
     }
+    this._onScan?.();
   }
 
   /**
@@ -248,6 +252,3 @@ export class DOMObserver {
     }));
   }
 }
-
-// Export attribute name for other modules
-export { COMMENT_ID_ATTR };

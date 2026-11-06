@@ -18,6 +18,7 @@ describe('Icons', () => {
       'minus',
       'pause',
       'play',
+      'sliders',
     ];
 
     for (const name of requiredIcons) {

@@ -5,9 +5,11 @@
  */
 
 import { MessageType } from '../../shared/messages.js';
+import { KeywordStorageKey } from '../../shared/keywords.js';
 import { Icons } from './icons.js';
 import { getUIContainer, getStackContainer } from './shadow-host.js';
-import { COMMENT_ID_ATTR } from '../dom-observer.js';
+import { KeywordOverlay } from './keyword-overlay.js';
+import { COMMENT_ID_ATTR } from '../../shared/constants.js';
 import { threadsSiteRule } from '../site-adapter.js';
 import { railTracker } from '../rail-tracker.js';
 
@@ -29,6 +31,11 @@ export class InlineControls {
     // Queue pause mirrored from the SW's queueNotify broadcast (content.js)
     this._queuePaused = false;
     this._resumeWaiters = [];
+    // Keyword highlight switch, mirrored from storage by content.js
+    this._keywordHighlightOn = true;
+    this._keywordRow = null;
+    this._keywordToggle = null;
+    this._keywordOverlay = null;
   }
 
   init() {
@@ -126,6 +133,7 @@ export class InlineControls {
 
     // Create confirmation dialog (in UI container, not stack)
     this._createConfirmDialog(uiContainer);
+    this._keywordOverlay = new KeywordOverlay(uiContainer);
 
     // Check initial URL
     this._handleRouteChange();
@@ -222,6 +230,7 @@ export class InlineControls {
     card.appendChild(countArea);
     card.appendChild(actions);
     card.appendChild(exitOnly);
+    card.appendChild(this._createKeywordRow());
     card.appendChild(queueSlot);
 
     container.appendChild(card);
@@ -231,6 +240,74 @@ export class InlineControls {
     this._cardActions = actions;
     this._cardExitOnly = exitOnly;
     this._queueSlot = queueSlot;
+  }
+
+  /**
+   * Keyword highlight row: one pill holding the switch (its label is part of
+   * the button, so clicking the text toggles too) and the manage button.
+   * Sits after the block actions, above the queue section.
+   */
+  _createKeywordRow() {
+    const row = document.createElement('div');
+    row.className = 'tb-card-keywords';
+
+    const group = document.createElement('div');
+    group.className = 'tb-kw-group';
+
+    const label = document.createElement('span');
+    label.className = 'tb-kw-label';
+    label.textContent = '標示關鍵字';
+
+    const track = document.createElement('span');
+    track.className = 'tb-kw-track';
+    track.setAttribute('aria-hidden', 'true');
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'tb-kw-switch';
+    toggle.setAttribute('role', 'switch');
+    toggle.appendChild(label);
+    toggle.appendChild(track);
+    toggle.addEventListener('click', () => {
+      const next = !this._keywordHighlightOn;
+      this.setKeywordHighlightState(next);
+      chrome.storage.local
+        .set({ [KeywordStorageKey.ENABLED]: next })
+        .catch((e) => console.warn('[ThreadBlocker] Keyword highlight toggle failed:', e.message));
+    });
+
+    const manage = document.createElement('button');
+    manage.type = 'button';
+    manage.className = 'tb-kw-manage';
+    manage.innerHTML = Icons.sliders;
+    manage.title = '管理關鍵字';
+    manage.setAttribute('aria-label', '管理關鍵字');
+    manage.addEventListener('click', () => this._keywordOverlay?.open({ returnFocusTo: manage }));
+
+    group.appendChild(toggle);
+    group.appendChild(manage);
+    row.appendChild(group);
+
+    this._keywordRow = row;
+    this._keywordToggle = toggle;
+    this._renderKeywordState();
+    return row;
+  }
+
+  /**
+   * Reflect the global keyword highlight switch (storage is the source of
+   * truth; content.js forwards every change here).
+   * @param {boolean} on
+   */
+  setKeywordHighlightState(on) {
+    this._keywordHighlightOn = on;
+    this._renderKeywordState();
+  }
+
+  _renderKeywordState() {
+    if (!this._keywordToggle) return;
+    this._keywordToggle.setAttribute('aria-checked', String(this._keywordHighlightOn));
+    this._keywordRow.classList.toggle('tb-card-keywords--off', !this._keywordHighlightOn);
   }
 
   /**
@@ -558,6 +635,10 @@ export class InlineControls {
     if (this._confirmDialog) {
       this._confirmDialog.remove();
       this._confirmDialog = null;
+    }
+    if (this._keywordOverlay) {
+      this._keywordOverlay.close();
+      this._keywordOverlay = null;
     }
     this._exitBlockMode();
   }

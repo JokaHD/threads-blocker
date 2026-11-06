@@ -49,14 +49,15 @@ cpSync('styles/content.css', `${outDir}/content.css`);
 cpSync('manifest.json', `${outDir}/manifest.json`);
 cpSync('icons', `${outDir}/icons`, { recursive: true });
 
+const builds = [contentBuild, swBuild];
+
 if (isWatch) {
-  const ctx1 = await esbuild.context(contentBuild);
-  const ctx2 = await esbuild.context(swBuild);
-  await ctx1.watch();
-  await ctx2.watch();
+  for (const options of builds) {
+    const ctx = await esbuild.context(options);
+    await ctx.watch();
+  }
   console.log('Watching for changes...');
 } else {
-  await esbuild.build(contentBuild);
-  await esbuild.build(swBuild);
+  await Promise.all(builds.map((options) => esbuild.build(options)));
   console.log('Build complete.');
 }

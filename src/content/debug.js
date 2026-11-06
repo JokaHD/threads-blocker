@@ -86,6 +86,9 @@ export function getDebugState() {
     rightRailMarkedInside: railTracker.get()?.querySelectorAll('[data-tb-comment-id]').length ?? 0,
     stackPlacement: debugSources.stackPlacement?.getState() ?? null,
 
+    // Keyword highlight (noBodyText / fallbackKeys rising = adapter drift)
+    keywords: debugSources.keywordHighlighter?.getDebugState() ?? null,
+
     // Block mode
     blockMode: document.body.classList.contains('tb-blockmode'),
 

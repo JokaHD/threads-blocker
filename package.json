@@ -56,7 +56,10 @@
           "shadow-host",
           "sidebar",
           "stack-placement",
-          "rail-tracker"
+          "rail-tracker",
+          "keyword-manager",
+          "keyword-overlay",
+          "keyword-highlighter"
         ]
       },
       {
@@ -80,7 +83,10 @@
           "**/tests/unit/shadow-host.test.js",
           "**/tests/unit/sidebar.test.js",
           "**/tests/unit/stack-placement.test.js",
-          "**/tests/unit/rail-tracker.test.js"
+          "**/tests/unit/rail-tracker.test.js",
+          "**/tests/unit/keyword-manager.test.js",
+          "**/tests/unit/keyword-overlay.test.js",
+          "**/tests/unit/keyword-highlighter.test.js"
         ]
       }
     ]

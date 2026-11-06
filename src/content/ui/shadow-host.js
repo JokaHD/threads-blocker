@@ -127,6 +127,14 @@ function getExtensionStyles() {
       --tb-radius-sm: 8px;
       --tb-radius-md: 12px;
       --tb-transition: 150ms ease;
+      --tb-switch-on: #5a6478;
+      /* Keyword manager overlay */
+      --tb-input-bg: rgba(255, 255, 255, 0.04);
+      --tb-neutral-action: #2f3a57;
+      --tb-neutral-action-text: #eef1f8;
+      --tb-warn-text: #d9b37a;
+      --tb-danger-text: #e3a0a0;
+      --tb-danger-line: #5a3434;
     }
 
     /* Light theme */
@@ -137,6 +145,10 @@ function getExtensionStyles() {
         --tb-border: #e0e0e0;
         --tb-text: #333;
         --tb-text-muted: #666;
+        --tb-input-bg: #fff;
+        --tb-warn-text: #9a6a1c;
+        --tb-danger-text: #a33a3a;
+        --tb-danger-line: #e6bcbc;
       }
     }
 
@@ -381,6 +393,392 @@ function getExtensionStyles() {
 
     .tb-card-exit-only:hover {
       color: var(--tb-text);
+    }
+
+    /* Keyword highlight row — after the block actions, above the queue */
+    .tb-card-keywords {
+      display: flex;
+      align-items: center;
+      margin: 16px -20px 0;
+      padding: 6px 12px;
+      border-top: 1px solid var(--tb-border);
+      font-size: 13px;
+      color: var(--tb-text);
+    }
+
+    /* Last row of the card when the queue section is hidden */
+    .tb-card-keywords:has(+ .tb-card-queue:empty),
+    .tb-card-keywords:has(+ .tb-card-queue > .tb-panel-hidden) {
+      margin-bottom: -20px;
+    }
+
+    .tb-card-keywords + .tb-card-queue {
+      margin-top: 0;
+    }
+
+    /* One pill across the row, centered in the card (equal side gaps):
+       [label ··· switch] | manage; the outline groups them.
+       The label lives inside the switch button, so the whole left segment
+       toggles */
+    .tb-kw-group {
+      display: flex;
+      flex: 1;
+      align-items: stretch;
+      border: 1px solid var(--tb-border);
+      border-radius: 999px;
+    }
+
+    .tb-kw-switch {
+      display: flex;
+      flex: 1;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 4px 10px 4px 9px;
+      border: none;
+      border-radius: 999px 0 0 999px;
+      background: none;
+      color: var(--tb-text);
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .tb-card-keywords--off .tb-kw-label {
+      color: var(--tb-text-muted);
+    }
+
+    .tb-kw-track {
+      position: relative;
+      flex: none;
+      width: 36px;
+      height: 20px;
+      border-radius: 10px;
+      background: var(--tb-switch-on);
+      transition: background var(--tb-transition);
+    }
+
+    .tb-kw-track::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 18px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #e8e8e8;
+      transition: left var(--tb-transition);
+    }
+
+    /* Shared by the card switch and the manager's global switch */
+    [role='switch'][aria-checked='false'] > .tb-kw-track {
+      background: var(--tb-border);
+    }
+
+    [role='switch'][aria-checked='false'] > .tb-kw-track::after {
+      left: 2px;
+      background: var(--tb-text-muted);
+    }
+
+    .tb-kw-manage {
+      display: flex;
+      align-items: center;
+      padding: 0 12px 0 10px;
+      border: none;
+      border-left: 1px solid var(--tb-border);
+      border-radius: 0 999px 999px 0;
+      background: none;
+      color: var(--tb-text-muted);
+      cursor: pointer;
+      transition: color var(--tb-transition);
+    }
+
+    .tb-kw-switch:hover .tb-kw-label,
+    .tb-kw-manage:hover {
+      color: var(--tb-text);
+    }
+
+    .tb-kw-manage svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .tb-kw-switch:focus-visible,
+    .tb-kw-manage:focus-visible {
+      outline: 2px solid var(--tb-primary);
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .tb-kw-track,
+      .tb-kw-track::after {
+        transition: none;
+      }
+    }
+
+    /* ============================================================
+       Keyword manager overlay — modal over the page (keyword-overlay.js)
+       ============================================================ */
+    .tb-kw-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.5);
+      pointer-events: auto;
+    }
+
+    /* Fixed frame sized by the window only, never by the keyword count;
+       the manager scrolls inside, so ✕ stays in reach */
+    .tb-kw-modal {
+      position: relative;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      max-width: 460px;
+      height: 70vh;
+      background: var(--tb-bg);
+      border: 1px solid var(--tb-border);
+      border-radius: var(--tb-radius-md);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+      color: var(--tb-text);
+      overflow: hidden;
+    }
+
+    .tb-kw-modal-close {
+      position: absolute;
+      top: 16px;
+      right: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: none;
+      border-radius: var(--tb-radius-sm);
+      background: none;
+      color: var(--tb-text-muted);
+      cursor: pointer;
+      transition: color var(--tb-transition);
+    }
+
+    .tb-kw-modal-close:hover {
+      color: var(--tb-text);
+      background: var(--tb-bg-hover);
+    }
+
+    .tb-kw-modal-close svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .km {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      display: grid;
+      align-content: start;
+      gap: 14px;
+      padding: 20px 8px 18px;
+      /* Room for the scrollbar is kept on both sides from the start, so the
+         content never narrows or shifts when it appears; with the gutters
+         the 8px side padding still reads as about 20px */
+      scrollbar-gutter: stable both-edges;
+    }
+
+    .km * {
+      box-sizing: border-box;
+    }
+
+    .km-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      /* Room for the ✕ */
+      padding-right: 36px;
+    }
+
+    .km-title {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .km-global {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--tb-text-muted);
+      font-size: 13px;
+    }
+
+    .km-add {
+      display: flex;
+      gap: 8px;
+    }
+
+    .km-input {
+      flex: 1;
+      min-width: 0;
+      padding: 8px 12px;
+      border: 1px solid var(--tb-border);
+      border-radius: var(--tb-radius-sm);
+      background: var(--tb-input-bg);
+      color: var(--tb-text);
+      font: inherit;
+    }
+
+    .km-btn {
+      padding: 8px 14px;
+      border: none;
+      border-radius: var(--tb-radius-sm);
+      background: var(--tb-neutral-action);
+      color: var(--tb-neutral-action-text);
+      font: inherit;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .km-error {
+      margin: -8px 0 0;
+      color: var(--tb-warn-text);
+      font-size: 12px;
+    }
+
+    .km-error[hidden],
+    .km-empty[hidden] {
+      display: none;
+    }
+
+    .km-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .km-table th {
+      padding: 6px;
+      border-bottom: 1px solid var(--tb-border);
+      color: var(--tb-text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .km-table td {
+      padding: 9px 6px;
+      border-bottom: 1px solid var(--tb-border);
+      white-space: nowrap;
+    }
+
+    .km-table .km-num {
+      text-align: right;
+    }
+
+    .km-col-on {
+      width: 40px;
+    }
+
+    .km-col-del {
+      width: 64px;
+    }
+
+    .km-row--off .km-kw {
+      color: var(--tb-text-muted);
+    }
+
+    .km-switch {
+      position: relative;
+      flex: none;
+      width: 28px;
+      height: 16px;
+      padding: 0;
+      border: none;
+      border-radius: 8px;
+      background: var(--tb-switch-on);
+      cursor: pointer;
+    }
+
+    .km-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 14px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #e8e8e8;
+      transition: left var(--tb-transition);
+    }
+
+    .km-switch[aria-checked='false'] {
+      background: var(--tb-border);
+    }
+
+    .km-switch[aria-checked='false']::after {
+      left: 2px;
+      background: var(--tb-text-muted);
+    }
+
+    /* Global switch: the card's track (.tb-kw-track) in a bare button */
+    .km-global-switch {
+      display: flex;
+      padding: 0;
+      border: none;
+      border-radius: 10px;
+      background: none;
+      cursor: pointer;
+    }
+
+    .km-del {
+      padding: 1px 6px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: none;
+      color: var(--tb-text-muted);
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .km-del--confirm {
+      border-color: var(--tb-danger-line);
+      color: var(--tb-danger-text);
+      font-size: 12px;
+    }
+
+    .km-empty,
+    .km-foot {
+      margin: 0;
+      color: var(--tb-text-muted);
+      font-size: 12px;
+    }
+
+    .km-sr {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+
+    .km button:focus-visible,
+    .km-input:focus-visible,
+    .tb-kw-modal-close:focus-visible {
+      outline: 2px solid var(--tb-primary);
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .km-switch::after {
+        transition: none;
+      }
     }
 
     /* ============================================================
