@@ -119,8 +119,6 @@ body.tb-blockmode [data-tb-comment-id] [data-tb-comment-id] {
      there is assumed, not measured.
    Saturation raised once after testing on a dense feed (0.30 read too
    faint); keep it muted, not neon.
-   The keyword manager's preview (--tb-kw-mark in shadow-host.js) uses
-   the same colors.
    data-tb-theme is set on <html> by KeywordHighlighter from Threads'
    own background, not the OS preference.
    ============================================================ */

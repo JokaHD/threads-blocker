@@ -135,8 +135,6 @@ function getExtensionStyles() {
       --tb-warn-text: #d9b37a;
       --tb-danger-text: #e3a0a0;
       --tb-danger-line: #5a3434;
-      /* Same amber as ::highlight(tb-keyword) in content.css */
-      --tb-kw-mark: rgba(230, 170, 40, 0.38);
     }
 
     /* Light theme */
@@ -151,7 +149,6 @@ function getExtensionStyles() {
         --tb-warn-text: #9a6a1c;
         --tb-danger-text: #a33a3a;
         --tb-danger-line: #e6bcbc;
-        --tb-kw-mark: rgba(245, 190, 50, 0.5);
       }
     }
 
@@ -693,15 +690,7 @@ function getExtensionStyles() {
       width: 64px;
     }
 
-    /* Keyword previewed with the in-page highlight (amber background) */
-    .km-kw {
-      padding: 1px 2px;
-      border-radius: 2px;
-      background: var(--tb-kw-mark);
-    }
-
     .km-row--off .km-kw {
-      background: none;
       color: var(--tb-text-muted);
     }
 
